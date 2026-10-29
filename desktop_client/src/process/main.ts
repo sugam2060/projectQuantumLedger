@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import { registerOnboardingHandlers } from './utils/onboarding';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -12,8 +13,15 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    icon: path.join(
+      __dirname,
+      '../../assets',
+      process.platform === 'win32' ? 'fortis.ico' : 'fortis.png',
+    ),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
     },
   });
 
@@ -34,6 +42,7 @@ const createWindow = () => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  registerOnboardingHandlers();
   createWindow();
 
   // On OS X it's common to re-create a window in the app when the
