@@ -31,6 +31,40 @@
 $ npm install
 ```
 
+## Database, cache, and messaging
+
+The backend uses PostgreSQL through Drizzle ORM, Redis through ioredis, and
+RabbitMQ through amqplib. The supplied `.env.example` connection URLs are copied
+into `.env` for local development. Run migrations and start the backend from
+this directory:
+
+```bash
+npm run db:generate
+npm run db:migrate
+npm run start:dev
+```
+
+`docker-compose.yml` is available when you want to run the infrastructure
+locally; in that case, set the three connection URLs in `.env` to the local
+addresses and credentials from that Compose file. Named volumes retain local
+service data. RabbitMQ management UI is available at http://localhost:15672
+(user/password: `quantum` / `quantum`). `DatabaseModule`, `RedisService`, and
+`RabbitMQService` are global Nest providers. Inject `DatabaseService` and use
+its shared `db` client for Drizzle queries; `DATABASE` remains available as a
+direct Drizzle client token. Inject `RedisService` for Redis commands and
+`RabbitMQService` to publish or consume JSON messages from durable queues.
+Define each table in its own file under `src/database/schema/` and export it
+from `src/database/schema.ts` before generating migrations. PostgreSQL pool
+defaults are 20 connections per backend process,
+30 seconds idle timeout, and 5 seconds connection timeout; tune with
+`DB_POOL_MAX`, `DB_POOL_IDLE_TIMEOUT_MS`, `DB_POOL_CONNECTION_TIMEOUT_MS`, and
+`DB_POOL_MAX_USES` while keeping the total across replicas within the database
+connection limit.
+
+Local Compose credentials are for development only. Set strong credentials and
+the matching `DATABASE_URL`, `REDIS_URL`, and `RABBITMQ_URL` in deployed
+environments.
+
 ## Compile and run the project
 
 ```bash
