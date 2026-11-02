@@ -6,6 +6,7 @@ import {ConfigModule} from "@nestjs/config"
 import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './redis/redis.module';
 import { RabbitMQModule } from './rabbitmq/rabbitmq.module';
+import { AuthModule } from './auth/auth.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -24,6 +25,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     DatabaseModule,
     RedisModule,
     RabbitMQModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

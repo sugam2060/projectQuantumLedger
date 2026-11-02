@@ -1,0 +1,28 @@
+---
+description: "Test-Driven Development Workflow"
+globs: ["src/**/*.ts", "test/**/*.ts"]
+alwaysApply: false
+---
+# TDD Workflow
+
+Follow this mandatory order for every new API:
+
+1. **Service Unit Tests** (`*.service.spec.ts`)
+   - Mock all dependencies
+   - Cover success, edge, and error paths
+
+2. **Controller Unit Tests** (`*.controller.spec.ts`)
+   - Include related guards, pipes, interceptors, middleware
+
+3. **End-to-End Tests** (`test/*.e2e-spec.ts`)
+   - Full request → response against real app module
+   - Cover auth, validation failures, error cases
+
+4. **Verify Test Failures**
+   - Run tests and confirm they fail for the right reason
+
+5. **Implementation**
+   - Create DTOs, service, controller, supporting pieces
+   - Continue until all tests pass
+
+Never modify a test just to make it pass unless the test is wrong.
