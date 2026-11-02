@@ -61,9 +61,63 @@ defaults are 20 connections per backend process,
 `DB_POOL_MAX_USES` while keeping the total across replicas within the database
 connection limit.
 
+The initial tenant/access schema includes businesses, branches, users,
+memberships, invitations, endpoint permissions, role templates, and role
+assignments. A branch-scoped template can be reused by assigning it to
+different members with different `branch_id` values in `membership_roles`; a
+global template uses a null `branch_id` and applies to all business branches.
+invitations carry the selected template and optional branch scope so those
+assignments can be created when the invite is accepted. This is schema support;
+permission codes still need to be seeded and invitation endpoints implemented.
+The auth module provides reusable role and permission guards; apply them on
+protected feature routes.
+
 Local Compose credentials are for development only. Set strong credentials and
 the matching `DATABASE_URL`, `REDIS_URL`, and `RABBITMQ_URL` in deployed
 environments.
+
+## Authentication
+
+Authentication is available for existing active users with a bcrypt password
+hash. Set `JWT_SECRET` to at least 32 random bytes (generate one with the
+command shown in `.env.example`). `POST /api/v1/auth/login` requires
+`X-Client-Type: desktop`, `mobile`, or `web`; the JSON body accepts `email`,
+`password`, and optional `deviceLabel`. Public registration is intentionally
+not enabled.
+
+Desktop and mobile clients receive an HS256 bearer access JWT (15 minutes),
+opaque base64url refresh token (48-hour Redis session), and the user and
+membership summary in the response body. Only a SHA-256 hash of the refresh
+secret is stored in Redis. `POST /api/v1/auth/refresh` rotates the refresh
+token and issues a new access token; send the refresh token in the request
+body for desktop/mobile clients. Reuse of a rotated token is rejected.
+`POST /api/v1/auth/logout` revokes the managed session. Protected routes use
+`Authorization: Bearer <access-token>`.
+
+Web clients receive `HttpOnly`, `SameSite=Strict` access and refresh cookies
+instead of token values in the response body. Cookies are `Secure` in
+production; the access cookie is scoped to `/api/v1` and the refresh cookie to
+`/api/v1/auth/refresh`. Use a same-site frontend/API deployment (or a same-origin
+proxy). If using separate origins, configure explicit credentialed CORS and
+review the cookie/CSRF policy for those origins.
+
+Login is rate-limited to 10 attempts per IP per 60 seconds using shared Redis
+state and returns `429` with `Retry-After` when exceeded. Configure the
+deployment's trusted proxy addresses deliberately so Express reports the
+client IP correctly; forwarded headers are not trusted automatically.
+
+JWTs include role and permission claims scoped to each business and branch.
+Use `@UseGuards(JwtAuthGuard, AccessControlGuard)` with `@RequireRoles(...)`
+and/or `@RequirePermissions(...)` on protected handlers. The guard checks the
+business and optional branch from route parameters or `X-Business-ID` and
+`X-Branch-ID` headers. Branch-scoped grants do not authorize a different
+branch or an unscoped business-wide request. Permission changes take effect
+when the access token expires or is refreshed.
+
+The login lookup runs in a transaction-local platform-access context so RLS
+can return the user's active memberships and grants. The auth service sets this
+context only inside short-lived read transactions; never derive it from request
+input. Apply the generated Drizzle migration before deploying this version.
 
 ## Compile and run the project
 

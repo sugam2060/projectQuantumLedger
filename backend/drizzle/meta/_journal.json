@@ -5,8 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1793379899614,
-      "tag": "0000_first_grim_reaper",
+      "when": 1793616398003,
+      "tag": "0000_bumpy_ben_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793616885196,
+      "tag": "0001_absent_thunderbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793625385107,
+      "tag": "0002_goofy_leopardon",
       "breakpoints": true
     }
   ]
