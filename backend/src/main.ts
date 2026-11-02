@@ -7,9 +7,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {instrument: ObserveInstrument});
   app.setGlobalPrefix("/api/v1", {
     exclude: [
-      {path: "health/(.*)", method: RequestMethod.ALL},
-      {path: "metrics/(.*)", method: RequestMethod.ALL},
-      {path: "webhooks/(.*)", method: RequestMethod.ALL}
+      {path: "health/{*path}", method: RequestMethod.ALL},
+      {path: "metrics/{*path}", method: RequestMethod.ALL},
+      {path: "webhooks/{*path}", method: RequestMethod.ALL}
     ]
   })
   const config = app.get(ConfigService)

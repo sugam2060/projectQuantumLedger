@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "nestjs-architecture-principles": {
+      "source": "amirtaherkhani/nestjs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nestjs-architecture-principles/SKILL.md",
+      "computedHash": "995dfb060b87cd4811373c5bcdcbe96bfd5474dbdd3a96115c0646c9a9bd2714"
+    },
+    "nestjs-code-audit": {
+      "source": "amirtaherkhani/nestjs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nestjs-code-audit/SKILL.md",
+      "computedHash": "e717133ad0538151724cbc4d3b1c3355041169625689742d10c7101859ead963"
+    },
+    "nestjs-feature-audit": {
+      "source": "amirtaherkhani/nestjs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nestjs-feature-audit/SKILL.md",
+      "computedHash": "08c669df05d5d2538fac26c6e0ebca6c757f09b5b9254527a660af7527ec4c0a"
+    },
+    "nestjs-features-performance": {
+      "source": "amirtaherkhani/nestjs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nestjs-features-performance/SKILL.md",
+      "computedHash": "66371534c1b68b01429679eb2795286ddd262dfbbc9bb88802e9a40ff161591e"
+    },
+    "nestjs-git-commit-pr-message": {
+      "source": "amirtaherkhani/nestjs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nestjs-git-commit-pr-message/SKILL.md",
+      "computedHash": "9a6e8bdd9008c4502176e6161c62aaa170eddf76cd084721e44d85b964852abb"
+    },
+    "nestjs-oop-design-patterns": {
+      "source": "amirtaherkhani/nestjs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nestjs-oop-design-patterns/SKILL.md",
+      "computedHash": "27de7e166e38f221707ebd2680fe7a04e5e45b234f4f757933ade6ac0872a139"
+    },
+    "nestjs-professional-software-engineering": {
+      "source": "amirtaherkhani/nestjs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nestjs-professional-software-engineering/SKILL.md",
+      "computedHash": "88d859f8a388dd1261abdc3c003e7eac8daa987b843466dac4fd2f58ed56985a"
+    }
+  }
+}

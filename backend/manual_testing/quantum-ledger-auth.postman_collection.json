@@ -1,0 +1,1648 @@
+{
+  "info": {
+    "_postman_id": "4da113a1-40d0-41fb-8d16-11f4bca25af4",
+    "name": "Quantum Ledger - Auth API Manual Tests",
+    "description": "Manual and Collection Runner checks for the implemented auth API. Import this file into Postman, set authEmail and authPassword to an existing active user, clear stale Postman cookies, then run the Desktop, Web, and Mobile workflows. baseUrl defaults to http://localhost:3000/api/v1. The dedicated sliding-window folder must be run separately after no login attempts from your IP for at least 60 seconds; it loops 11 requests and expects the first 10 to reach DTO validation and the 11th to return 429. Rate limiting counts invalid login requests too. The current backend exposes no feature endpoint decorated with RequireRoles/RequirePermissions and AccessControlGuard, so role/permission enforcement on a feature route cannot yet be exercised here; the desktop login test inspects those claims in the JWT. Use a disposable test account and a non-production backend.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "authEmail",
+      "value": "replace-with-existing-active-user@example.com",
+      "type": "string"
+    },
+    {
+      "key": "authPassword",
+      "value": "replace-with-valid-test-password",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "previousRefreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "revokedAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "mobileAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "mobileRefreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "logoutAllDesktopAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "logoutAllMobileAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rateLimitAttempt",
+      "value": "0",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Desktop bearer-token session (run in order)",
+      "description": "Run these requests in order using Collection Runner. The captured refresh token is rotated, its replay is rejected, and logout revokes the active session.",
+      "item": [
+        {
+          "name": "Desktop - login and inspect JWT claims",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "desktop"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"password\": \"{{authPassword}}\",\n  \"deviceLabel\": \"Postman-Desktop-Test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Requires an existing active user with tenant membership and a valid password."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login succeeds with 200 and disables caching', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.response.to.have.header('Cache-Control', 'no-store');",
+                  "  pm.response.to.have.header('Pragma', 'no-cache');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Response includes tokens, expiry, user, and memberships', function () {",
+                  "  pm.expect(body.tokenType).to.eql('Bearer');",
+                  "  pm.expect(body.expiresIn).to.eql(900);",
+                  "  pm.expect(body.accessToken).to.be.a('string');",
+                  "  pm.expect(body.refreshToken).to.match(/^[A-Za-z0-9_-]{64}$/);",
+                  "  pm.expect(body.user.id).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.user.email).to.eql(pm.variables.get('authEmail'));",
+                  "  pm.expect(body.memberships).to.be.an('array');",
+                  "  body.memberships.forEach(function (membership) {",
+                  "    pm.expect(membership.businessId).to.be.a('string').and.not.empty;",
+                  "    pm.expect(membership.branchIds).to.be.an('array');",
+                  "  });",
+                  "});",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "pm.collectionVariables.set('userId', body.user.id);",
+                  "function decodeJwtPayload(token) {",
+                  "  const encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+                  "  return JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '=')));",
+                  "}",
+                  "pm.test('JWT includes scoped role and permission claims and expires in 15 minutes', function () {",
+                  "  const payload = decodeJwtPayload(body.accessToken);",
+                  "  pm.expect(payload.sub).to.eql(body.user.id);",
+                  "  pm.expect(payload.email).to.eql(body.user.email);",
+                  "  pm.expect(payload.jti).to.be.a('string').and.not.empty;",
+                  "  pm.expect(payload.roles).to.be.an('array');",
+                  "  pm.expect(payload.permissions).to.be.an('array');",
+                  "  pm.expect(payload.memberships).to.be.an('array');",
+                  "  pm.expect(payload.iat).to.be.a('number');",
+                  "  pm.expect(payload.exp - payload.iat).to.eql(900);",
+                  "  pm.expect(payload.iss).to.eql('quantum-ledger');",
+                  "  pm.expect(payload.aud).to.eql('quantum-ledger-api');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desktop - profile requires authentication",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Call without Authorization header or cookies. Confirms protected route rejects anonymous callers."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unauthenticated profile request is rejected', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desktop - access protected profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Valid bearer token accesses profile', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.eql({",
+                  "    userId: pm.collectionVariables.get('userId'),",
+                  "    email: pm.variables.get('authEmail')",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh - reject client type mismatch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "mobile"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "The refresh token was created for a desktop session and must not be accepted as a mobile refresh."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Refresh token is bound to its original client type', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desktop - rotate refresh token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "desktop"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('previousRefreshToken', pm.collectionVariables.get('refreshToken'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Refresh rotates both tokens and preserves the session summary', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.accessToken).to.be.a('string');",
+                  "  pm.expect(body.refreshToken).to.match(/^[A-Za-z0-9_-]{64}$/);",
+                  "  pm.expect(body.refreshToken).not.to.eql(pm.collectionVariables.get('previousRefreshToken'));",
+                  "  pm.expect(body.expiresIn).to.eql(900);",
+                  "  pm.expect(body.user.id).to.eql(pm.collectionVariables.get('userId'));",
+                  "  pm.expect(body.tokenType).to.eql('Bearer');",
+                  "  pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desktop - reject replayed refresh token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "desktop"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{previousRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('A rotated refresh token cannot be replayed', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desktop - logout revokes active session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('revokedAccessToken', pm.collectionVariables.get('accessToken'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout returns 204 with no response body', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "  pm.expect(pm.response.text()).to.eql('');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desktop - revoked access token is rejected",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{revokedAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout immediately invalidates the access token session', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desktop - revoked refresh token is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "desktop"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout revokes the refresh token too', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Web cookie session (run in order)",
+      "description": "Postman stores and sends the HttpOnly cookies automatically. Run this folder in order; web refresh uses the refresh cookie rather than a body token.",
+      "item": [
+        {
+          "name": "Web - login sets HttpOnly cookies and omits body tokens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "web"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"password\": \"{{authPassword}}\",\n  \"deviceLabel\": \"Postman-Web-Test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Web login succeeds without returning tokens in JSON', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.tokenType).to.eql('Bearer');",
+                  "  pm.expect(body.expiresIn).to.eql(900);",
+                  "  pm.expect(body).not.to.have.property('accessToken');",
+                  "  pm.expect(body).not.to.have.property('refreshToken');",
+                  "  pm.expect(body.user.email).to.eql(pm.variables.get('authEmail'));",
+                  "});",
+                  "const cookies = pm.response.headers.all().filter(function (header) { return header.key.toLowerCase() === 'set-cookie'; }).map(function (header) { return header.value; }).join(';');",
+                  "pm.test('Web login sets both HttpOnly SameSite=Strict cookies', function () {",
+                  "  pm.expect(cookies).to.include('access_token=');",
+                  "  pm.expect(cookies).to.include('refresh_token=');",
+                  "  pm.expect(cookies).to.include('HttpOnly');",
+                  "  pm.expect(cookies).to.include('SameSite=Strict');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Web - cookie authenticates profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Postman should send the access_token cookie from the preceding login automatically."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cookie-authenticated profile returns the test user', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().email).to.eql(pm.variables.get('authEmail'));",
+                  "  pm.expect(pm.response.json().userId).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Web - refresh rotates cookie pair",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "web"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "The cookie jar should send refresh_token for this path; the response rotates both cookies."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Web refresh succeeds without exposing tokens in JSON', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).not.to.have.property('accessToken');",
+                  "  pm.expect(body).not.to.have.property('refreshToken');",
+                  "  pm.expect(body.expiresIn).to.eql(900);",
+                  "});",
+                  "const cookies = pm.response.headers.all().filter(function (header) { return header.key.toLowerCase() === 'set-cookie'; }).map(function (header) { return header.value; }).join(';');",
+                  "pm.test('Refresh response rotates both auth cookies', function () {",
+                  "  pm.expect(cookies).to.include('access_token=');",
+                  "  pm.expect(cookies).to.include('refresh_token=');",
+                  "  pm.expect(cookies).to.include('HttpOnly');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Web - logout clears cookie session",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Postman sends access_token automatically; logout revokes the session and expires both cookies."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Web logout succeeds and clears cookies', function () {",
+                  "  pm.response.to.have.status(204);",
+                  "  const cookies = pm.response.headers.all().filter(function (header) { return header.key.toLowerCase() === 'set-cookie'; }).map(function (header) { return header.value; }).join(';');",
+                  "  pm.expect(cookies).to.include('access_token=');",
+                  "  pm.expect(cookies).to.include('refresh_token=');",
+                  "  pm.expect(cookies).to.match(/(Max-Age=0|Expires=Thu, 01 Jan 1970)/i);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Web - profile is rejected after logout",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logged-out web cookie session cannot access profile', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mobile bearer-token session (run in order)",
+      "description": "Confirms mobile clients receive tokens in JSON and may omit the optional deviceLabel.",
+      "item": [
+        {
+          "name": "Mobile - login without optional deviceLabel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "mobile"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"password\": \"{{authPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Mobile login returns bearer tokens and accepts omitted deviceLabel', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.tokenType).to.eql('Bearer');",
+                  "  pm.expect(body.expiresIn).to.eql(900);",
+                  "  pm.expect(body.accessToken.split('.')).to.have.length(3);",
+                  "  pm.expect(body.refreshToken).to.match(/^[A-Za-z0-9_-]{64}$/);",
+                  "  pm.expect(body.user.email).to.eql(pm.variables.get('authEmail'));",
+                  "  pm.collectionVariables.set('mobileAccessToken', body.accessToken);",
+                  "  pm.collectionVariables.set('mobileRefreshToken', body.refreshToken);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mobile - bearer token accesses profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mobileAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Mobile bearer token accesses profile', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().email).to.eql(pm.variables.get('authEmail'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mobile - refresh token can be rotated",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "mobile"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{mobileRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Mobile refresh returns a new refresh token', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.refreshToken).to.match(/^[A-Za-z0-9_-]{64}$/);",
+                  "  pm.expect(body.refreshToken).not.to.eql(pm.collectionVariables.get('mobileRefreshToken'));",
+                  "  pm.collectionVariables.set('mobileRefreshToken', body.refreshToken);",
+                  "  pm.collectionVariables.set('mobileAccessToken', body.accessToken);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Logout all sessions (run in order)",
+      "description": "Run this folder separately with Collection Runner using a disposable test account. It creates desktop and mobile sessions, verifies x-client-type is required, revokes all sessions with POST /auth/logout-all, then verifies both access tokens are rejected. The endpoint revokes the calling session too, so use fresh logins for another run.",
+      "item": [
+        {
+          "name": "Logout all - create desktop session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "desktop"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"password\": \"{{authPassword}}\",\n  \"deviceLabel\": \"Postman-Logout-All-Desktop\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Desktop login succeeds for logout-all workflow', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.collectionVariables.set('logoutAllDesktopAccessToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout all - create mobile session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "mobile"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"password\": \"{{authPassword}}\",\n  \"deviceLabel\": \"Postman-Logout-All-Mobile\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Mobile login succeeds for logout-all workflow', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.collectionVariables.set('logoutAllMobileAccessToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout all - client type header is required",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{logoutAllDesktopAccessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Lost device\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout-all"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing x-client-type is rejected', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout all - revoke every user session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{logoutAllDesktopAccessToken}}"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "desktop"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Lost device\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout-all"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout-all returns the documented success response', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.eql({ revoked: true });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout all - desktop session is revoked",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{logoutAllDesktopAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout-all invalidates the calling desktop session', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout all - mobile session is revoked",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{logoutAllMobileAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout-all invalidates sessions on other client types', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Validation and authentication failures",
+      "description": "These login requests count toward the per-IP login rate limit.",
+      "item": [
+        {
+          "name": "Login - wrong password returns generic 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "desktop"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"password\": \"DefinitelyWrong-Manual-Test-Password-987\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Wrong credentials return generic unauthorized response', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().message).to.eql('Invalid email or password');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - invalid body returns 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "mobile"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Malformed login input is rejected by validation', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - unsupported client type returns 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "server"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"password\": \"{{authPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unsupported client type is rejected', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - missing client type returns 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{authEmail}}\",\n  \"password\": \"{{authPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing client type is rejected', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh - missing token returns 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "desktop"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing refresh token is unauthorized', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh - malformed token returns 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "desktop"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"not-a-valid-refresh-token\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Malformed refresh token is unauthorized', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Profile - malformed bearer token returns 401",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer not-a-jwt"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Malformed JWT is unauthorized', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout - unauthenticated request returns 401",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout requires an authenticated session', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rate limit - sliding-window threshold (run separately)",
+      "description": "Run this folder with Collection Runner only, after waiting at least 60 seconds without any login requests from the same IP. It sends invalid-but-well-formedly-routed login attempts: 10 must reach DTO validation (400), then attempt 11 must return 429 with Retry-After between 1 and 60 seconds. If the run is interrupted, reset collection variable rateLimitAttempt to 0.",
+      "item": [
+        {
+          "name": "Rate limit - probe login threshold",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "desktop"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Collection Runner loops this request to verify the 10-per-60-second per-IP limit. Do not use the single-request Send button."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const attempt = Number(pm.collectionVariables.get('rateLimitAttempt') || '0') + 1;",
+                  "pm.collectionVariables.set('rateLimitAttempt', String(attempt));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const attempt = Number(pm.collectionVariables.get('rateLimitAttempt') || '0');",
+                  "if (attempt <= 10) {",
+                  "  pm.test('Attempt ' + attempt + ' remains below the rate limit', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Attempt 11 is rate limited with Retry-After', function () {",
+                  "    pm.response.to.have.status(429);",
+                  "    const retryAfter = Number(pm.response.headers.get('Retry-After'));",
+                  "    pm.expect(retryAfter).to.be.within(1, 60);",
+                  "    pm.expect(pm.response.json().message).to.eql('Too many login attempts');",
+                  "  });",
+                  "}",
+                  "if (attempt < 11 && pm.response.code !== 429) {",
+                  "  pm.execution.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  pm.collectionVariables.set('rateLimitAttempt', '0');",
+                  "  pm.execution.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

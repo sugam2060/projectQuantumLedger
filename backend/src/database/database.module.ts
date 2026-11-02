@@ -1,23 +1,14 @@
 import { Global, Module } from '@nestjs/common';
 import { DatabaseService } from './database.service';
+import { databaseProviders, DATABASE, DATABASE_POOL } from './database.providers';
 
-export const DATABASE = Symbol('DATABASE');
-export const DATABASE_POOL = Symbol('DATABASE_POOL');
+export { DATABASE, DATABASE_POOL };
 
 @Global()
 @Module({
   providers: [
     DatabaseService,
-    {
-      provide: DATABASE_POOL,
-      inject: [DatabaseService],
-      useFactory: (database: DatabaseService) => database.pool,
-    },
-    {
-      provide: DATABASE,
-      inject: [DatabaseService],
-      useFactory: (database: DatabaseService) => database.db,
-    },
+    ...databaseProviders,
   ],
   exports: [DatabaseService, DATABASE, DATABASE_POOL],
 })

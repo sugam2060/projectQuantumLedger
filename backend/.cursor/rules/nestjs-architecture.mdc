@@ -1,0 +1,29 @@
+---
+description: "NestJS Architecture Rules for Quantum Ledger"
+globs: ["src/**/*.ts"]
+alwaysApply: true
+---
+# NestJS Architecture Rules
+
+Follow these core principles when working with NestJS in Quantum Ledger:
+
+## Separation of Concerns
+- Business logic lives only in `.service.ts` files
+- API endpoints live only in `.controller.ts` files
+- Use DTOs for all request bodies, queries, and parameters
+
+## NestJS Building Blocks
+- DTOs: Use `class-validator` / `class-transformer`
+- Pipes: Validation/transformation (`ValidationPipe` globally)
+- Guards: Authentication and authorization
+- Interceptors: Cross-cutting concerns (logging, caching, etc.)
+- Middleware: Request-level processing (IDs, rate limiting)
+- Exception filters: Consistent error responses
+
+## Dependency Management
+- Inject dependencies via constructors
+- Config from `ConfigModule` only
+- Strict typing: no `any`
+- Multi-step DB writes in transactions
+
+For complete guidelines, see AGENTS.md.
