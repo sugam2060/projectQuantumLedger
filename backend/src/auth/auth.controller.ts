@@ -24,6 +24,7 @@ import {
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { LoginDto } from './dto/login.dto';
+import { LogoutAllDto } from './dto/logout-all.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ClientTypeHeader, ClientTypePipe } from './pipes/client-type.pipe';
@@ -96,6 +97,38 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
     await this.authService.logout(user.sessionId);
+    this.clearAuthCookies(response);
+  }
+
+  @Post('logout-all')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async logoutAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @ClientTypeHeader(ClientTypePipe) clientType: ClientType,
+    @Res({ passthrough: true }) response: Response,
+    @Body() body?: LogoutAllDto,
+  ): Promise<{ revoked: true }> {
+    await this.authService.logoutAll(user.userId, body?.reason);
+
+    if (clientType === 'web') {
+      this.clearAuthCookies(response);
+    }
+
+    return { revoked: true };
+  }
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  profile(@CurrentUser() user: AuthenticatedUser) {
+    return {
+      userId: user.userId,
+      email: user.email,
+    };
+  }
+
+  private clearAuthCookies(response: Response): void {
     response.clearCookie(ACCESS_TOKEN_COOKIE, {
       httpOnly: true,
       secure: this.shouldUseSecureCookies(),
@@ -108,15 +141,6 @@ export class AuthController {
       sameSite: 'strict',
       path: REFRESH_COOKIE_PATH,
     });
-  }
-
-  @Get('profile')
-  @UseGuards(JwtAuthGuard)
-  profile(@CurrentUser() user: AuthenticatedUser) {
-    return {
-      userId: user.userId,
-      email: user.email,
-    };
   }
 
   private setAuthCookies(

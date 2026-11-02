@@ -5,6 +5,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
+  accessAuditEvents,
   branchAssignments,
   branches,
   businessMemberships,
@@ -156,6 +157,16 @@ export class AuthService {
 
   async logout(sessionId: string): Promise<void> {
     await this.authSessionService.revoke(sessionId);
+  }
+
+  async logoutAll(userId: string, reason?: string): Promise<void> {
+    await this.authSessionService.revokeAll(userId);
+    await this.databaseService.db.insert(accessAuditEvents).values({
+      actorUserId: userId,
+      targetUserId: userId,
+      action: 'auth.logout_all',
+      reason: reason ?? null,
+    });
   }
 
   private async createSession(

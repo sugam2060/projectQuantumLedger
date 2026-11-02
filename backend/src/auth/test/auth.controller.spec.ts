@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { AuthController } from '../auth.controller';
 import { AuthService } from '../auth.service';
+import type { AuthenticatedUser } from '../authenticated-user.interface';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { ClientTypePipe } from '../pipes/client-type.pipe';
 
@@ -12,6 +13,7 @@ describe('AuthController', () => {
     login: jest.fn(),
     refresh: jest.fn(),
     logout: jest.fn(),
+    logoutAll: jest.fn(),
   };
   const responseMock = {
     cookie: jest.fn(),
@@ -55,6 +57,7 @@ describe('AuthController', () => {
     controller = module.get<AuthController>(AuthController);
     authService.login.mockResolvedValue(result);
     authService.refresh.mockResolvedValue(result);
+    authService.logoutAll.mockResolvedValue(undefined);
   });
 
   it('returns tokens and memberships to a desktop client without setting cookies', async () => {
@@ -116,5 +119,52 @@ describe('AuthController', () => {
     expect(authService.refresh).toHaveBeenCalledWith(result.refreshToken, {
       clientType: 'mobile',
     });
+  });
+
+  it('revokes all of the current user sessions and returns a success flag', async () => {
+    const user = {
+      userId: result.user.id,
+      sessionId: 'current-session',
+      email: result.user.email,
+      roles: [],
+      permissions: [],
+      memberships: [],
+    } satisfies AuthenticatedUser;
+
+    await expect(
+      controller.logoutAll(user, 'desktop', response, {
+        reason: 'Lost device',
+      }),
+    ).resolves.toEqual({ revoked: true });
+
+    expect(authService.logoutAll).toHaveBeenCalledWith(
+      user.userId,
+      'Lost device',
+    );
+  });
+
+  it('clears browser cookies after revoking sessions for a web client', async () => {
+    const user = {
+      userId: result.user.id,
+      sessionId: 'current-session',
+      email: result.user.email,
+      roles: [],
+      permissions: [],
+      memberships: [],
+    } satisfies AuthenticatedUser;
+
+    await controller.logoutAll(user, 'web', response);
+
+    expect(responseMock.clearCookie).toHaveBeenCalledTimes(2);
+    expect(responseMock.clearCookie).toHaveBeenNthCalledWith(
+      1,
+      'access_token',
+      expect.objectContaining({ path: '/api/v1' }),
+    );
+    expect(responseMock.clearCookie).toHaveBeenNthCalledWith(
+      2,
+      'refresh_token',
+      expect.objectContaining({ path: '/api/v1/auth/refresh' }),
+    );
   });
 });

@@ -24,8 +24,10 @@ describe('AuthService', () => {
   const database = {
     db: {
       transaction: jest.fn(),
+      insert: jest.fn(),
     },
   };
+  const auditValues = jest.fn();
   const jwtService = {
     signAsync: jest.fn(),
   };
@@ -35,6 +37,7 @@ describe('AuthService', () => {
     rotate: jest.fn(),
     isActive: jest.fn(),
     revoke: jest.fn(),
+    revokeAll: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -47,10 +50,13 @@ describe('AuthService', () => {
         ) => Promise<unknown>,
       ) => callback(createTransaction([[user], [], []])),
     );
+    database.db.insert.mockReturnValue({ values: auditValues });
+    auditValues.mockResolvedValue(undefined);
     jwtService.signAsync.mockResolvedValue('signed-access-token');
     authSessionService.create.mockResolvedValue(undefined);
     authSessionService.get.mockResolvedValue(null);
     authSessionService.rotate.mockResolvedValue(true);
+    authSessionService.revokeAll.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -188,6 +194,21 @@ describe('AuthService', () => {
     await expect(
       service.refresh(refreshToken, { clientType: 'desktop' }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('revokes every user session and records the optional reason', async () => {
+    await expect(
+      service.logoutAll(user.id, 'Lost device'),
+    ).resolves.toBeUndefined();
+
+    expect(authSessionService.revokeAll).toHaveBeenCalledWith(user.id);
+    expect(database.db.insert).toHaveBeenCalled();
+    expect(auditValues).toHaveBeenCalledWith({
+      actorUserId: user.id,
+      targetUserId: user.id,
+      action: 'auth.logout_all',
+      reason: 'Lost device',
+    });
   });
 });
 

@@ -38,9 +38,12 @@ describe('Authentication (e2e)', () => {
   const database = {
     db: {
       transaction: jest.fn(),
+      insert: jest.fn(),
     },
   };
+  const auditValues = jest.fn();
   const redisState = new Map<string, string>();
+  const sessionIndexes = new Map<string, Set<string>>();
   const rateAttempts = new Map<string, number[]>();
   const redis = {
     client: {
@@ -62,6 +65,17 @@ describe('Authentication (e2e)', () => {
       get: jest.fn(async (key: string) => redisState.get(key) ?? null),
       exists: jest.fn(async (key: string) => Number(redisState.has(key))),
       del: jest.fn(async (key: string) => Number(redisState.delete(key))),
+      scan: jest.fn(async () => ['0', []]),
+      mget: jest.fn(async (...keys: string[]) =>
+        keys.map((key) => redisState.get(key) ?? null),
+      ),
+      sadd: jest.fn(async (key: string, ...members: string[]) => {
+        const index = sessionIndexes.get(key) ?? new Set<string>();
+        const previousSize = index.size;
+        members.forEach((member) => index.add(member));
+        sessionIndexes.set(key, index);
+        return index.size - previousSize;
+      }),
       eval: jest.fn(
         async (
           script: string,
@@ -80,16 +94,47 @@ describe('Authentication (e2e)', () => {
             if (activeAttempts.length >= limit) {
               return [
                 0,
-                Math.max(
-                  1,
-                  activeAttempts[0] + windowMilliseconds - now,
-                ),
+                Math.max(1, activeAttempts[0] + windowMilliseconds - now),
               ];
             }
 
             activeAttempts.push(now);
             rateAttempts.set(key, activeAttempts);
             return [1, 0];
+          }
+
+          if (script.includes('SMEMBERS')) {
+            const sessions = sessionIndexes.get(key) ?? new Set<string>();
+            for (const sessionId of sessions) {
+              redisState.delete(`auth:session:${sessionId}`);
+            }
+            sessionIndexes.delete(key);
+            return sessions.size;
+          }
+
+          if (script.includes('SREM')) {
+            const serialized = redisState.get(key);
+            if (serialized) {
+              const session = JSON.parse(serialized) as { userId: string };
+              sessionIndexes
+                .get(`auth:user-sessions:${session.userId}`)
+                ?.delete(String(arguments_[0]));
+            }
+            return Number(redisState.delete(key));
+          }
+
+          if (script.includes("'NX'")) {
+            const indexKey = String(arguments_[0]);
+            const serialized = String(arguments_[1]);
+            const sessionId = String(arguments_[2]);
+            if (redisState.has(key)) {
+              return 0;
+            }
+            redisState.set(key, serialized);
+            const index = sessionIndexes.get(indexKey) ?? new Set<string>();
+            index.add(sessionId);
+            sessionIndexes.set(indexKey, index);
+            return 1;
           }
 
           const serialized = redisState.get(key);
@@ -108,6 +153,11 @@ describe('Authentication (e2e)', () => {
           }
           session.refreshTokenHash = String(arguments_[1]);
           redisState.set(key, JSON.stringify(session));
+          const indexKey = `auth:user-sessions:${session.userId}`;
+          const sessionId = key.slice('auth:session:'.length);
+          const index = sessionIndexes.get(indexKey) ?? new Set<string>();
+          index.add(sessionId);
+          sessionIndexes.set(indexKey, index);
           return 1;
         },
       ),
@@ -117,7 +167,10 @@ describe('Authentication (e2e)', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     redisState.clear();
+    sessionIndexes.clear();
     rateAttempts.clear();
+    database.db.insert.mockReturnValue({ values: auditValues });
+    auditValues.mockResolvedValue(undefined);
     compareMock.mockResolvedValue(true);
     database.db.transaction.mockImplementation(
       async (
@@ -213,7 +266,7 @@ describe('Authentication (e2e)', () => {
       .expect(401);
   });
 
-  it('sets only http-only cookies for web clients', async () => {
+  it('returns token metadata to web clients', async () => {
     const login = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .set('x-client-type', 'web')
@@ -226,6 +279,59 @@ describe('Authentication (e2e)', () => {
       user: { id: user.id, email: user.email },
       memberships: [{ businessId: 'business-one', branchIds: ['branch-one'] }],
     });
+  });
+
+  it('requires a client type and revokes every session for the authenticated user', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('x-client-type', 'desktop')
+      .send({ email: user.email, password: 'correct-password' })
+      .expect(200);
+    const secondLogin = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('x-client-type', 'mobile')
+      .send({ email: user.email, password: 'correct-password' })
+      .expect(200);
+    expect(secondLogin.body.accessToken).toEqual(expect.any(String));
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/logout-all')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .send({ reason: 'Lost device' })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/logout-all')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .set('x-client-type', 'desktop')
+      .send({ reason: 'Lost device' })
+      .expect(200)
+      .expect({ revoked: true });
+
+    expect(
+      [...redisState.keys()].filter((key) => key.startsWith('auth:session:')),
+    ).toHaveLength(0);
+    expect(auditValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: user.id,
+        targetUserId: user.id,
+        action: 'auth.logout_all',
+        reason: 'Lost device',
+      }),
+    );
+
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/profile')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .expect(401);
+  });
+
+  it('sets only http-only cookies for web clients', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('x-client-type', 'web')
+      .send({ email: user.email, password: 'correct-password' })
+      .expect(200);
     const setCookies = [login.headers['set-cookie']].flat();
     expect(setCookies).toHaveLength(2);
     expect(setCookies.join(';')).toContain('HttpOnly');
