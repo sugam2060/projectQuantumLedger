@@ -1,9 +1,13 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { DrizzleModule, getDrizzleToken } from '@nestjs/drizzle';
+import { DrizzleModule } from '@nestjs/drizzle';
 import { createDatabaseOptions } from './database.provider';
 import { DatabaseService } from './database.service';
+import { RequestContextService } from './request_context.service';
+import { RlsContextInterceptor } from './rls_context.interceptor';
 
+@Global()
 @Module({
   imports: [
     DrizzleModule.forRootAsync({
@@ -13,10 +17,11 @@ import { DatabaseService } from './database.service';
     }),
   ],
   providers: [
+    RequestContextService,
+    DatabaseService,
     {
-      provide: DatabaseService,
-      useFactory: (database: DatabaseService) => database,
-      inject: [getDrizzleToken()],
+      provide: APP_INTERCEPTOR,
+      useClass: RlsContextInterceptor,
     },
   ],
   exports: [DatabaseService, DrizzleModule],
