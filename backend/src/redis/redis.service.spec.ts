@@ -1,3 +1,5 @@
+import { jest as jestGlobal } from '@jest/globals';
+const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test, TestingModule } from '@nestjs/testing';
 import { RedisService } from './redis.service';
 import { REDIS_CLIENT } from './redis.config';
@@ -50,7 +52,7 @@ describe('RedisService', () => {
     service = module.get<RedisService>(RedisService);
 
     // Clear all mocks before each test
-    Object.values(mockRedisClient).forEach(mock => {
+    Object.values(mockRedisClient).forEach((mock) => {
       if (typeof mock === 'function') {
         mock.mockClear();
       }
@@ -77,7 +79,12 @@ describe('RedisService', () => {
 
       await service.set('test-key', 'test-value', 3600);
 
-      expect(mockRedisClient.set).toHaveBeenCalledWith('test-key', 'test-value', 'EX', 3600);
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        'test-key',
+        'test-value',
+        'EX',
+        3600,
+      );
     });
 
     it('should call redis.set without ttl when not provided', async () => {
@@ -85,7 +92,10 @@ describe('RedisService', () => {
 
       await service.set('test-key', 'test-value');
 
-      expect(mockRedisClient.set).toHaveBeenCalledWith('test-key', 'test-value');
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        'test-key',
+        'test-value',
+      );
     });
   });
 
@@ -144,7 +154,11 @@ describe('RedisService', () => {
 
       const result = await service.zadd('sorted-set-key', 100, 'member1');
 
-      expect(mockRedisClient.zadd).toHaveBeenCalledWith('sorted-set-key', 100, 'member1');
+      expect(mockRedisClient.zadd).toHaveBeenCalledWith(
+        'sorted-set-key',
+        100,
+        'member1',
+      );
       expect(result).toBe(1);
     });
   });
@@ -155,7 +169,11 @@ describe('RedisService', () => {
 
       const result = await service.zcount('sorted-set-key', 0, 100);
 
-      expect(mockRedisClient.zcount).toHaveBeenCalledWith('sorted-set-key', 0, 100);
+      expect(mockRedisClient.zcount).toHaveBeenCalledWith(
+        'sorted-set-key',
+        0,
+        100,
+      );
       expect(result).toBe(5);
     });
   });
@@ -166,7 +184,11 @@ describe('RedisService', () => {
 
       const result = await service.zremrangebyscore('sorted-set-key', 0, 100);
 
-      expect(mockRedisClient.zremrangebyscore).toHaveBeenCalledWith('sorted-set-key', 0, 100);
+      expect(mockRedisClient.zremrangebyscore).toHaveBeenCalledWith(
+        'sorted-set-key',
+        0,
+        100,
+      );
       expect(result).toBe(3);
     });
   });
@@ -197,7 +219,12 @@ describe('RedisService', () => {
 
       const result = await service.eval(script, 1, 'key1', 'arg1');
 
-      expect(mockRedisClient.eval).toHaveBeenCalledWith(script, 1, 'key1', 'arg1');
+      expect(mockRedisClient.eval).toHaveBeenCalledWith(
+        script,
+        1,
+        'key1',
+        'arg1',
+      );
       expect(result).toBe('script-result');
     });
   });
@@ -221,7 +248,11 @@ describe('RedisService', () => {
 
       const result = await service.setnx('test-key', 'test-value', 3600);
 
-      expect(mockRedisClient.set).toHaveBeenCalledWith('test-key', 'test-value', 'NX');
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        'test-key',
+        'test-value',
+        'NX',
+      );
       expect(mockRedisClient.expire).toHaveBeenCalledWith('test-key', 3600);
       expect(result).toBe(true);
     });
@@ -231,7 +262,11 @@ describe('RedisService', () => {
 
       const result = await service.setnx('test-key', 'test-value');
 
-      expect(mockRedisClient.set).toHaveBeenCalledWith('test-key', 'test-value', 'NX');
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        'test-key',
+        'test-value',
+        'NX',
+      );
       expect(result).toBe(false);
     });
   });
@@ -261,7 +296,11 @@ describe('RedisService', () => {
 
       const result = await service.hset('hash-key', 'field1', 'value1');
 
-      expect(mockRedisClient.hset).toHaveBeenCalledWith('hash-key', 'field1', 'value1');
+      expect(mockRedisClient.hset).toHaveBeenCalledWith(
+        'hash-key',
+        'field1',
+        'value1',
+      );
       expect(result).toBe(1);
     });
   });
@@ -291,7 +330,11 @@ describe('RedisService', () => {
 
       const result = await service.hincrby('hash-key', 'counter', 1);
 
-      expect(mockRedisClient.hincrby).toHaveBeenCalledWith('hash-key', 'counter', 1);
+      expect(mockRedisClient.hincrby).toHaveBeenCalledWith(
+        'hash-key',
+        'counter',
+        1,
+      );
       expect(result).toBe(5);
     });
   });
@@ -302,7 +345,11 @@ describe('RedisService', () => {
 
       const result = await service.hdel('hash-key', 'field1', 'field2');
 
-      expect(mockRedisClient.hdel).toHaveBeenCalledWith('hash-key', 'field1', 'field2');
+      expect(mockRedisClient.hdel).toHaveBeenCalledWith(
+        'hash-key',
+        'field1',
+        'field2',
+      );
       expect(result).toBe(2);
     });
   });
@@ -313,7 +360,10 @@ describe('RedisService', () => {
 
       const result = await service.hexists('hash-key', 'field1');
 
-      expect(mockRedisClient.hexists).toHaveBeenCalledWith('hash-key', 'field1');
+      expect(mockRedisClient.hexists).toHaveBeenCalledWith(
+        'hash-key',
+        'field1',
+      );
       expect(result).toBe(true);
     });
 
@@ -330,9 +380,17 @@ describe('RedisService', () => {
     it('should calculate minScore and call redis.zcount', async () => {
       mockRedisClient.zcount.mockResolvedValue(10);
 
-      const result = await service.getSlidingWindowCount('rate-limit-key', 60000, 100000);
+      const result = await service.getSlidingWindowCount(
+        'rate-limit-key',
+        60000,
+        100000,
+      );
 
-      expect(mockRedisClient.zcount).toHaveBeenCalledWith('rate-limit-key', 40000, 100000);
+      expect(mockRedisClient.zcount).toHaveBeenCalledWith(
+        'rate-limit-key',
+        40000,
+        100000,
+      );
       expect(result).toBe(10);
     });
   });
@@ -342,15 +400,27 @@ describe('RedisService', () => {
       const mockPipeline = {
         zadd: jest.fn().mockReturnThis(),
         expire: jest.fn().mockReturnThis(),
-        exec: jest.fn().mockResolvedValue([['OK', 1], ['OK', 1]]),
+        exec: jest.fn().mockResolvedValue([
+          ['OK', 1],
+          ['OK', 1],
+        ]),
       };
 
       mockRedisClient.pipeline.mockReturnValue(mockPipeline);
 
-      await service.addToSlidingWindow('rate-limit-key', 100000, 'member1', 3600);
+      await service.addToSlidingWindow(
+        'rate-limit-key',
+        100000,
+        'member1',
+        3600,
+      );
 
       expect(mockRedisClient.pipeline).toHaveBeenCalled();
-      expect(mockPipeline.zadd).toHaveBeenCalledWith('rate-limit-key', 100000, 'member1');
+      expect(mockPipeline.zadd).toHaveBeenCalledWith(
+        'rate-limit-key',
+        100000,
+        'member1',
+      );
       expect(mockPipeline.expire).toHaveBeenCalledWith('rate-limit-key', 3600);
       expect(mockPipeline.exec).toHaveBeenCalled();
     });
@@ -360,9 +430,17 @@ describe('RedisService', () => {
     it('should calculate minScore and call redis.zremrangebyscore', async () => {
       mockRedisClient.zremrangebyscore.mockResolvedValue(5);
 
-      const result = await service.cleanSlidingWindow('rate-limit-key', 60000, 100000);
+      const result = await service.cleanSlidingWindow(
+        'rate-limit-key',
+        60000,
+        100000,
+      );
 
-      expect(mockRedisClient.zremrangebyscore).toHaveBeenCalledWith('rate-limit-key', '-inf', 40000);
+      expect(mockRedisClient.zremrangebyscore).toHaveBeenCalledWith(
+        'rate-limit-key',
+        '-inf',
+        40000,
+      );
       expect(result).toBe(5);
     });
   });
@@ -384,7 +462,13 @@ describe('RedisService', () => {
 
       const result = await service.scan(0, 'pattern*', 50);
 
-      expect(mockRedisClient.scan).toHaveBeenCalledWith(0, 'MATCH', 'pattern*', 'COUNT', 50);
+      expect(mockRedisClient.scan).toHaveBeenCalledWith(
+        0,
+        'MATCH',
+        'pattern*',
+        'COUNT',
+        50,
+      );
       expect(result).toEqual([10, ['key1', 'key2']]);
     });
   });
@@ -451,7 +535,14 @@ describe('RedisService', () => {
       const keyValuePairs = { key1: 'value1', key2: 'value2', key3: 'value3' };
       const result = await service.mset(keyValuePairs);
 
-      expect(mockRedisClient.mset).toHaveBeenCalledWith('key1', 'value1', 'key2', 'value2', 'key3', 'value3');
+      expect(mockRedisClient.mset).toHaveBeenCalledWith(
+        'key1',
+        'value1',
+        'key2',
+        'value2',
+        'key3',
+        'value3',
+      );
       expect(result).toBe('OK');
     });
   });

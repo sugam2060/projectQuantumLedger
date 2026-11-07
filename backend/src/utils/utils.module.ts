@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { UtilsService } from './utils.service';
 import { RateLimitMiddleware } from './ratelimit.middleware';
-import { RateLimitKeyGenerator, RateLimitKeyGeneratorOptions } from './rate-limit-key.generator';
+import {
+  RateLimitKeyGenerator,
+  RateLimitKeyGeneratorOptions,
+} from './rate-limit-key.generator';
 
 @Module({
   providers: [

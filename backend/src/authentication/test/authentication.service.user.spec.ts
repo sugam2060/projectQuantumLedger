@@ -1,3 +1,5 @@
+import { jest as jestGlobal } from '@jest/globals';
+const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserAuthService } from '../authentication.service.user';
 import { DatabaseService } from '../../database/database.service';
@@ -6,7 +8,7 @@ import { UtilsService } from '../../utils/utils.service';
 import { RedisService } from '../../redis/redis.service';
 import { ClientLoginDTO, ClientType } from '../dto/clientLogin.dto';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs';
 import { sql } from 'drizzle-orm';
 
 describe('UserAuthService', () => {
@@ -25,10 +27,10 @@ describe('UserAuthService', () => {
         from: jest.fn().mockReturnValue({
           leftJoin: jest.fn().mockReturnValue({
             leftJoin: jest.fn().mockReturnValue({
-              where: jest.fn().mockReturnValue([])
-            })
-          })
-        })
+              where: jest.fn().mockReturnValue([]),
+            }),
+          }),
+        }),
       }),
     };
 
@@ -93,29 +95,45 @@ describe('UserAuthService', () => {
     it('should throw BadRequestException if email is missing', async () => {
       const invalidDto: any = { ...mockDto, email: undefined };
 
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(BadRequestException);
-      await expect(service.userLogin(invalidDto)).rejects.toThrow('Valid email is required');
+      await expect(service.userLogin(invalidDto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.userLogin(invalidDto)).rejects.toThrow(
+        'Valid email is required',
+      );
     });
 
     it('should throw BadRequestException if password is missing', async () => {
       const invalidDto: any = { ...mockDto, password: undefined };
 
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(BadRequestException);
-      await expect(service.userLogin(invalidDto)).rejects.toThrow('Valid password is required');
+      await expect(service.userLogin(invalidDto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.userLogin(invalidDto)).rejects.toThrow(
+        'Valid password is required',
+      );
     });
 
     it('should throw BadRequestException if email is not a string', async () => {
       const invalidDto = { ...mockDto, email: 123 as any };
 
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(BadRequestException);
-      await expect(service.userLogin(invalidDto)).rejects.toThrow('Valid email is required');
+      await expect(service.userLogin(invalidDto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.userLogin(invalidDto)).rejects.toThrow(
+        'Valid email is required',
+      );
     });
 
     it('should throw BadRequestException if password is not a string', async () => {
       const invalidDto = { ...mockDto, password: 123 as any };
 
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(BadRequestException);
-      await expect(service.userLogin(invalidDto)).rejects.toThrow('Valid password is required');
+      await expect(service.userLogin(invalidDto)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.userLogin(invalidDto)).rejects.toThrow(
+        'Valid password is required',
+      );
     });
 
     it('should throw UnauthorizedException for invalid credentials when no user found', async () => {
@@ -127,17 +145,21 @@ describe('UserAuthService', () => {
             from: jest.fn().mockReturnValue({
               leftJoin: jest.fn().mockReturnValue({
                 leftJoin: jest.fn().mockReturnValue({
-                  where: jest.fn().mockReturnValue([])
-                })
-              })
-            })
+                  where: jest.fn().mockReturnValue([]),
+                }),
+              }),
+            }),
           }),
         };
         return callback(tx);
       });
 
-      await expect(service.userLogin(mockDto)).rejects.toThrow(UnauthorizedException);
-      await expect(service.userLogin(mockDto)).rejects.toThrow('Invalid email or password');
+      await expect(service.userLogin(mockDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      await expect(service.userLogin(mockDto)).rejects.toThrow(
+        'Invalid email or password',
+      );
     });
 
     it('should successfully authenticate user and return tokens', async () => {
@@ -152,7 +174,7 @@ describe('UserAuthService', () => {
           roleId: 'role123',
           roleName: 'admin',
           rolePermissions: ['read', 'write'],
-        }
+        },
       ];
 
       // Mock the transaction to return user data
@@ -163,23 +185,25 @@ describe('UserAuthService', () => {
             from: jest.fn().mockReturnValue({
               leftJoin: jest.fn().mockReturnValue({
                 leftJoin: jest.fn().mockReturnValue({
-                  where: jest.fn().mockReturnValue(mockUserData)
-                })
-              })
-            })
+                  where: jest.fn().mockReturnValue(mockUserData),
+                }),
+              }),
+            }),
           }),
         };
         return callback(tx);
       });
 
       // Mock bcrypt.compare to return true (valid password)
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      jest.spyOn(bcrypt, 'compare').mockImplementation(async () => true);
 
       // Mock JWT service
       jwtServiceMock.signAsync.mockResolvedValue('mock-jwt-token');
 
       // Mock utils service
-      utilsServiceMock.generateRefreshToken.mockReturnValue('mock-refresh-token');
+      utilsServiceMock.generateRefreshToken.mockReturnValue(
+        'mock-refresh-token',
+      );
 
       // Mock Redis service
       redisServiceMock.set.mockResolvedValue(undefined);
@@ -204,7 +228,7 @@ describe('UserAuthService', () => {
       expect(redisServiceMock.set).toHaveBeenCalledWith(
         `refresh_token:mock-refresh-token`,
         'user123',
-        7 * 24 * 60 * 60
+        7 * 24 * 60 * 60,
       );
     });
   });
@@ -219,7 +243,9 @@ describe('UserAuthService', () => {
     it('should throw UnauthorizedException for invalid refresh token', async () => {
       redisServiceMock.get.mockResolvedValue(null);
 
-      await expect(service.refreshAccessToken(mockRefreshToken)).rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.refreshAccessToken(mockRefreshToken),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('should successfully refresh access token', async () => {
@@ -238,16 +264,18 @@ describe('UserAuthService', () => {
                 id: 'user123',
                 emailNormalized: 'test@example.com',
                 name: 'Test User',
-                status: 'active'
-              }
-            ])
-          })
-        })
+                status: 'active',
+              },
+            ]),
+          }),
+        }),
       }));
 
       // Mock JWT and token generation
       jwtServiceMock.signAsync.mockResolvedValue('new-access-token');
-      utilsServiceMock.generateRefreshToken.mockReturnValue('new-refresh-token');
+      utilsServiceMock.generateRefreshToken.mockReturnValue(
+        'new-refresh-token',
+      );
       redisServiceMock.set.mockResolvedValue(undefined);
       redisServiceMock.delete.mockResolvedValue(undefined);
 
@@ -265,11 +293,13 @@ describe('UserAuthService', () => {
         },
       });
 
-      expect(redisServiceMock.delete).toHaveBeenCalledWith(`refresh_token:${mockRefreshToken}`);
+      expect(redisServiceMock.delete).toHaveBeenCalledWith(
+        `refresh_token:${mockRefreshToken}`,
+      );
       expect(redisServiceMock.set).toHaveBeenCalledWith(
         `refresh_token:new-refresh-token`,
         'user123',
-        7 * 24 * 60 * 60
+        7 * 24 * 60 * 60,
       );
     });
   });
@@ -283,7 +313,7 @@ describe('UserAuthService', () => {
       await service.invalidateRefreshToken(mockRefreshToken);
 
       expect(redisServiceMock.delete).toHaveBeenCalledWith(
-        `refresh_token:${mockRefreshToken}`
+        `refresh_token:${mockRefreshToken}`,
       );
     });
   });

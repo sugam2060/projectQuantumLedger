@@ -1,4 +1,10 @@
-import { Injectable, NestMiddleware, HttpStatus, Logger, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  NestMiddleware,
+  HttpStatus,
+  Logger,
+  Inject,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response, NextFunction } from 'express';
 import { RedisService } from '../redis/redis.service';
@@ -6,32 +12,34 @@ import { RateLimitKeyGenerator } from './rate-limit-key.generator';
 import * as os from 'os';
 
 export interface RateLimitOptions {
-  requests: number;           // Number of requests allowed
-  windowMs: number;            // Time window in milliseconds
-  keyPrefix?: string;         // Prefix for Redis keys
-  errorMessage?: string;      // Custom error message
+  requests: number; // Number of requests allowed
+  windowMs: number; // Time window in milliseconds
+  keyPrefix?: string; // Prefix for Redis keys
+  errorMessage?: string; // Custom error message
   // Security enhancements
-  adaptiveLimits?: {          // Adaptive limits based on user roles/tiers
-    role?: string;            // Role name (optional)
-    tier?: string;            // Tier name (optional)
-    requests: number;         // Allowed requests for this role/tier
+  adaptiveLimits?: {
+    // Adaptive limits based on user roles/tiers
+    role?: string; // Role name (optional)
+    tier?: string; // Tier name (optional)
+    requests: number; // Allowed requests for this role/tier
   }[];
-  burstLimit?: number;        // Maximum requests allowed in a burst window (e.g., per second)
-  burstWindowMs?: number;     // Burst window in milliseconds (default: 1000ms)
-  whitelist?: {               // Whitelist configuration
-    ips?: string[];           // List of trusted IP addresses
-    userIds?: string[];       // List of trusted user IDs
+  burstLimit?: number; // Maximum requests allowed in a burst window (e.g., per second)
+  burstWindowMs?: number; // Burst window in milliseconds (default: 1000ms)
+  whitelist?: {
+    // Whitelist configuration
+    ips?: string[]; // List of trusted IP addresses
+    userIds?: string[]; // List of trusted user IDs
   };
-  enableLogging?: boolean;    // Enable detailed security logging
+  enableLogging?: boolean; // Enable detailed security logging
   logLevel?: 'info' | 'warn' | 'error'; // Log level for security events
   // Business considerations
-  gracePeriodMs?: number;                 // Extra window for premium users (milliseconds)
-  premiumMultiplier?: number;             // Multiplier for premium users (default: 1)
-  dynamicAdjustment?: boolean;            // Enable dynamic adjustment based on system load
-  loadThreshold?: number;                 // System load threshold (0-1) for adjustment
-  regions?: Record<string, { requests: number, windowMs: number }>; // Region-specific limits
-  apiKeyLimit?: { requests: number, windowMs: number }; // Limit for API key requests
-  apiKeyHeader?: string;                  // Header name for API key (default: 'x-api-key')
+  gracePeriodMs?: number; // Extra window for premium users (milliseconds)
+  premiumMultiplier?: number; // Multiplier for premium users (default: 1)
+  dynamicAdjustment?: boolean; // Enable dynamic adjustment based on system load
+  loadThreshold?: number; // System load threshold (0-1) for adjustment
+  regions?: Record<string, { requests: number; windowMs: number }>; // Region-specific limits
+  apiKeyLimit?: { requests: number; windowMs: number }; // Limit for API key requests
+  apiKeyHeader?: string; // Header name for API key (default: 'x-api-key')
 }
 
 @Injectable()
@@ -56,7 +64,9 @@ export class RateLimitMiddleware implements NestMiddleware {
   ) {
     // Register this instance for distributed coordination
     this.registerInstance().catch((error) => {
-      this.logger.log('Failed to register instance, running in standalone mode');
+      this.logger.log(
+        'Failed to register instance, running in standalone mode',
+      );
       this.redisAvailable = false;
     });
   }
@@ -77,14 +87,16 @@ export class RateLimitMiddleware implements NestMiddleware {
       await this.redisService.set(
         instanceKey,
         JSON.stringify(instanceData),
-        Math.ceil(this.INSTANCE_TTL_MS / 1000)
+        Math.ceil(this.INSTANCE_TTL_MS / 1000),
       );
       this.logger.log(`Registered rate limiting instance: ${instanceId}`);
 
       // Start heartbeat interval
       this.startHeartbeat(instanceId, instanceKey);
     } catch (error) {
-      this.logger.log('Failed to register instance, running in standalone mode');
+      this.logger.log(
+        'Failed to register instance, running in standalone mode',
+      );
       this.redisAvailable = false;
     }
   }
@@ -108,7 +120,7 @@ export class RateLimitMiddleware implements NestMiddleware {
         await this.redisService.set(
           instanceKey,
           JSON.stringify(heartbeatData),
-          Math.ceil(this.INSTANCE_TTL_MS / 1000)
+          Math.ceil(this.INSTANCE_TTL_MS / 1000),
         );
       } catch (error) {
         if (this.redisAvailable) {
@@ -122,7 +134,7 @@ export class RateLimitMiddleware implements NestMiddleware {
     try {
       const pattern = 'rate-limit:instances:*';
       // Note: In production, use SCAN instead of KEYS for better performance
-      const keys = await this.redisService.keys?.(pattern) || [];
+      const keys = (await this.redisService.keys?.(pattern)) || [];
       return keys;
     } catch (error) {
       if (this.redisAvailable) {
@@ -160,10 +172,15 @@ export class RateLimitMiddleware implements NestMiddleware {
     }
 
     this.redisFailureCount++;
-    if (this.redisFailureCount >= this.CIRCUIT_BREAKER_THRESHOLD && !this.circuitBreakerOpen) {
+    if (
+      this.redisFailureCount >= this.CIRCUIT_BREAKER_THRESHOLD &&
+      !this.circuitBreakerOpen
+    ) {
       this.circuitBreakerOpen = true;
       this.circuitBreakerOpenedAt = Date.now();
-      this.logger.warn(`Circuit breaker opened after ${this.redisFailureCount} failures`);
+      this.logger.warn(
+        `Circuit breaker opened after ${this.redisFailureCount} failures`,
+      );
     }
   }
 
@@ -205,37 +222,61 @@ export class RateLimitMiddleware implements NestMiddleware {
     }
 
     // Validate premium multiplier
-    if (options.premiumMultiplier !== undefined && options.premiumMultiplier < 1) {
+    if (
+      options.premiumMultiplier !== undefined &&
+      options.premiumMultiplier < 1
+    ) {
       throw new Error('Premium multiplier must be greater than or equal to 1');
     }
 
     // Validate load threshold
-    if (options.loadThreshold !== undefined && (options.loadThreshold <= 0 || options.loadThreshold > 1)) {
+    if (
+      options.loadThreshold !== undefined &&
+      (options.loadThreshold <= 0 || options.loadThreshold > 1)
+    ) {
       throw new Error('Load threshold must be between 0 and 1');
     }
   }
 
-  private getGlobalWhitelist(): { ips?: string[], userIds?: string[] } {
+  private getGlobalWhitelist(): { ips?: string[]; userIds?: string[] } {
     const ips = this.configService.get<string>('RATE_LIMIT_WHITELIST_IPS');
-    const userIds = this.configService.get<string>('RATE_LIMIT_WHITELIST_USER_IDS');
+    const userIds = this.configService.get<string>(
+      'RATE_LIMIT_WHITELIST_USER_IDS',
+    );
     return {
-      ips: ips?.split(',').map(ip => ip.trim()).filter(ip => ip.length > 0),
-      userIds: userIds?.split(',').map(id => id.trim()).filter(id => id.length > 0),
+      ips: ips
+        ?.split(',')
+        .map((ip) => ip.trim())
+        .filter((ip) => ip.length > 0),
+      userIds: userIds
+        ?.split(',')
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0),
     };
   }
 
-  private isWhitelisted(req: Request, whitelist?: RateLimitOptions['whitelist']): boolean {
+  private isWhitelisted(
+    req: Request,
+    whitelist?: RateLimitOptions['whitelist'],
+  ): boolean {
     const globalWhitelist = this.getGlobalWhitelist();
     const mergedWhitelist = {
       ips: [...(globalWhitelist.ips || []), ...(whitelist?.ips || [])],
-      userIds: [...(globalWhitelist.userIds || []), ...(whitelist?.userIds || [])],
+      userIds: [
+        ...(globalWhitelist.userIds || []),
+        ...(whitelist?.userIds || []),
+      ],
     };
 
-    if (mergedWhitelist.ips.length === 0 && mergedWhitelist.userIds.length === 0) {
+    if (
+      mergedWhitelist.ips.length === 0 &&
+      mergedWhitelist.userIds.length === 0
+    ) {
       return false;
     }
 
-    const clientIp = req.ip || (req as any).connection?.remoteAddress || 'unknown';
+    const clientIp =
+      req.ip || (req as any).connection?.remoteAddress || 'unknown';
     // Check IP whitelist
     if (mergedWhitelist.ips.includes(clientIp)) {
       this.logSecurityEvent('info', `IP ${clientIp} is whitelisted`, req);
@@ -265,12 +306,16 @@ export class RateLimitMiddleware implements NestMiddleware {
       if (user) {
         const roleName = user.role;
         if (roleName) {
-          const roleLimit = options.adaptiveLimits.find(limit => limit.role === roleName);
+          const roleLimit = options.adaptiveLimits.find(
+            (limit) => limit.role === roleName,
+          );
           if (roleLimit) limit = roleLimit.requests;
         }
         const tier = user.tier;
         if (tier) {
-          const tierLimit = options.adaptiveLimits.find(limit => limit.tier === tier);
+          const tierLimit = options.adaptiveLimits.find(
+            (limit) => limit.tier === tier,
+          );
           if (tierLimit) limit = tierLimit.requests;
         }
       }
@@ -295,7 +340,10 @@ export class RateLimitMiddleware implements NestMiddleware {
 
     // Check permissions array
     if (Array.isArray(user.permissions)) {
-      if (user.permissions.includes('premium_access') || user.permissions.includes('unlimited_requests')) {
+      if (
+        user.permissions.includes('premium_access') ||
+        user.permissions.includes('unlimited_requests')
+      ) {
         return true;
       }
     }
@@ -320,7 +368,10 @@ export class RateLimitMiddleware implements NestMiddleware {
     return 'global';
   }
 
-  private getApiKey(req: Request, headerName: string = 'x-api-key'): string | null {
+  private getApiKey(
+    req: Request,
+    headerName: string = 'x-api-key',
+  ): string | null {
     const apiKey = req.headers[headerName];
     if (apiKey && typeof apiKey === 'string') {
       return apiKey.trim();
@@ -335,7 +386,9 @@ export class RateLimitMiddleware implements NestMiddleware {
     const normalizedLoad = load / cpuCount;
 
     // Determine threshold: use provided threshold, then config service, then default 0.8
-    const threshold = loadThreshold ?? this.configService.get<number>('RATE_LIMIT_LOAD_THRESHOLD', 0.8);
+    const threshold =
+      loadThreshold ??
+      this.configService.get<number>('RATE_LIMIT_LOAD_THRESHOLD', 0.8);
     if (normalizedLoad > threshold) {
       // Reduce limit by 50% when load exceeds threshold
       return 0.5;
@@ -343,7 +396,10 @@ export class RateLimitMiddleware implements NestMiddleware {
     return 1.0;
   }
 
-  private computeEffectiveLimits(req: Request, options: RateLimitOptions): { requests: number, windowMs: number } {
+  private computeEffectiveLimits(
+    req: Request,
+    options: RateLimitOptions,
+  ): { requests: number; windowMs: number } {
     // Start with adaptive limit based on role/tier
     let requests = this.getAdaptiveLimit(req, options);
     let windowMs = options.windowMs;
@@ -374,7 +430,11 @@ export class RateLimitMiddleware implements NestMiddleware {
     }
 
     // Premium multiplier (only apply if requests haven't been overridden by region/API key)
-    if (this.isPremiumUser(req) && options.premiumMultiplier && !requestsOverridden) {
+    if (
+      this.isPremiumUser(req) &&
+      options.premiumMultiplier &&
+      !requestsOverridden
+    ) {
       requests = Math.floor(requests * options.premiumMultiplier);
     }
 
@@ -397,7 +457,7 @@ export class RateLimitMiddleware implements NestMiddleware {
   private async applyBurstDetection(
     req: Request,
     options: RateLimitOptions,
-    clientId: string
+    clientId: string,
   ): Promise<{ blocked: boolean; message?: string }> {
     if (!options.burstLimit || options.burstLimit <= 0) {
       return { blocked: false };
@@ -442,7 +502,15 @@ export class RateLimitMiddleware implements NestMiddleware {
         end
       `;
 
-      const result = await this.redisService.eval<[number]>(luaScript, 1, burstKey, now, burstWindowMs, options.burstLimit, uniqueId);
+      const result = await this.redisService.eval<[number]>(
+        luaScript,
+        1,
+        burstKey,
+        now,
+        burstWindowMs,
+        options.burstLimit,
+        uniqueId,
+      );
       const blocked = result[0] === 1;
 
       if (blocked) {
@@ -475,7 +543,7 @@ export class RateLimitMiddleware implements NestMiddleware {
     level: 'info' | 'warn' | 'error',
     message: string,
     req: Request,
-    data?: any
+    data?: any,
   ) {
     const clientId = this.getClientIdentifier(req);
     const logMessage = `[RateLimit Security] ${message} - Client: ${clientId} - Path: ${req.method} ${req.path}`;
@@ -495,21 +563,35 @@ export class RateLimitMiddleware implements NestMiddleware {
 
     try {
       // Try to get rate limit config from route handler
-      if (req.route?.stack && Array.isArray(req.route.stack) && req.route.stack.length > 0) {
+      if (
+        req.route?.stack &&
+        Array.isArray(req.route.stack) &&
+        req.route.stack.length > 0
+      ) {
         const lastHandler = req.route.stack[req.route.stack.length - 1];
         if (lastHandler?.handle) {
-          rateLimitConfig = Reflect.getMetadata('rateLimit', lastHandler.handle);
+          rateLimitConfig = Reflect.getMetadata(
+            'rateLimit',
+            lastHandler.handle,
+          );
         }
       }
 
       // If not found in route handler, try to get from request handler directly
       if (!rateLimitConfig && (req as any).handler) {
-        rateLimitConfig = Reflect.getMetadata('rateLimit', (req as any).handler);
+        rateLimitConfig = Reflect.getMetadata(
+          'rateLimit',
+          (req as any).handler,
+        );
       }
     } catch (error: unknown) {
       // If there's an error accessing metadata, proceed without rate limiting
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.warn('Error accessing rate limit metadata, proceeding without rate limiting:', errorMessage);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        'Error accessing rate limit metadata, proceeding without rate limiting:',
+        errorMessage,
+      );
       return next();
     }
 
@@ -537,11 +619,15 @@ export class RateLimitMiddleware implements NestMiddleware {
 
     try {
       // Apply sliding window rate limit with effective limits
-      const slidingWindowResult = await this.applySlidingWindowRateLimit(req, res, {
-        ...rateLimitConfig,
-        requests: effectiveLimits.requests,
-        windowMs: effectiveLimits.windowMs,
-      });
+      const slidingWindowResult = await this.applySlidingWindowRateLimit(
+        req,
+        res,
+        {
+          ...rateLimitConfig,
+          requests: effectiveLimits.requests,
+          windowMs: effectiveLimits.windowMs,
+        },
+      );
 
       if (slidingWindowResult.blocked) {
         this.logSecurityEvent('warn', 'Rate limit exceeded', req, {
@@ -550,14 +636,20 @@ export class RateLimitMiddleware implements NestMiddleware {
         });
         res.status(HttpStatus.TOO_MANY_REQUESTS).json({
           statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          message: slidingWindowResult.message || 'Too many requests, please try again later',
+          message:
+            slidingWindowResult.message ||
+            'Too many requests, please try again later',
           error: 'Too Many Requests',
         });
         return;
       }
 
       // Apply burst detection
-      const burstResult = await this.applyBurstDetection(req, rateLimitConfig, this.getClientIdentifier(req));
+      const burstResult = await this.applyBurstDetection(
+        req,
+        rateLimitConfig,
+        this.getClientIdentifier(req),
+      );
       if (burstResult.blocked) {
         this.logSecurityEvent('warn', 'Burst limit exceeded', req, {
           burstLimit: rateLimitConfig.burstLimit,
@@ -565,20 +657,23 @@ export class RateLimitMiddleware implements NestMiddleware {
         });
         res.status(HttpStatus.TOO_MANY_REQUESTS).json({
           statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          message: burstResult.message || 'Too many requests, please try again later',
+          message:
+            burstResult.message || 'Too many requests, please try again later',
           error: 'Too Many Requests',
         });
         return;
       }
 
       // Log successful request if logging enabled
-      if (rateLimitConfig.enableLogging && rateLimitConfig.logLevel === 'info') {
+      if (
+        rateLimitConfig.enableLogging &&
+        rateLimitConfig.logLevel === 'info'
+      ) {
         this.logSecurityEvent('info', 'Request allowed', req, {
           limit: effectiveLimits.requests,
           burstLimit: rateLimitConfig.burstLimit,
         });
       }
-
     } catch (error) {
       if (this.redisAvailable) {
         this.logger.error('Rate limiting error:', error);
@@ -593,7 +688,7 @@ export class RateLimitMiddleware implements NestMiddleware {
   private async applySlidingWindowRateLimit(
     req: Request,
     res: Response,
-    options: RateLimitOptions
+    options: RateLimitOptions,
   ): Promise<{ blocked: boolean; message?: string }> {
     const {
       requests,
@@ -656,12 +751,23 @@ export class RateLimitMiddleware implements NestMiddleware {
     try {
       // Try Redis-based sliding window first with timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Redis timeout')), this.REDIS_TIMEOUT_MS);
+        setTimeout(
+          () => reject(new Error('Redis timeout')),
+          this.REDIS_TIMEOUT_MS,
+        );
       });
 
       const result = await Promise.race([
-        this.redisService.eval<[number, number, number]>(luaScript, 1, key, now, windowMs, requests, uniqueId),
-        timeoutPromise
+        this.redisService.eval<[number, number, number]>(
+          luaScript,
+          1,
+          key,
+          now,
+          windowMs,
+          requests,
+          uniqueId,
+        ),
+        timeoutPromise,
       ]);
 
       const [count, remaining, resetTime] = result;
@@ -688,7 +794,9 @@ export class RateLimitMiddleware implements NestMiddleware {
         return this.applyLocalSlidingWindowRateLimit(req, res, options);
       }
 
-      this.logger.error(`Redis rate limiting error (timeout or other), falling back to local sliding window: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        `Redis rate limiting error (timeout or other), falling back to local sliding window: ${error instanceof Error ? error.message : String(error)}`,
+      );
       // Fallback to local sliding window when Redis is unavailable or times out
       return this.applyLocalSlidingWindowRateLimit(req, res, options);
     }
@@ -697,7 +805,7 @@ export class RateLimitMiddleware implements NestMiddleware {
   private async applyLocalSlidingWindowRateLimit(
     req: Request,
     res: Response,
-    options: RateLimitOptions
+    options: RateLimitOptions,
   ): Promise<{ blocked: boolean; message?: string }> {
     const {
       requests,
@@ -718,7 +826,7 @@ export class RateLimitMiddleware implements NestMiddleware {
     const timestamps = cache.get(clientId) || [];
 
     // Remove timestamps older than the window
-    const validTimestamps = timestamps.filter(ts => ts > windowStart);
+    const validTimestamps = timestamps.filter((ts) => ts > windowStart);
 
     // Check if limit exceeded
     if (validTimestamps.length >= requests) {
@@ -737,7 +845,7 @@ export class RateLimitMiddleware implements NestMiddleware {
     setTimeout(() => {
       const currentTimestamps = cache.get(clientId);
       if (currentTimestamps) {
-        const updated = currentTimestamps.filter(ts => ts > now - windowMs);
+        const updated = currentTimestamps.filter((ts) => ts > now - windowMs);
         if (updated.length === 0) {
           cache.delete(clientId);
         } else {
@@ -748,7 +856,8 @@ export class RateLimitMiddleware implements NestMiddleware {
 
     // Calculate remaining requests and reset time
     const remaining = requests - validTimestamps.length;
-    const oldest = validTimestamps.length > 0 ? Math.min(...validTimestamps) : now;
+    const oldest =
+      validTimestamps.length > 0 ? Math.min(...validTimestamps) : now;
     const resetTime = oldest + windowMs;
     this.addRateLimitHeaders(res, remaining, requests, resetTime - now);
 
@@ -764,10 +873,13 @@ export class RateLimitMiddleware implements NestMiddleware {
     res: Response,
     remaining: number,
     limit: number,
-    resetInMs: number
+    resetInMs: number,
   ): void {
     res.setHeader('X-RateLimit-Limit', limit);
     res.setHeader('X-RateLimit-Remaining', Math.max(0, remaining));
-    res.setHeader('X-RateLimit-Reset', new Date(Date.now() + resetInMs).toISOString());
+    res.setHeader(
+      'X-RateLimit-Reset',
+      new Date(Date.now() + resetInMs).toISOString(),
+    );
   }
 }
