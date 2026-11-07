@@ -25,14 +25,19 @@ async function runMigrations() {
   const pool = new Pool({ connectionString });
 
   try {
+    console.info('Applying Drizzle migrations...');
+    await migrate(drizzle(pool), {
+      migrationsFolder: resolve(backendDirectory, 'drizzle'),
+    });
+
+    console.info('Applying core helper and security-definer SQL...');
+    const [helperFunctionsSql, securityDefinerSql] = await Promise.all([
+      readFile(resolve(scriptDirectory, 'core_helper_function.sql'), 'utf8'),
+      readFile(resolve(scriptDirectory, 'core_security_definer.sql'), 'utf8'),
+    ]);
+
     const client = await pool.connect();
     try {
-      console.info('Applying core helper and security-definer SQL first...');
-      const [helperFunctionsSql, securityDefinerSql] = await Promise.all([
-        readFile(resolve(scriptDirectory, 'core_helper_function.sql'), 'utf8'),
-        readFile(resolve(scriptDirectory, 'core_security_definer.sql'), 'utf8'),
-      ]);
-
       await client.query('BEGIN');
       await client.query(helperFunctionsSql);
       await client.query(securityDefinerSql);
@@ -44,11 +49,6 @@ async function runMigrations() {
     } finally {
       client.release();
     }
-
-    console.info('Applying Drizzle migrations...');
-    await migrate(drizzle(pool), {
-      migrationsFolder: resolve(backendDirectory, 'drizzle'),
-    });
 
     console.info('Database migrations completed.');
   } finally {
