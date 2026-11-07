@@ -106,7 +106,7 @@ describe('AuthenticationController', () => {
     });
 
     it('should throw BadRequestException when email is missing', async () => {
-      const invalidDto = { ...mockDto, email: undefined };
+      const invalidDto: any = { ...mockDto, email: undefined };
 
       authServiceMock.userLogin.mockRejectedValue(new BadRequestException('Valid email is required'));
 
@@ -115,7 +115,7 @@ describe('AuthenticationController', () => {
     });
 
     it('should throw BadRequestException when password is missing', async () => {
-      const invalidDto = { ...mockDto, password: undefined };
+      const invalidDto: any = { ...mockDto, password: undefined };
 
       authServiceMock.userLogin.mockRejectedValue(new BadRequestException('Valid password is required'));
 
@@ -169,7 +169,7 @@ describe('AuthenticationController', () => {
     });
 
     it('should successfully refresh token from cookie for web client', async () => {
-      const mockRequestWithoutBodyToken = {
+      const mockRequestWithoutBodyToken: any = {
         ...mockRequest,
         headers: { 'x-client-type': 'web' },
       };
@@ -193,10 +193,10 @@ describe('AuthenticationController', () => {
     });
 
     it('should throw UnauthorizedException when no refresh token provided', async () => {
-      const mockRequestWithoutToken = {
+      const mockRequestWithoutToken: any = {
         headers: { 'x-client-type': 'web' },
         cookies: {},
-      } as any;
+      };
 
       await expect(controller.refreshToken(undefined, mockRequestWithoutToken, mockResponse)).rejects.toThrow('Refresh token is required');
     });

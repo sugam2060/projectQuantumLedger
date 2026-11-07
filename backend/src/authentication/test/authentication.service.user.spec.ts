@@ -91,14 +91,14 @@ describe('UserAuthService', () => {
     });
 
     it('should throw BadRequestException if email is missing', async () => {
-      const invalidDto = { ...mockDto, email: undefined };
+      const invalidDto: any = { ...mockDto, email: undefined };
 
       await expect(service.userLogin(invalidDto)).rejects.toThrow(BadRequestException);
       await expect(service.userLogin(invalidDto)).rejects.toThrow('Valid email is required');
     });
 
     it('should throw BadRequestException if password is missing', async () => {
-      const invalidDto = { ...mockDto, password: undefined };
+      const invalidDto: any = { ...mockDto, password: undefined };
 
       await expect(service.userLogin(invalidDto)).rejects.toThrow(BadRequestException);
       await expect(service.userLogin(invalidDto)).rejects.toThrow('Valid password is required');
@@ -120,7 +120,7 @@ describe('UserAuthService', () => {
 
     it('should throw UnauthorizedException for invalid credentials when no user found', async () => {
       // Mock the transaction to return empty results
-      dbMock.transaction.mockImplementation(async (callback) => {
+      dbMock.transaction.mockImplementation(async (callback: any) => {
         const tx = {
           execute: jest.fn().mockResolvedValue(undefined),
           select: jest.fn().mockReturnValue({
@@ -156,7 +156,7 @@ describe('UserAuthService', () => {
       ];
 
       // Mock the transaction to return user data
-      dbMock.transaction.mockImplementation(async (callback) => {
+      dbMock.transaction.mockImplementation(async (callback: any) => {
         const tx = {
           execute: jest.fn().mockResolvedValue(undefined),
           select: jest.fn().mockReturnValue({
