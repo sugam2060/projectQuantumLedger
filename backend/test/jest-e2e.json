@@ -1,22 +1,28 @@
 {
-  "preset": "ts-jest",
-  "testEnvironment": "node",
   "moduleFileExtensions": ["js", "json", "ts"],
-  "rootDir": ".",
+  "rootDir": "..",
+  "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": [
       "ts-jest",
       {
+        "tsconfig": "<rootDir>/tsconfig.test.json",
         "useESM": true
       }
     ]
   },
+  "collectCoverageFrom": [
+    "src/**/*.(t|j)s",
+    "!src/**/*.d.ts"
+  ],
+  "coverageDirectory": "../coverage",
   "transformIgnorePatterns": [
     "/node_modules/(?!(@nestjs|axios|@angular|rxjs)/)"
   ],
   "extensionsToTreatAsEsm": [".ts"],
   "moduleNameMapper": {
+    "^src/(.*)$": "<rootDir>/src/$1",
     "^(\\.{1,2}/.*)\\.js$": "$1"
   }
 }

@@ -17,7 +17,7 @@ import { RateLimit } from './decorators/rate-limit.decorator';
 
 @Controller('authentication')
 export class AuthenticationController {
-  constructor(private readonly authService: UserAuthService) { }
+  constructor(private readonly authService: UserAuthService) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -26,7 +26,7 @@ export class AuthenticationController {
     windowMs: 3600000, // 100 requests per hour
     // Dynamic adjustment based on system load
     dynamicAdjustment: true,
-    loadThreshold: 0.8
+    loadThreshold: 0.8,
   })
   async login(
     @Body() dto: ClientLoginDTO,
@@ -70,7 +70,7 @@ export class AuthenticationController {
   @HttpCode(HttpStatus.OK)
   @Public()
   async refreshToken(
-    @Body('refreshToken') refreshToken: string,
+    @Body('refreshToken') refreshToken: string | undefined,
     @ReqDecorator() req: Request,
     @ResDecorator({ passthrough: true }) res: Response,
   ) {
@@ -111,7 +111,11 @@ export class AuthenticationController {
           res.cookie('refresh_token', result.refreshToken, refreshTokenOptions);
 
           // Return result without tokens for web clients
-          const { accessToken, refreshToken: newRefreshToken, ...resultWithoutTokens } = result;
+          const {
+            accessToken,
+            refreshToken: newRefreshToken,
+            ...resultWithoutTokens
+          } = result;
           return resultWithoutTokens;
         } else {
           // Return result without access token for web clients

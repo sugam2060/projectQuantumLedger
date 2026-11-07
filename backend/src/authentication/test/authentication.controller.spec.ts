@@ -1,3 +1,5 @@
+import { jest as jestGlobal } from '@jest/globals';
+const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthenticationController } from '../authentication.controller';
 import { UserAuthService } from '../authentication.service.user';
@@ -79,7 +81,7 @@ describe('AuthenticationController', () => {
           secure: false,
           sameSite: 'strict',
           path: '/',
-        })
+        }),
       );
       expect(result).toEqual({
         user: { id: 'user123', email: 'test@example.com' },
@@ -98,7 +100,11 @@ describe('AuthenticationController', () => {
 
       authServiceMock.userLogin.mockResolvedValue(mockResult);
 
-      const result = await controller.login(mobileDto, mockRequest, mockResponse);
+      const result = await controller.login(
+        mobileDto,
+        mockRequest,
+        mockResponse,
+      );
 
       expect(authServiceMock.userLogin).toHaveBeenCalledWith(mobileDto);
       expect(mockResponse.cookie).not.toHaveBeenCalled();
@@ -108,26 +114,44 @@ describe('AuthenticationController', () => {
     it('should throw BadRequestException when email is missing', async () => {
       const invalidDto: any = { ...mockDto, email: undefined };
 
-      authServiceMock.userLogin.mockRejectedValue(new BadRequestException('Valid email is required'));
+      authServiceMock.userLogin.mockRejectedValue(
+        new BadRequestException('Valid email is required'),
+      );
 
-      await expect(controller.login(invalidDto, mockRequest, mockResponse)).rejects.toThrow(BadRequestException);
-      await expect(controller.login(invalidDto, mockRequest, mockResponse)).rejects.toThrow('Valid email is required');
+      await expect(
+        controller.login(invalidDto, mockRequest, mockResponse),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        controller.login(invalidDto, mockRequest, mockResponse),
+      ).rejects.toThrow('Valid email is required');
     });
 
     it('should throw BadRequestException when password is missing', async () => {
       const invalidDto: any = { ...mockDto, password: undefined };
 
-      authServiceMock.userLogin.mockRejectedValue(new BadRequestException('Valid password is required'));
+      authServiceMock.userLogin.mockRejectedValue(
+        new BadRequestException('Valid password is required'),
+      );
 
-      await expect(controller.login(invalidDto, mockRequest, mockResponse)).rejects.toThrow(BadRequestException);
-      await expect(controller.login(invalidDto, mockRequest, mockResponse)).rejects.toThrow('Valid password is required');
+      await expect(
+        controller.login(invalidDto, mockRequest, mockResponse),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        controller.login(invalidDto, mockRequest, mockResponse),
+      ).rejects.toThrow('Valid password is required');
     });
 
     it('should handle unauthorized access', async () => {
-      authServiceMock.userLogin.mockRejectedValue(new UnauthorizedException('Invalid credentials'));
+      authServiceMock.userLogin.mockRejectedValue(
+        new UnauthorizedException('Invalid credentials'),
+      );
 
-      await expect(controller.login(mockDto, mockRequest, mockResponse)).rejects.toThrow(UnauthorizedException);
-      await expect(controller.login(mockDto, mockRequest, mockResponse)).rejects.toThrow('Invalid credentials');
+      await expect(
+        controller.login(mockDto, mockRequest, mockResponse),
+      ).rejects.toThrow(UnauthorizedException);
+      await expect(
+        controller.login(mockDto, mockRequest, mockResponse),
+      ).rejects.toThrow('Invalid credentials');
     });
   });
 
@@ -158,9 +182,15 @@ describe('AuthenticationController', () => {
 
       authServiceMock.refreshAccessToken.mockResolvedValue(mockResult);
 
-      const result = await controller.refreshToken('body-refresh-token', mockRequest, mockResponse);
+      const result = await controller.refreshToken(
+        'body-refresh-token',
+        mockRequest,
+        mockResponse,
+      );
 
-      expect(authServiceMock.refreshAccessToken).toHaveBeenCalledWith('body-refresh-token');
+      expect(authServiceMock.refreshAccessToken).toHaveBeenCalledWith(
+        'body-refresh-token',
+      );
       expect(mockResponse.cookie).toHaveBeenCalledTimes(2);
       expect(result).toEqual({
         user: { id: 'user123', email: 'test@example.com' },
@@ -183,9 +213,15 @@ describe('AuthenticationController', () => {
 
       authServiceMock.refreshAccessToken.mockResolvedValue(mockResult);
 
-      const result = await controller.refreshToken(undefined, mockRequestWithoutBodyToken, mockResponse);
+      const result = await controller.refreshToken(
+        undefined,
+        mockRequestWithoutBodyToken,
+        mockResponse,
+      );
 
-      expect(authServiceMock.refreshAccessToken).toHaveBeenCalledWith('cookie-refresh-token');
+      expect(authServiceMock.refreshAccessToken).toHaveBeenCalledWith(
+        'cookie-refresh-token',
+      );
       expect(result).toEqual({
         user: { id: 'user123', email: 'test@example.com' },
         memberships: [],
@@ -198,16 +234,28 @@ describe('AuthenticationController', () => {
         cookies: {},
       };
 
-      await expect(controller.refreshToken(undefined, mockRequestWithoutToken, mockResponse)).rejects.toThrow('Refresh token is required');
+      await expect(
+        controller.refreshToken(
+          undefined,
+          mockRequestWithoutToken,
+          mockResponse,
+        ),
+      ).rejects.toThrow('Refresh token is required');
     });
 
     it('should handle unauthorized refresh token', async () => {
-      authServiceMock.refreshAccessToken.mockRejectedValue(new UnauthorizedException('Invalid refresh token'));
+      authServiceMock.refreshAccessToken.mockRejectedValue(
+        new UnauthorizedException('Invalid refresh token'),
+      );
       authServiceMock.invalidateRefreshToken.mockResolvedValue(undefined);
 
-      await expect(controller.refreshToken('invalid-token', mockRequest, mockResponse)).rejects.toThrow(UnauthorizedException);
+      await expect(
+        controller.refreshToken('invalid-token', mockRequest, mockResponse),
+      ).rejects.toThrow(UnauthorizedException);
 
-      expect(authServiceMock.invalidateRefreshToken).toHaveBeenCalledWith('invalid-token');
+      expect(authServiceMock.invalidateRefreshToken).toHaveBeenCalledWith(
+        'invalid-token',
+      );
     });
   });
 });

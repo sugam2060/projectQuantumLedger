@@ -183,7 +183,8 @@ export class RateLimitKeyGenerator {
    */
   private getDeviceFingerprint(req: Request): string {
     // Try custom header first
-    const customFingerprint = req.headers[this.options.deviceFingerprintHeader.toLowerCase()];
+    const customFingerprint =
+      req.headers[this.options.deviceFingerprintHeader.toLowerCase()];
     if (customFingerprint && typeof customFingerprint === 'string') {
       return customFingerprint;
     }

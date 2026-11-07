@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { and, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
@@ -6,7 +10,7 @@ import { businessMemberships, roles, users } from '../database/schema';
 import { ClientLoginDTO, ClientType } from './dto/clientLogin.dto';
 import { UtilsService } from '../utils/utils.service';
 import { RedisService } from '../redis/redis.service';
-import * as bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UserAuthService {
@@ -58,15 +62,12 @@ export class UserAuthService {
           businessMemberships,
           and(
             eq(users.id, businessMemberships.userId),
-            eq(businessMemberships.isActive, true)
-          )
+            eq(businessMemberships.isActive, true),
+          ),
         )
         .leftJoin(roles, eq(businessMemberships.roleId, roles.id))
         .where(
-          and(
-            eq(users.emailNormalized, email),
-            eq(users.status, 'active')
-          ),
+          and(eq(users.emailNormalized, email), eq(users.status, 'active')),
         );
 
       // Check if user exists
@@ -95,7 +96,7 @@ export class UserAuthService {
 
       // Group membership data by businessId to avoid duplicates
       const membershipMap = new Map();
-      userData.forEach(record => {
+      userData.forEach((record) => {
         if (record.businessId) {
           const key = `${record.businessId}-${record.roleId}`;
           if (!membershipMap.has(key)) {
@@ -113,7 +114,8 @@ export class UserAuthService {
 
       const membershipsWithRoles = Array.from(membershipMap.values());
 
-      const activeMembership = membershipsWithRoles.length === 1 ? membershipsWithRoles[0] : undefined;
+      const activeMembership =
+        membershipsWithRoles.length === 1 ? membershipsWithRoles[0] : undefined;
       const accessToken = await this.jwtService.signAsync(
         {
           sub: user.id,
@@ -137,7 +139,11 @@ export class UserAuthService {
       if (dto.remember) {
         refreshToken = this.utilsService.generateRefreshToken();
         // Store refresh token in Redis with 7-day expiration
-        await this.redisService.set(`refresh_token:${refreshToken}`, user.id, 7 * 24 * 60 * 60);
+        await this.redisService.set(
+          `refresh_token:${refreshToken}`,
+          user.id,
+          7 * 24 * 60 * 60,
+        );
       }
 
       return {
@@ -187,12 +193,16 @@ export class UserAuthService {
       SELECT set_config('app.is_platform_user', 'true', true)
     `);
 
-    const [user] = await this.db.select({
-      id: users.id,
-      emailNormalized: users.emailNormalized,
-      name: users.name,
-      status: users.status,
-    }).from(users).where(eq(users.id, userId)).limit(1);
+    const [user] = await this.db
+      .select({
+        id: users.id,
+        emailNormalized: users.emailNormalized,
+        name: users.name,
+        status: users.status,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
 
     // Reset platform user context
     await this.db.execute(sql`
@@ -219,7 +229,11 @@ export class UserAuthService {
     // Optionally generate a new refresh token (refresh token rotation)
     // This adds an extra layer of security by rotating refresh tokens
     const newRefreshToken = this.utilsService.generateRefreshToken();
-    await this.redisService.set(`refresh_token:${newRefreshToken}`, userId, 7 * 24 * 60 * 60);
+    await this.redisService.set(
+      `refresh_token:${newRefreshToken}`,
+      userId,
+      7 * 24 * 60 * 60,
+    );
 
     // Invalidate the old refresh token
     await this.invalidateRefreshToken(refreshToken);
