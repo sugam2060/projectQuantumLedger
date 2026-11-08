@@ -263,29 +263,32 @@ jobs:
 
   # Static Application Security Testing (SAST)
   sast:
-    name: 🛡️ SAST Analysis
+    name: 🛡️ SAST Analysis (Semgrep)
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
+    timeout-minutes: 10
+    container: semgrep/semgrep
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: javascript-typescript
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+      - name: Run Semgrep
+        run: |
+          semgrep scan \
+            --config p/typescript \
+            --config p/nodejs \
+            --config p/owasp-top-ten \
+            --config p/secrets \
+            --exclude node_modules --exclude dist --exclude coverage \
+            --error
 
   # Pull Request automation
   pr-automation:
     name: 🤖 PR Automation
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    permissions:
+      issues: write
+      pull-requests: write
     needs: [security, code-quality, dependency-audit, unit-tests, integration-tests, e2e-tests, matrix-testing, build-verification]
     steps:
       - name: Add PR labels
