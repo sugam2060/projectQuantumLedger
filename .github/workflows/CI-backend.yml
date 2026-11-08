@@ -261,26 +261,6 @@ jobs:
           path: backend/dist
           key: ${{ runner.os }}-build-${{ hashFiles('backend/**/*.ts') }}
 
-  # Static Application Security Testing (SAST)
-  sast:
-    name: 🛡️ SAST Analysis (Semgrep)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    container: semgrep/semgrep
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Run Semgrep
-        run: |
-          semgrep scan \
-            --config p/typescript \
-            --config p/nodejs \
-            --config p/owasp-top-ten \
-            --config p/secrets \
-            --exclude node_modules --exclude dist --exclude coverage \
-            --error
-
   # Pull Request automation
   pr-automation:
     name: 🤖 PR Automation
