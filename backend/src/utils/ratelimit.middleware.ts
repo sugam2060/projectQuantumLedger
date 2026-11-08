@@ -4,6 +4,7 @@ import {
   HttpStatus,
   Logger,
   Inject,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response, NextFunction } from 'express';
@@ -43,7 +44,7 @@ export interface RateLimitOptions {
 }
 
 @Injectable()
-export class RateLimitMiddleware implements NestMiddleware {
+export class RateLimitMiddleware implements NestMiddleware, OnModuleDestroy {
   private readonly logger = new Logger(RateLimitMiddleware.name);
   private localRateLimitCache?: Map<string, number[]>;
   private readonly REDIS_TIMEOUT_MS = 1000;
@@ -57,6 +58,10 @@ export class RateLimitMiddleware implements NestMiddleware {
 
   private redisAvailable = true;
 
+  private heartbeatInterval: ReturnType<typeof setInterval> | undefined;
+
+  private destroyed = false;
+
   constructor(
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,
@@ -69,6 +74,14 @@ export class RateLimitMiddleware implements NestMiddleware {
       );
       this.redisAvailable = false;
     });
+  }
+
+  onModuleDestroy(): void {
+    this.destroyed = true;
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = undefined;
+    }
   }
 
   // Distributed coordination methods
@@ -109,7 +122,11 @@ export class RateLimitMiddleware implements NestMiddleware {
   }
 
   private startHeartbeat(instanceId: string, instanceKey: string): void {
-    setInterval(async () => {
+    if (this.destroyed) {
+      return;
+    }
+
+    this.heartbeatInterval = setInterval(async () => {
       try {
         const heartbeatData = {
           id: instanceId,
