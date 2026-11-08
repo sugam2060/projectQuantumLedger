@@ -36,7 +36,7 @@ jobs:
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}
           extra_args: --only-verified
-          version: v3.99.8
+          version: 3.99.8
 
   # Code quality checks
   code-quality:
@@ -127,20 +127,6 @@ jobs:
     name: 🔗 Integration Tests
     runs-on: ubuntu-latest
     services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
       redis:
         image: redis:7
         ports:
@@ -166,23 +152,13 @@ jobs:
           cd backend
           npm ci
 
-      - name: Run database migrations
-        run: |
-          cd backend
-          npm run db:migrate
-        env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
-          DATABASE_MIGRATION_URL: postgresql://test_user:test_password@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379
-          JWT_SECRET: test_secret_at_least_32_characters_long_for_testing_purposes_only
-
       - name: Run integration tests
         run: |
           cd backend
           npm run test
         env:
           NODE_OPTIONS: --experimental-vm-modules
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+          DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: test_secret_at_least_32_characters_long_for_testing_purposes_only
 
@@ -191,20 +167,6 @@ jobs:
     name: 🌐 E2E Tests
     runs-on: ubuntu-latest
     services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: e2e_user
-          POSTGRES_PASSWORD: e2e_password
-          POSTGRES_DB: e2e_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
       redis:
         image: redis:7
         ports:
@@ -230,23 +192,13 @@ jobs:
           cd backend
           npm ci
 
-      - name: Run database migrations
-        run: |
-          cd backend
-          npm run db:migrate
-        env:
-          DATABASE_URL: postgresql://e2e_user:e2e_password@localhost:5432/e2e_db
-          DATABASE_MIGRATION_URL: postgresql://e2e_user:e2e_password@localhost:5432/e2e_db
-          REDIS_URL: redis://localhost:6379
-          JWT_SECRET: test_secret_at_least_32_characters_long_for_testing_purposes_only
-
       - name: Run E2E tests
         run: |
           cd backend
           npm run test:e2e
         env:
           NODE_OPTIONS: --experimental-vm-modules
-          DATABASE_URL: postgresql://e2e_user:e2e_password@localhost:5432/e2e_db
+          DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: test_secret_at_least_32_characters_long_for_testing_purposes_only
 
