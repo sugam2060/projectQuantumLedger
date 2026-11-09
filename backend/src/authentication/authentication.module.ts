@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
@@ -9,11 +9,12 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PermissionGuard } from './guards/permission.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UtilsModule } from '../utils/utils.module';
+import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.module';
 
-@Global()
 @Module({
   imports: [
     UtilsModule,
+    RolesPermissionsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [ConfigService],

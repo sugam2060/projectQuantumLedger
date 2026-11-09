@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { JwtService } from '@nestjs/jwt';
+import { REDIS_CLIENT } from '../src/redis/redis.config';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -12,7 +13,10 @@ describe('AppController (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(REDIS_CLIENT)
+      .useValue({ quit: async () => 'OK' })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     jwtService = app.get(JwtService);
