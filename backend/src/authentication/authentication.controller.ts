@@ -30,7 +30,7 @@ export class AuthenticationController {
     loadThreshold: 0.8,
   })
   @Public()
-  @RequiredRoles("users.login")
+  @RequiredRoles('users.login')
   async login(
     @Body() dto: ClientLoginDTO,
     @ReqDecorator() req: Request,
@@ -69,7 +69,7 @@ export class AuthenticationController {
     return result;
   }
 
-  @RequiredRoles("users.refresh")
+  @RequiredRoles('users.refresh')
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @Public()
