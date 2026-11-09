@@ -6,6 +6,7 @@ import { DatabaseModule } from './database/database.module';
 import { AuthenticationModule } from './authentication/authentication.module';
 import { UtilsModule } from './utils/utils.module';
 import { RedisModule } from './redis/redis.module';
+import { RolesPermissionsModule } from './roles-permissions/roles-permissions.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { RedisModule } from './redis/redis.module';
     AuthenticationModule,
     UtilsModule,
     RedisModule,
+    RolesPermissionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

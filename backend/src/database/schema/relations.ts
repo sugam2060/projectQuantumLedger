@@ -3,6 +3,7 @@ import { accessLogs, auditLogs } from './audit_logs/access_audit_logs';
 import { branches } from './Identity_and_tenent/branches';
 import { business } from './Identity_and_tenent/businesses';
 import { businessMemberships } from './Identity_and_tenent/business_membership';
+import { endpointRoleAccess } from './Identity_and_tenent/endpoint_role_access';
 import { invitations } from './Identity_and_tenent/invitations';
 import { platformUsers } from './Identity_and_tenent/platform_users';
 import { roles } from './Identity_and_tenent/roles';
@@ -21,6 +22,7 @@ export const businessRelations = relations(business, ({ one, many }) => ({
   terminals: many(terminals),
   accessLogs: many(accessLogs),
   auditLogs: many(auditLogs),
+  endpointRoleAccess: many(endpointRoleAccess),
 }));
 
 export const platformUsersRelations = relations(platformUsers, ({ many }) => ({
@@ -53,6 +55,7 @@ export const rolesRelations = relations(roles, ({ one, many }) => ({
   }),
   memberships: many(businessMemberships),
   invitations: many(invitations),
+  endpointRoleAccess: many(endpointRoleAccess),
 }));
 
 export const businessMembershipsRelations = relations(
