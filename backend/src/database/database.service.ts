@@ -54,8 +54,18 @@ export class DatabaseService {
     callback: (transaction: DrizzleTransaction) => Promise<T>,
     config?: TransactionConfig,
   ): Promise<T> {
-    const session = this.contextService.getSession();
+    return this.transactionWithSession(
+      this.contextService.getSession(),
+      callback,
+      config,
+    );
+  }
 
+  transactionWithSession<T>(
+    session: ReturnType<RequestContextService['getSession']>,
+    callback: (transaction: DrizzleTransaction) => Promise<T>,
+    config?: TransactionConfig,
+  ): Promise<T> {
     return this.database.transaction(async (transaction) => {
       await transaction.execute(sql`
         SELECT

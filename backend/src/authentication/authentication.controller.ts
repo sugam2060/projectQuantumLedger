@@ -14,6 +14,7 @@ import type { ClientLoginDTO } from './dto/clientLogin.dto';
 import { ClientType } from './dto/clientLogin.dto';
 import { Public } from './decorators/public.decorator';
 import { RateLimit } from './decorators/rate-limit.decorator';
+import { RequiredRoles } from './decorators/required_permission.decorator';
 
 @Controller('authentication')
 export class AuthenticationController {
@@ -28,6 +29,8 @@ export class AuthenticationController {
     dynamicAdjustment: true,
     loadThreshold: 0.8,
   })
+  @Public()
+  @RequiredRoles('users.login')
   async login(
     @Body() dto: ClientLoginDTO,
     @ReqDecorator() req: Request,
@@ -66,6 +69,7 @@ export class AuthenticationController {
     return result;
   }
 
+  @RequiredRoles('users.refresh')
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @Public()

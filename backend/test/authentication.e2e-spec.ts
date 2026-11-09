@@ -1,10 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
-import { DatabaseService } from '../src/database/database.service';
 import { RedisService } from '../src/redis/redis.service';
-import { JwtService } from '@nestjs/jwt';
+import { REDIS_CLIENT } from '../src/redis/redis.config';
 
 describe('AuthenticationController (e2e)', () => {
   let app: INestApplication;
@@ -12,9 +11,17 @@ describe('AuthenticationController (e2e)', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(RedisService)
+      .useValue({})
+      .overrideProvider(REDIS_CLIENT)
+      .useValue({ quit: async () => 'OK' })
+      .compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
   });
 
@@ -29,10 +36,10 @@ describe('AuthenticationController (e2e)', () => {
         remember: true,
       };
 
-      const response = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .post('/authentication/login')
         .send(loginDto)
-        .expect(401);
+        .expect(400);
     });
 
     it('should reject login with missing password', async () => {
@@ -41,10 +48,10 @@ describe('AuthenticationController (e2e)', () => {
         remember: true,
       };
 
-      const response = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .post('/authentication/login')
         .send(loginDto)
-        .expect(401);
+        .expect(400);
     });
   });
 });

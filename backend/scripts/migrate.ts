@@ -7,7 +7,54 @@ import { Pool } from 'pg';
 
 const backendDirectory = resolve(__dirname, '..');
 const scriptDirectory = resolve(backendDirectory, 'scripts');
+const appRole = 'fortis_app';
 
+function quoteSqlLiteral(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+async function applySqlFile(
+  pool: Pool,
+  filename: string,
+  replacements: Record<string, string> = {},
+) {
+  let statement = await readFile(resolve(scriptDirectory, filename), 'utf8');
+  for (const [placeholder, value] of Object.entries(replacements)) {
+    statement = statement.replaceAll(placeholder, value);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(statement);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function runtimeRolePassword(): string | undefined {
+  const configuredPassword = process.env.FORTIS_APP_DB_PASSWORD;
+  if (configuredPassword?.trim()) {
+    return configuredPassword;
+  }
+
+  const runtimeUrl = process.env.DATABASE_URL;
+  if (!runtimeUrl) {
+    return undefined;
+  }
+
+  const credentials = new URL(runtimeUrl);
+  if (decodeURIComponent(credentials.username) !== appRole) {
+    return undefined;
+  }
+  return credentials.password
+    ? decodeURIComponent(credentials.password)
+    : undefined;
+}
 
 async function runMigrations() {
   const envFile = resolve(backendDirectory, '.env');
@@ -25,30 +72,27 @@ async function runMigrations() {
   const pool = new Pool({ connectionString });
 
   try {
+    console.info('Ensuring the fortis_app runtime role exists...');
+    const appPassword = runtimeRolePassword();
+    await applySqlFile(pool, 'fortis_app_creation.sql', {
+      '__FORTIS_APP_PASSWORD_LITERAL__': appPassword
+        ? quoteSqlLiteral(appPassword)
+        : 'NULL',
+    });
+
+    console.info('Applying core RLS helper functions...');
+    await applySqlFile(pool, 'core_helper_function.sql');
+
     console.info('Applying Drizzle migrations...');
     await migrate(drizzle(pool), {
       migrationsFolder: resolve(backendDirectory, 'drizzle'),
     });
 
-    console.info('Applying core helper and security-definer SQL...');
-    const [helperFunctionsSql, securityDefinerSql] = await Promise.all([
-      readFile(resolve(scriptDirectory, 'core_helper_function.sql'), 'utf8'),
-      readFile(resolve(scriptDirectory, 'core_security_definer.sql'), 'utf8'),
-    ]);
+    console.info('Applying core security-definer SQL...');
+    await applySqlFile(pool, 'core_security_definer.sql');
 
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query(helperFunctionsSql);
-      await client.query(securityDefinerSql);
-      await client.query('COMMIT');
-      console.info('Core helpers applied successfully.');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    console.info('Granting least-privilege runtime access...');
+    await applySqlFile(pool, 'fortis_app_privileges.sql');
 
     console.info('Database migrations completed.');
   } finally {

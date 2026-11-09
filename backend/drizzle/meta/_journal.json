@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1793809900184,
-      "tag": "0000_brown_red_ghost",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1793810495174,
-      "tag": "0001_clever_bloodstrike",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1793811999436,
-      "tag": "0002_lively_taskmaster",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1793874762372,
-      "tag": "0003_tiresome_namorita",
+      "when": 1794240334958,
+      "tag": "0000_robust_stone_men",
       "breakpoints": true
     }
   ]
