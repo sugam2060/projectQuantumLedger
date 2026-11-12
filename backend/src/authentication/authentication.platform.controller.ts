@@ -38,8 +38,20 @@ export class AuthenticationPlatformController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
+    const headerClientType = request.headers['x-client-type'];
+    if (
+      Array.isArray(headerClientType) ||
+      (headerClientType !== undefined &&
+        !Object.values(ClientType).some(
+          (clientType) => clientType === headerClientType,
+        ))
+    ) {
+      throw new BadRequestException('A valid x-client-type header is required');
+    }
+    const clientType = headerClientType ?? dto.client_type;
+
     const result = await this.platformAuthService.login(dto);
-    if (dto.client_type === ClientType.WEB || !dto.client_type) {
+    if (clientType === ClientType.WEB || !clientType) {
       const cookieOptions = {
         httpOnly: true,
         secure:

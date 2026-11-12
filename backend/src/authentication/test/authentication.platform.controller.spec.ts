@@ -48,7 +48,6 @@ describe('AuthenticationPlatformController', () => {
     const dto = {
       email: 'platform@example.com',
       password: 'password',
-      client_type: ClientType.WEB,
     };
     const response = { cookie: jest.fn() };
     platformAuthService.login.mockResolvedValue(authResult);
@@ -56,7 +55,10 @@ describe('AuthenticationPlatformController', () => {
     await expect(
       controller.login(
         dto,
-        { secure: true, headers: {} } as never,
+        {
+          secure: true,
+          headers: { 'x-client-type': ClientType.WEB },
+        } as never,
         response as never,
       ),
     ).resolves.toEqual({
@@ -89,14 +91,16 @@ describe('AuthenticationPlatformController', () => {
     const dto = {
       email: 'platform@example.com',
       password: 'password',
-      client_type: ClientType.MOBILE,
     };
     platformAuthService.login.mockResolvedValue(authResult);
 
     await expect(
       controller.login(
         dto,
-        { secure: false, headers: {} } as never,
+        {
+          secure: false,
+          headers: { 'x-client-type': ClientType.MOBILE },
+        } as never,
         {
           cookie: jest.fn(),
         } as never,
