@@ -5,9 +5,13 @@ import { ConfigService } from '@nestjs/config';
 import { RedisService } from './redis/redis.service';
 import { RateLimitKeyGenerator } from './utils/rate-limit-key.generator';
 import { RateLimitMiddleware } from './utils/ratelimit.middleware';
+import { cookieParserMiddleware } from './utils/cookie-parser.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Populate req.cookies before the global JWT guard reads web access tokens.
+  app.use(cookieParserMiddleware);
 
   // Set global prefix
   app.setGlobalPrefix('/api/v1');

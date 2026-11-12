@@ -86,4 +86,28 @@ describeWithDatabase('Endpoint role access database integration', () => {
     expect(result.rows[0].insert_scopes_role_to_business).toBe(true);
     expect(result.rows[0].delete_requires_owner).toBe(true);
   });
+
+  it('allows platform login to select only the email in its RLS context', async () => {
+    const result = await pool.query<{
+      email_scoped_policy: boolean;
+      legacy_lookup_function_removed: boolean;
+    }>(`
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM pg_policy p
+          JOIN pg_class c ON c.oid = p.polrelid
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = current_schema()
+            AND c.relname = 'platform_users'
+            AND p.polname = 'platform_users_select'
+            AND pg_get_expr(p.polqual, p.polrelid) ILIKE '%app.platform_auth_email%'
+        ) AS email_scoped_policy,
+        to_regprocedure('public.lookup_platform_user_for_auth(text)') IS NULL
+          AS legacy_lookup_function_removed
+    `);
+
+    expect(result.rows[0].email_scoped_policy).toBe(true);
+    expect(result.rows[0].legacy_lookup_function_removed).toBe(true);
+  });
 });

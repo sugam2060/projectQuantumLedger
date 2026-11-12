@@ -24,6 +24,11 @@ export class PermissionGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
+    const request = context.switchToHttp().getRequest<{
+      user?: AuthenticatedUser;
+    }>();
+    if (request.user?.isPlatform === true) return true;
+
     const endpointKey = this.reflector.getAllAndOverride<string>(
       REQUIRED_ROLES,
       [context.getHandler(), context.getClass()],
@@ -31,9 +36,6 @@ export class PermissionGuard implements CanActivate {
 
     if (!endpointKey) return true;
 
-    const request = context.switchToHttp().getRequest<{
-      user?: AuthenticatedUser;
-    }>();
     if (!request.user) {
       throw new ForbiddenException('User not authenticated');
     }

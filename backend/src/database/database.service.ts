@@ -73,6 +73,7 @@ export class DatabaseService {
           set_config('app.user_id', ${session.userId ?? ''}, true),
           set_config('app.branch_id', ${session.branchId ?? ''}, true),
           set_config('app.platform_user_id', ${session.platformUserId ?? ''}, true),
+          set_config('app.platform_auth_email', ${session.platformAuthEmail ?? ''}, true),
           set_config('app.is_platform_user', ${session.isPlatform ? 'true' : 'false'}, true),
           set_config('app.is_owner', ${session.isOwner ? 'true' : 'false'}, true);
       `);

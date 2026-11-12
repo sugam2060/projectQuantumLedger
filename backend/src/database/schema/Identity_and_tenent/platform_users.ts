@@ -40,12 +40,15 @@ export const platformUsers = pgTable(
       sql`status IN ('active', 'disabled', 'suspended')`,
     ),
 
-    // RLS Policy (SELECT): Platform managers can ONLY read their own data (PM A cannot read PM B)
+    // Login can read only the row matching the normalized email explicitly
+    // supplied in this transaction's auth context. Authenticated users can
+    // still read only their own row.
     pgPolicy('platform_users_select', {
       for: 'select',
       to: 'fortis_app',
       using: sql`
             id = app_platform_user_id()
+            OR email_normalized = NULLIF(current_setting('app.platform_auth_email', true), '')
         `,
     }),
 
