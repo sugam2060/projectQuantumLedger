@@ -6,6 +6,7 @@ export interface RequestSession {
   userId?: string;
   branchId?: string;
   platformUserId?: string;
+  platformAuthEmail?: string;
   isPlatform?: boolean;
   isOwner?: boolean; // <-- Added here
 }

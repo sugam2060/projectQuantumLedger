@@ -54,4 +54,19 @@ describe('AuthenticationController (e2e)', () => {
         .expect(400);
     });
   });
+
+  describe('platform authentication endpoints', () => {
+    it('validates platform login payloads', async () => {
+      await request(app.getHttpServer())
+        .post('/platform/user/login')
+        .send({ password: 'password123' })
+        .expect(400);
+    });
+
+    it('requires refresh-token and x-client-type headers', async () => {
+      await request(app.getHttpServer())
+        .post('/platform/user/refresh')
+        .expect(400);
+    });
+  });
 });

@@ -4,6 +4,7 @@ import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionGuard } from '../permission.guard';
 import { REQUIRED_ROLES } from '../../decorators/required_permission.decorator';
+import type { AuthenticatedUser } from '../../strategies/jwt.strategy';
 
 describe('PermissionGuard', () => {
   const reflector = {
@@ -12,7 +13,9 @@ describe('PermissionGuard', () => {
   const endpointAccess = {
     hasAccess: jest.fn(),
   };
-  const request = { user: { userId: 'user-1', businessId: 'business-1' } };
+  const request: { user?: AuthenticatedUser } = {
+    user: { userId: 'user-1', businessId: 'business-1', permissions: [] },
+  };
   const context = {
     getHandler: jest.fn(),
     getClass: jest.fn(),
@@ -62,5 +65,23 @@ describe('PermissionGuard', () => {
     endpointAccess.hasAccess.mockResolvedValue(true);
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+
+  it('bypasses endpoint role checks for an authenticated platform user', async () => {
+    request.user = {
+      userId: undefined,
+      platformUserId: 'platform-user-1',
+      isPlatform: true,
+      permissions: [],
+    };
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(endpointAccess.hasAccess).not.toHaveBeenCalled();
+
+    request.user = {
+      userId: 'user-1',
+      businessId: 'business-1',
+      permissions: [],
+    };
   });
 });
