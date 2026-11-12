@@ -7,6 +7,7 @@ import { RequestSession } from '../../database/request_context.service';
 export interface AuthenticatedUser extends RequestSession {
   permissions: string[];
   role?: string;
+  isBootstrap?: boolean;
 }
 
 interface JwtPayload {
@@ -16,6 +17,7 @@ interface JwtPayload {
   branchId?: unknown;
   platformUserId?: unknown;
   isPlatform?: unknown;
+  isBootstrap?: unknown;
   isOwner?: unknown;
   role?: unknown;
   permissions?: unknown;
@@ -72,6 +74,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       platformUserId,
       isPlatform,
       isOwner: payload.isOwner === true,
+      isBootstrap: isPlatform && payload.isBootstrap === true,
       role: typeof payload.role === 'string' ? payload.role : undefined,
       permissions: payload.permissions ?? [],
     };

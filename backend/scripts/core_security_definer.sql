@@ -1,3 +1,7 @@
+-- Remove the former login lookup function now that login uses the
+-- transaction-scoped RLS policy on platform_users directly.
+DROP FUNCTION IF EXISTS public.lookup_platform_user_for_auth(TEXT);
+
 CREATE OR REPLACE FUNCTION public.redeem_invitation_and_register(
     p_token_hash TEXT,
     p_name TEXT,

@@ -4,6 +4,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthenticationController } from './authentication.controller';
+import { AuthenticationPlatformController } from './authentication.platform.controller';
+import { PlatformAuthService } from './authentication.service.platform';
 import { UserAuthService } from './authentication.service.user';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PermissionGuard } from './guards/permission.guard';
@@ -31,9 +33,10 @@ import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.m
       },
     }),
   ],
-  controllers: [AuthenticationController],
+  controllers: [AuthenticationController, AuthenticationPlatformController],
   providers: [
     UserAuthService,
+    PlatformAuthService,
     JwtStrategy,
     {
       provide: APP_GUARD,
