@@ -1,6 +1,7 @@
 import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test } from '@nestjs/testing';
+import { ClientType } from '../dto/clientLogin.dto';
 import { AuthenticationPlatformController } from '../authentication.platform.controller';
 import { PlatformAuthService } from '../authentication.service.platform';
 import { IS_PUBLIC } from '../decorators/public.decorator';
@@ -47,7 +48,7 @@ describe('AuthenticationPlatformController', () => {
     const dto = {
       email: 'platform@example.com',
       password: 'password',
-      client_type: 'web' as const,
+      client_type: ClientType.WEB,
     };
     const response = { cookie: jest.fn() };
     platformAuthService.login.mockResolvedValue(authResult);
@@ -88,7 +89,7 @@ describe('AuthenticationPlatformController', () => {
     const dto = {
       email: 'platform@example.com',
       password: 'password',
-      client_type: 'mobile' as const,
+      client_type: ClientType.MOBILE,
     };
     platformAuthService.login.mockResolvedValue(authResult);
 
