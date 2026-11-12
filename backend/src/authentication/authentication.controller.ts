@@ -2,6 +2,8 @@ import {
   Controller,
   Post,
   Body,
+  Get,
+  ValidationPipe,
   HttpCode,
   HttpStatus,
   Res as ResDecorator,
@@ -15,10 +17,37 @@ import { ClientType } from './dto/clientLogin.dto';
 import { Public } from './decorators/public.decorator';
 import { RateLimit } from './decorators/rate-limit.decorator';
 import { RequiredRoles } from './decorators/required_permission.decorator';
+import type { AuthenticatedUser } from './strategies/jwt.strategy';
+import { AuthenticationMeHeadersDto } from './dto/authentication-me-headers.dto';
+import { AuthenticationMeHeaders } from './decorators/authentication-me-headers.decorator';
+
+interface AuthenticatedRequest extends Request {
+  user: AuthenticatedUser;
+}
 
 @Controller('authentication')
 export class AuthenticationController {
   constructor(private readonly authService: UserAuthService) {}
+
+  @Get('me')
+  @RateLimit({ requests: 60, windowMs: 60_000 })
+  getCurrentUser(
+    @ReqDecorator() request: AuthenticatedRequest,
+    @AuthenticationMeHeaders(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        validateCustomDecorators: true,
+      }),
+    )
+    headers: AuthenticationMeHeadersDto,
+  ) {
+    return this.authService.getCurrentUser(
+      request.user,
+      headers.clientType,
+      headers.terminalId,
+    );
+  }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)

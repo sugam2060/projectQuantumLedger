@@ -4,12 +4,20 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
-import { businessMemberships, roles, users } from '../database/schema';
+import {
+  businessMemberships,
+  endpointRoleAccess,
+  roles,
+  terminals,
+  users,
+} from '../database/schema';
+import type { AuthenticatedUser } from './strategies/jwt.strategy';
 import { ClientLoginDTO, ClientType } from './dto/clientLogin.dto';
 import { UtilsService } from '../utils/utils.service';
 import { RedisService } from '../redis/redis.service';
+import { EndpointAccessCatalogService } from '../roles-permissions/endpoint-access-catalog.service';
 import bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -19,6 +27,7 @@ export class UserAuthService {
     private readonly jwtService: JwtService,
     private readonly utilsService: UtilsService,
     private readonly redisService: RedisService,
+    private readonly endpointCatalog: EndpointAccessCatalogService,
   ) {}
 
   async userLogin(dto: ClientLoginDTO) {
@@ -155,6 +164,142 @@ export class UserAuthService {
         memberships: membershipsWithRoles,
       };
     });
+  }
+
+  async getCurrentUser(
+    authenticatedUser: AuthenticatedUser,
+    clientType: ClientType,
+    requestedTerminalId: string,
+  ) {
+    const { userId, businessId } = authenticatedUser;
+    if (!userId || authenticatedUser.isPlatform) {
+      throw new UnauthorizedException('A user access token is required');
+    }
+
+    const rows = await this.db.transactionWithSession(authenticatedUser, (tx) =>
+      tx
+        .select({
+          userId: users.id,
+          displayName: users.name,
+          status: users.status,
+          membershipBusinessId: businessMemberships.businessId,
+          membershipBranchId: businessMemberships.branchId,
+          roleId: roles.id,
+          roleVersion: roles.version,
+          rolePermissions: roles.permissions,
+          endpointKey: endpointRoleAccess.endpointKey,
+          configuredRoleId: endpointRoleAccess.roleId,
+          terminalId: terminals.id,
+        })
+        .from(users)
+        .leftJoin(
+          businessMemberships,
+          and(
+            eq(businessMemberships.userId, users.id),
+            eq(businessMemberships.isActive, true),
+            businessId
+              ? eq(businessMemberships.businessId, businessId)
+              : sql`false`,
+          ),
+        )
+        .leftJoin(roles, eq(roles.id, businessMemberships.roleId))
+        .leftJoin(
+          endpointRoleAccess,
+          eq(endpointRoleAccess.businessId, businessMemberships.businessId),
+        )
+        .leftJoin(
+          terminals,
+          and(
+            eq(terminals.id, requestedTerminalId),
+            eq(terminals.businessId, businessMemberships.businessId),
+            eq(terminals.status, 'active'),
+            or(
+              isNull(businessMemberships.branchId),
+              eq(terminals.branchId, businessMemberships.branchId),
+            ),
+          ),
+        )
+        .where(eq(users.id, userId)),
+    );
+
+    const profile = rows[0];
+    if (!profile || profile.status !== 'active') {
+      throw new UnauthorizedException('User is not active');
+    }
+    if (businessId && !profile.membershipBusinessId) {
+      throw new UnauthorizedException('Active business membership not found');
+    }
+    if (businessId && !profile.terminalId) {
+      throw new UnauthorizedException(
+        'Terminal is not active in the authenticated context',
+      );
+    }
+
+    const effectivePermissions = new Set<string>();
+    if (profile.roleId) {
+      const configuredRolesByEndpoint = new Map<string, Set<string>>();
+      for (const row of rows) {
+        if (row.endpointKey && row.configuredRoleId) {
+          const configuredRoles =
+            configuredRolesByEndpoint.get(row.endpointKey) ?? new Set<string>();
+          configuredRoles.add(row.configuredRoleId);
+          configuredRolesByEndpoint.set(row.endpointKey, configuredRoles);
+        }
+      }
+
+      const catalog = this.endpointCatalog.list();
+      const catalogKeys = new Set(catalog.map((entry) => entry.endpointKey));
+      for (const permission of this.readPermissions(profile.rolePermissions)) {
+        const configuredRoles = configuredRolesByEndpoint.get(permission);
+        if (
+          !catalogKeys.has(permission) ||
+          !configuredRoles ||
+          configuredRoles.has(profile.roleId)
+        ) {
+          effectivePermissions.add(permission);
+        }
+      }
+      for (const endpoint of catalog) {
+        const configuredRoles = configuredRolesByEndpoint.get(
+          endpoint.endpointKey,
+        );
+        if (!configuredRoles || configuredRoles.has(profile.roleId)) {
+          effectivePermissions.add(endpoint.endpointKey);
+        }
+      }
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const tokenExpiresAt = authenticatedUser.tokenExpiresAt;
+    const issuedAt = authenticatedUser.tokenIssuedAt;
+
+    return {
+      id: profile.userId,
+      displayName: profile.displayName,
+      activeContext: profile.membershipBusinessId
+        ? {
+            businessId: profile.membershipBusinessId,
+            branchId: profile.membershipBranchId,
+          }
+        : null,
+      is_owner: authenticatedUser.isOwner === true,
+      role_template: profile.roleId,
+      role_template_version:
+        profile.roleVersion === null ? null : String(profile.roleVersion),
+      effectivePermissions: [...effectivePermissions].sort(),
+      session: {
+        clientType,
+        terminalId: profile.terminalId ?? null,
+        issuedAt: issuedAt ? new Date(issuedAt * 1000).toISOString() : null,
+        expiresAt: tokenExpiresAt
+          ? new Date(tokenExpiresAt * 1000).toISOString()
+          : null,
+        expiresInSeconds:
+          tokenExpiresAt === undefined
+            ? null
+            : Math.max(0, tokenExpiresAt - now),
+      },
+    };
   }
 
   private readPermissions(value: unknown): string[] {

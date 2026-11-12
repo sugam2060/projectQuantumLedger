@@ -8,6 +8,6 @@ import { EndpointAccessCatalogService } from './endpoint-access-catalog.service'
   imports: [DiscoveryModule],
   controllers: [RolesPermissionsController],
   providers: [EndpointAccessService, EndpointAccessCatalogService],
-  exports: [EndpointAccessService],
+  exports: [EndpointAccessService, EndpointAccessCatalogService],
 })
 export class RolesPermissionsModule {}

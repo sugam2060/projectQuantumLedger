@@ -8,6 +8,8 @@ export interface AuthenticatedUser extends RequestSession {
   permissions: string[];
   role?: string;
   isBootstrap?: boolean;
+  tokenIssuedAt?: number;
+  tokenExpiresAt?: number;
 }
 
 interface JwtPayload {
@@ -22,6 +24,7 @@ interface JwtPayload {
   role?: unknown;
   permissions?: unknown;
   exp?: unknown;
+  iat?: unknown;
 }
 
 const UUID_PATTERN =
@@ -77,6 +80,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       isBootstrap: isPlatform && payload.isBootstrap === true,
       role: typeof payload.role === 'string' ? payload.role : undefined,
       permissions: payload.permissions ?? [],
+      tokenIssuedAt: typeof payload.iat === 'number' ? payload.iat : undefined,
+      tokenExpiresAt: payload.exp,
     };
   }
 

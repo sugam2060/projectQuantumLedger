@@ -9,6 +9,7 @@ import { PlatformAuthService } from './authentication.service.platform';
 import { UserAuthService } from './authentication.service.user';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PermissionGuard } from './guards/permission.guard';
+import { RateLimitGuard } from './guards/rate-limit.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UtilsModule } from '../utils/utils.module';
 import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.module';
@@ -41,6 +42,10 @@ import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.m
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
     },
     {
       provide: APP_GUARD,

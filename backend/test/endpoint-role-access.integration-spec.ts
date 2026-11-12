@@ -110,4 +110,34 @@ describeWithDatabase('Endpoint role access database integration', () => {
     expect(result.rows[0].email_scoped_policy).toBe(true);
     expect(result.rows[0].legacy_lookup_function_removed).toBe(true);
   });
+
+  it('has schema support for role template versioning', async () => {
+    const result = await pool.query<{
+      version_column_exists: boolean;
+      version_trigger_exists: boolean;
+    }>(`
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'roles'
+            AND column_name = 'version'
+            AND is_nullable = 'NO'
+        ) AS version_column_exists,
+        EXISTS (
+          SELECT 1
+          FROM pg_trigger t
+          JOIN pg_class c ON c.oid = t.tgrelid
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = current_schema()
+            AND c.relname = 'roles'
+            AND t.tgname = 'roles_bump_template_version'
+            AND NOT t.tgisinternal
+        ) AS version_trigger_exists
+    `);
+
+    expect(result.rows[0].version_column_exists).toBe(true);
+    expect(result.rows[0].version_trigger_exists).toBe(true);
+  });
 });

@@ -574,13 +574,19 @@ export class RateLimitMiddleware implements NestMiddleware, OnModuleDestroy {
     }
   }
 
-  async use(req: Request, res: Response, next: NextFunction) {
+  async use(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+    configuredRateLimit?: RateLimitOptions,
+  ) {
     // Check if rate limiting is configured for this route
-    let rateLimitConfig = null;
+    let rateLimitConfig: RateLimitOptions | null = configuredRateLimit ?? null;
 
     try {
       // Try to get rate limit config from route handler
       if (
+        !rateLimitConfig &&
         req.route?.stack &&
         Array.isArray(req.route.stack) &&
         req.route.stack.length > 0

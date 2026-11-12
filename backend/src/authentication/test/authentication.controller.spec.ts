@@ -4,8 +4,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthenticationController } from '../authentication.controller';
 import { UserAuthService } from '../authentication.service.user';
 import { ClientLoginDTO, ClientType } from '../dto/clientLogin.dto';
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { REQUIRED_ROLES } from '../decorators/required_permission.decorator';
+import {
+  BadRequestException,
+  UnauthorizedException,
+  ValidationPipe,
+} from '@nestjs/common';
 import { Response } from 'express';
+import { AuthenticationMeHeadersDto } from '../dto/authentication-me-headers.dto';
 
 describe('AuthenticationController', () => {
   let controller: AuthenticationController;
@@ -15,6 +21,7 @@ describe('AuthenticationController', () => {
     // Mock the UserAuthService
     authServiceMock = {
       userLogin: jest.fn(),
+      getCurrentUser: jest.fn(),
       refreshAccessToken: jest.fn(),
       invalidateRefreshToken: jest.fn(),
     };
@@ -34,6 +41,65 @@ describe('AuthenticationController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('GET /authentication/me', () => {
+    it('requires authentication, applies rate limiting, and has no permission key', async () => {
+      const handler = AuthenticationController.prototype.getCurrentUser;
+      expect(Reflect.getMetadata('isPublic', handler)).not.toBe(true);
+      expect(Reflect.getMetadata('rateLimit', handler)).toEqual(
+        expect.objectContaining({ requests: 60, windowMs: 60_000 }),
+      );
+      expect(Reflect.getMetadata(REQUIRED_ROLES, handler)).toBeUndefined();
+    });
+
+    it('returns the authenticated user context', async () => {
+      const user = {
+        userId: '00000000-0000-4000-8000-000000000001',
+        permissions: [],
+      };
+      const result = { id: user.userId, effectivePermissions: [] };
+      authServiceMock.getCurrentUser.mockResolvedValue(result);
+
+      await expect(
+        controller.getCurrentUser({ user } as never, {
+          clientType: ClientType.MOBILE,
+          terminalId: '00000000-0000-4000-8000-000000000002',
+        }),
+      ).resolves.toBe(result);
+      expect(authServiceMock.getCurrentUser).toHaveBeenCalledWith(
+        user,
+        ClientType.MOBILE,
+        '00000000-0000-4000-8000-000000000002',
+      );
+    });
+
+    it('validates and maps the required client and terminal headers', async () => {
+      const pipe = new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        validateCustomDecorators: true,
+      });
+      const headers = await pipe.transform(
+        {
+          clientType: ClientType.WEB,
+          terminalId: '00000000-0000-4000-8000-000000000002',
+        },
+        { type: 'custom', metatype: AuthenticationMeHeadersDto },
+      );
+
+      expect(headers).toEqual({
+        clientType: ClientType.WEB,
+        terminalId: '00000000-0000-4000-8000-000000000002',
+      });
+
+      await expect(
+        pipe.transform(
+          { clientType: 'invalid', terminalId: 'bad-id' },
+          { type: 'custom', metatype: AuthenticationMeHeadersDto },
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 
   describe('login', () => {

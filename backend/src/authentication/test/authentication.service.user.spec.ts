@@ -10,6 +10,7 @@ import { ClientLoginDTO, ClientType } from '../dto/clientLogin.dto';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import { sql } from 'drizzle-orm';
+import { EndpointAccessCatalogService } from '../../roles-permissions/endpoint-access-catalog.service';
 
 describe('UserAuthService', () => {
   let service: UserAuthService;
@@ -17,11 +18,13 @@ describe('UserAuthService', () => {
   let jwtServiceMock: any;
   let utilsServiceMock: any;
   let redisServiceMock: any;
+  let endpointCatalogMock: { list: jest.Mock };
 
   beforeEach(async () => {
     // Mock dependencies
     dbMock = {
       transaction: jest.fn(),
+      transactionWithSession: jest.fn(),
       execute: jest.fn(),
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
@@ -47,6 +50,15 @@ describe('UserAuthService', () => {
       get: jest.fn(),
       delete: jest.fn(),
     };
+    endpointCatalogMock = {
+      list: jest
+        .fn()
+        .mockReturnValue([
+          { endpointKey: 'inventory.create' },
+          { endpointKey: 'inventory.delete' },
+          { endpointKey: 'catalog.view' },
+        ]),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -67,6 +79,10 @@ describe('UserAuthService', () => {
           provide: RedisService,
           useValue: redisServiceMock,
         },
+        {
+          provide: EndpointAccessCatalogService,
+          useValue: endpointCatalogMock,
+        },
       ],
     }).compile();
 
@@ -78,6 +94,112 @@ describe('UserAuthService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('getCurrentUser', () => {
+    const authenticatedUser = {
+      userId: '00000000-0000-4000-8000-000000000001',
+      businessId: '00000000-0000-4000-8000-000000000002',
+      branchId: '00000000-0000-4000-8000-000000000003',
+      isOwner: false,
+      isPlatform: false,
+      permissions: [],
+      tokenIssuedAt: 1_800_000_000,
+      tokenExpiresAt: 1_800_000_900,
+    };
+
+    it('returns profile, active role permissions, and session context', async () => {
+      const rows = [
+        {
+          userId: authenticatedUser.userId,
+          displayName: 'Cashier One',
+          status: 'active',
+          membershipBusinessId: authenticatedUser.businessId,
+          membershipBranchId: authenticatedUser.branchId,
+          isOwner: false,
+          roleId: '00000000-0000-4000-8000-000000000004',
+          roleName: 'Cashier',
+          roleVersion: 3,
+          rolePermissions: ['products.read'],
+          endpointKey: 'inventory.create',
+          configuredRoleId: '00000000-0000-4000-8000-000000000004',
+          terminalId: '00000000-0000-4000-8000-000000000005',
+        },
+        {
+          userId: authenticatedUser.userId,
+          displayName: 'Cashier One',
+          status: 'active',
+          membershipBusinessId: authenticatedUser.businessId,
+          membershipBranchId: authenticatedUser.branchId,
+          isOwner: false,
+          roleId: '00000000-0000-4000-8000-000000000004',
+          roleName: 'Cashier',
+          roleVersion: 3,
+          rolePermissions: ['products.read'],
+          endpointKey: 'inventory.delete',
+          configuredRoleId: '00000000-0000-4000-8000-000000000006',
+          terminalId: '00000000-0000-4000-8000-000000000005',
+        },
+      ];
+      const query = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue(rows),
+      };
+      const tx = { select: jest.fn().mockReturnValue(query) };
+      dbMock.transactionWithSession.mockImplementation(
+        async (
+          _session: unknown,
+          callback: (transaction: unknown) => unknown,
+        ) => callback(tx),
+      );
+
+      await expect(
+        service.getCurrentUser(
+          authenticatedUser,
+          ClientType.WEB,
+          '00000000-0000-4000-8000-000000000005',
+        ),
+      ).resolves.toEqual({
+        id: authenticatedUser.userId,
+        displayName: 'Cashier One',
+        activeContext: {
+          businessId: authenticatedUser.businessId,
+          branchId: authenticatedUser.branchId,
+        },
+        is_owner: false,
+        role_template: '00000000-0000-4000-8000-000000000004',
+        role_template_version: '3',
+        effectivePermissions: [
+          'catalog.view',
+          'inventory.create',
+          'products.read',
+        ],
+        session: {
+          clientType: ClientType.WEB,
+          terminalId: '00000000-0000-4000-8000-000000000005',
+          issuedAt: new Date(1_800_000_000_000).toISOString(),
+          expiresAt: new Date(1_800_000_900_000).toISOString(),
+          expiresInSeconds: expect.any(Number),
+        },
+      });
+      expect(dbMock.transactionWithSession).toHaveBeenCalledWith(
+        authenticatedUser,
+        expect.any(Function),
+      );
+      expect(tx.select).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects platform tokens on the user profile endpoint', async () => {
+      await expect(
+        service.getCurrentUser(
+          { isPlatform: true, permissions: [] },
+          ClientType.MOBILE,
+          '00000000-0000-4000-8000-000000000005',
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
+    });
   });
 
   describe('userLogin', () => {

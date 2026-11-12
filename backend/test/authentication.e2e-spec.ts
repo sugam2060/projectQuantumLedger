@@ -69,4 +69,10 @@ describe('AuthenticationController (e2e)', () => {
         .expect(400);
     });
   });
+
+  describe('GET /authentication/me', () => {
+    it('requires a valid access token', async () => {
+      await request(app.getHttpServer()).get('/authentication/me').expect(401);
+    });
+  });
 });
