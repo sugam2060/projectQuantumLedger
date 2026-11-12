@@ -1,8 +1,11 @@
 name: Continuous Integration
 
 on:
+  push:
+    branches: ["**"]
   pull_request:
-    branches: [ "**" ]
+    branches: ["**"]
+  workflow_dispatch:
 
 jobs:
   # Security scanning
@@ -31,6 +34,7 @@ jobs:
 
       - name: Run secret scanning
         uses: trufflesecurity/trufflehog@v3.99.8
+        if: github.event_name == 'pull_request'
         with:
           path: ./
           base: ${{ github.event.pull_request.base.sha }}
@@ -326,3 +330,46 @@ jobs:
               repo: context.repo.repo,
               body: comment
             });
+
+  # Configure this stable check as required in the repository ruleset.
+  backend-ci-required:
+    name: Backend CI Required
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - security
+      - code-quality
+      - dependency-audit
+      - unit-tests
+      - integration-tests
+      - e2e-tests
+      - matrix-testing
+      - build-verification
+    steps:
+      - name: Verify all CI jobs passed
+        if: >-
+          always() &&
+          needs.security.result == 'success' &&
+          needs.code-quality.result == 'success' &&
+          needs.dependency-audit.result == 'success' &&
+          needs.unit-tests.result == 'success' &&
+          needs.integration-tests.result == 'success' &&
+          needs.e2e-tests.result == 'success' &&
+          needs.matrix-testing.result == 'success' &&
+          needs.build-verification.result == 'success'
+        run: echo "All backend CI jobs passed."
+
+      - name: Fail when any CI job did not pass
+        if: >-
+          always() &&
+          (needs.security.result != 'success' ||
+          needs.code-quality.result != 'success' ||
+          needs.dependency-audit.result != 'success' ||
+          needs.unit-tests.result != 'success' ||
+          needs.integration-tests.result != 'success' ||
+          needs.e2e-tests.result != 'success' ||
+          needs.matrix-testing.result != 'success' ||
+          needs.build-verification.result != 'success')
+        run: |
+          echo "One or more backend CI jobs failed, were cancelled, or were skipped."
+          exit 1
