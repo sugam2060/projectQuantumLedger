@@ -7,6 +7,7 @@ export const AuthenticationMeHeaders = createParamDecorator(
     return {
       clientType: request.headers['x-client-type'],
       terminalId: request.headers['x-terminal-id'],
+      initialLoad: request.headers['x-initial-load'],
     };
   },
 );

@@ -140,4 +140,53 @@ describeWithDatabase('Endpoint role access database integration', () => {
     expect(result.rows[0].version_column_exists).toBe(true);
     expect(result.rows[0].version_trigger_exists).toBe(true);
   });
+
+  it('allows login terminal validation through the platform terminal-read RLS policy', async () => {
+    const result = await pool.query<{
+      rls_enabled: boolean;
+      select_policy_allows_platform_context: boolean;
+      terminal_branch_is_required: boolean;
+      terminal_has_business_and_branch_foreign_keys: boolean;
+    }>(`
+      SELECT
+        c.relrowsecurity AS rls_enabled,
+        EXISTS (
+          SELECT 1
+          FROM pg_policy p
+          WHERE p.polrelid = c.oid
+            AND p.polname = 'terminals_select'
+            AND pg_get_expr(p.polqual, p.polrelid) ILIKE '%app_is_platform%'
+        ) AS select_policy_allows_platform_context,
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns column_row
+          WHERE column_row.table_schema = current_schema()
+            AND column_row.table_name = 'terminals'
+            AND column_row.column_name = 'branch_id'
+            AND column_row.is_nullable = 'NO'
+        ) AS terminal_branch_is_required,
+        (
+          SELECT count(*) = 2
+          FROM pg_constraint constraint_row
+          WHERE constraint_row.conrelid = c.oid
+            AND constraint_row.contype = 'f'
+            AND constraint_row.conname IN (
+              'terminals_business_id_business_id_fk',
+              'terminals_branch_id_branches_id_fk'
+            )
+        ) AS terminal_has_business_and_branch_foreign_keys
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = current_schema()
+        AND c.relname = 'terminals'
+    `);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].rls_enabled).toBe(true);
+    expect(result.rows[0].select_policy_allows_platform_context).toBe(true);
+    expect(result.rows[0].terminal_branch_is_required).toBe(true);
+    expect(result.rows[0].terminal_has_business_and_branch_foreign_keys).toBe(
+      true,
+    );
+  });
 });

@@ -9,7 +9,6 @@ import { RedisService } from '../../redis/redis.service';
 import { ClientLoginDTO, ClientType } from '../dto/clientLogin.dto';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
-import { sql } from 'drizzle-orm';
 import { EndpointAccessCatalogService } from '../../roles-permissions/endpoint-access-catalog.service';
 
 describe('UserAuthService', () => {
@@ -108,10 +107,11 @@ describe('UserAuthService', () => {
       tokenExpiresAt: 1_800_000_900,
     };
 
-    it('returns profile, active role permissions, and session context', async () => {
+    it('returns nested profile, active role permissions, and session context on initial load', async () => {
       const rows = [
         {
           userId: authenticatedUser.userId,
+          email: 'cashier@example.com',
           displayName: 'Cashier One',
           status: 'active',
           membershipBusinessId: authenticatedUser.businessId,
@@ -120,33 +120,36 @@ describe('UserAuthService', () => {
           roleId: '00000000-0000-4000-8000-000000000004',
           roleName: 'Cashier',
           roleVersion: 3,
-          rolePermissions: ['products.read'],
-          endpointKey: 'inventory.create',
-          configuredRoleId: '00000000-0000-4000-8000-000000000004',
-          terminalId: '00000000-0000-4000-8000-000000000005',
-        },
-        {
-          userId: authenticatedUser.userId,
-          displayName: 'Cashier One',
-          status: 'active',
-          membershipBusinessId: authenticatedUser.businessId,
-          membershipBranchId: authenticatedUser.branchId,
-          isOwner: false,
-          roleId: '00000000-0000-4000-8000-000000000004',
-          roleName: 'Cashier',
-          roleVersion: 3,
-          rolePermissions: ['products.read'],
-          endpointKey: 'inventory.delete',
-          configuredRoleId: '00000000-0000-4000-8000-000000000006',
           terminalId: '00000000-0000-4000-8000-000000000005',
         },
       ];
-      const query = {
+      const profileQuery = {
         from: jest.fn().mockReturnThis(),
         leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockResolvedValue(rows),
       };
-      const tx = { select: jest.fn().mockReturnValue(query) };
+      const permissionsQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            rolePermissions: ['products.read'],
+            endpointKey: 'inventory.create',
+            configuredRoleId: '00000000-0000-4000-8000-000000000004',
+          },
+          {
+            rolePermissions: ['products.read'],
+            endpointKey: 'inventory.delete',
+            configuredRoleId: '00000000-0000-4000-8000-000000000006',
+          },
+        ]),
+      };
+      const tx = {
+        select: jest
+          .fn()
+          .mockReturnValueOnce(profileQuery)
+          .mockReturnValueOnce(permissionsQuery),
+      };
       dbMock.transactionWithSession.mockImplementation(
         async (
           _session: unknown,
@@ -161,8 +164,11 @@ describe('UserAuthService', () => {
           '00000000-0000-4000-8000-000000000005',
         ),
       ).resolves.toEqual({
-        id: authenticatedUser.userId,
-        displayName: 'Cashier One',
+        user: {
+          id: authenticatedUser.userId,
+          email: 'cashier@example.com',
+          name: 'Cashier One',
+        },
         activeContext: {
           businessId: authenticatedUser.businessId,
           branchId: authenticatedUser.branchId,
@@ -187,6 +193,50 @@ describe('UserAuthService', () => {
         authenticatedUser,
         expect.any(Function),
       );
+      expect(tx.select).toHaveBeenCalledTimes(2);
+    });
+
+    it('omits effective permissions when initial load is false', async () => {
+      const profileQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            userId: authenticatedUser.userId,
+            email: 'cashier@example.com',
+            displayName: 'Cashier One',
+            status: 'active',
+            membershipBusinessId: authenticatedUser.businessId,
+            membershipBranchId: authenticatedUser.branchId,
+            roleId: '00000000-0000-4000-8000-000000000004',
+            roleVersion: 3,
+            terminalId: '00000000-0000-4000-8000-000000000005',
+          },
+        ]),
+      };
+      const tx = { select: jest.fn().mockReturnValue(profileQuery) };
+      dbMock.transactionWithSession.mockImplementation(
+        async (
+          _session: unknown,
+          callback: (transaction: unknown) => unknown,
+        ) => callback(tx),
+      );
+
+      const result = await service.getCurrentUser(
+        authenticatedUser,
+        ClientType.WEB,
+        '00000000-0000-4000-8000-000000000005',
+        false,
+      );
+
+      expect(result).not.toHaveProperty('effectivePermissions');
+      expect(result).toMatchObject({
+        user: {
+          id: authenticatedUser.userId,
+          email: 'cashier@example.com',
+          name: 'Cashier One',
+        },
+      });
       expect(tx.select).toHaveBeenCalledTimes(1);
     });
 
@@ -284,7 +334,7 @@ describe('UserAuthService', () => {
       );
     });
 
-    it('should successfully authenticate user and return tokens', async () => {
+    it('should authenticate only when an active terminal matches a membership business and branch', async () => {
       // Mock user data that would be returned from the database
       const mockUserData = [
         {
@@ -293,6 +343,7 @@ describe('UserAuthService', () => {
           userPasswordHash: '$2a$10$hashedPassword',
           userStatus: 'active',
           businessId: 'business123',
+          branchId: null,
           roleId: 'role123',
           roleName: 'admin',
           rolePermissions: ['read', 'write'],
@@ -301,17 +352,28 @@ describe('UserAuthService', () => {
 
       // Mock the transaction to return user data
       dbMock.transaction.mockImplementation(async (callback: any) => {
+        const userQuery = {
+          from: jest.fn().mockReturnThis(),
+          leftJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockResolvedValue(mockUserData),
+        };
+        const terminalQuery = {
+          from: jest.fn().mockReturnThis(),
+          innerJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockResolvedValue([
+            {
+              terminalId: 'terminal123',
+              businessId: 'business123',
+              branchId: 'branch123',
+            },
+          ]),
+        };
         const tx = {
           execute: jest.fn().mockResolvedValue(undefined),
-          select: jest.fn().mockReturnValue({
-            from: jest.fn().mockReturnValue({
-              leftJoin: jest.fn().mockReturnValue({
-                leftJoin: jest.fn().mockReturnValue({
-                  where: jest.fn().mockReturnValue(mockUserData),
-                }),
-              }),
-            }),
-          }),
+          select: jest
+            .fn()
+            .mockReturnValueOnce(userQuery)
+            .mockReturnValueOnce(terminalQuery),
         };
         return callback(tx);
       });
@@ -330,7 +392,7 @@ describe('UserAuthService', () => {
       // Mock Redis service
       redisServiceMock.set.mockResolvedValue(undefined);
 
-      const result = await service.userLogin(mockDto);
+      const result = await service.userLogin(mockDto, 'terminal123');
 
       expect(result).toEqual({
         accessToken: 'mock-jwt-token',
@@ -346,12 +408,104 @@ describe('UserAuthService', () => {
       });
 
       expect(jwtServiceMock.signAsync).toHaveBeenCalled();
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
+        businessId: 'business123',
+        branchId: 'branch123',
+      });
       expect(utilsServiceMock.generateRefreshToken).toHaveBeenCalled();
       expect(redisServiceMock.set).toHaveBeenCalledWith(
         `refresh_token:mock-refresh-token`,
         'user123',
         7 * 24 * 60 * 60,
       );
+    });
+
+    it('rejects login when terminal is not active for a matching membership', async () => {
+      const mockUserData = [
+        {
+          userId: 'user123',
+          userEmail: 'test@example.com',
+          userPasswordHash: '$2a$10$hashedPassword',
+          userStatus: 'active',
+          businessId: 'business123',
+          branchId: 'branch123',
+          roleId: 'role123',
+          roleName: 'admin',
+          rolePermissions: ['read'],
+        },
+      ];
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue(mockUserData),
+      };
+      const terminalQuery = {
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([]),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback({
+          execute: jest.fn().mockResolvedValue(undefined),
+          select: jest
+            .fn()
+            .mockReturnValueOnce(userQuery)
+            .mockReturnValueOnce(terminalQuery),
+        }),
+      );
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await expect(service.userLogin(mockDto, 'terminal123')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
+    });
+
+    it('rejects login when an active terminal belongs to another business or branch', async () => {
+      const mockUserData = [
+        {
+          userId: 'user123',
+          userEmail: 'test@example.com',
+          userPasswordHash: '$2a$10$hashedPassword',
+          userStatus: 'active',
+          businessId: 'business123',
+          branchId: 'branch123',
+          roleId: 'role123',
+          roleName: 'admin',
+          rolePermissions: ['read'],
+        },
+      ];
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue(mockUserData),
+      };
+      const terminalQuery = {
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            terminalId: 'terminal123',
+            businessId: 'different-business',
+            branchId: 'different-branch',
+          },
+        ]),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback({
+          execute: jest.fn().mockResolvedValue(undefined),
+          select: jest
+            .fn()
+            .mockReturnValueOnce(userQuery)
+            .mockReturnValueOnce(terminalQuery),
+        }),
+      );
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await expect(service.userLogin(mockDto, 'terminal123')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
     });
   });
 

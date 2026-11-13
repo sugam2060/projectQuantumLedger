@@ -8,6 +8,7 @@ import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
   businessMemberships,
+  branches,
   endpointRoleAccess,
   roles,
   terminals,
@@ -30,7 +31,7 @@ export class UserAuthService {
     private readonly endpointCatalog: EndpointAccessCatalogService,
   ) {}
 
-  async userLogin(dto: ClientLoginDTO) {
+  async userLogin(dto: ClientLoginDTO, requestedTerminalId: string) {
     // Ensure email exists and is a string before processing
     if (!dto.email || typeof dto.email !== 'string') {
       throw new BadRequestException('Valid email is required');
@@ -45,8 +46,9 @@ export class UserAuthService {
     const expiresIn = dto.remember ? '7d' : '15m';
 
     return this.db.transaction(async (tx) => {
-      // Login has no authenticated user context yet, so briefly enable the
-      // platform read policy for the unique email lookup only.
+      // Login has no authenticated user context yet, so enable the platform
+      // read policy for the user lookup and terminal validation in this
+      // transaction only.
       await tx.execute(sql`
         SELECT set_config('app.is_platform_user', 'true', true)
       `);
@@ -90,6 +92,39 @@ export class UserAuthService {
         throw new UnauthorizedException('Invalid email or password');
       }
 
+      const [terminal] = await tx
+        .select({
+          terminalId: terminals.id,
+          businessId: terminals.businessId,
+          branchId: terminals.branchId,
+        })
+        .from(terminals)
+        .innerJoin(
+          branches,
+          and(
+            eq(branches.id, terminals.branchId),
+            eq(branches.businessId, terminals.businessId),
+          ),
+        )
+        .where(
+          and(
+            eq(terminals.id, requestedTerminalId),
+            eq(terminals.status, 'active'),
+          ),
+        );
+
+      const selectedMembership = userData.find(
+        (record) =>
+          terminal &&
+          record.businessId === terminal.businessId &&
+          (record.branchId === null || record.branchId === terminal.branchId),
+      );
+      if (!terminal || !selectedMembership) {
+        throw new UnauthorizedException(
+          'Terminal is not active for an assigned business branch',
+        );
+      }
+
       await tx.execute(sql`
         SELECT
           set_config('app.is_platform_user', 'false', true),
@@ -123,8 +158,15 @@ export class UserAuthService {
 
       const membershipsWithRoles = Array.from(membershipMap.values());
 
-      const activeMembership =
-        membershipsWithRoles.length === 1 ? membershipsWithRoles[0] : undefined;
+      const activeMembership = {
+        ...membershipsWithRoles.find(
+          (membership) =>
+            membership.businessId === selectedMembership.businessId &&
+            (membership.branchId === null ||
+              membership.branchId === terminal.branchId),
+        ),
+        branchId: terminal.branchId,
+      };
       const accessToken = await this.jwtService.signAsync(
         {
           sub: user.id,
@@ -170,112 +212,141 @@ export class UserAuthService {
     authenticatedUser: AuthenticatedUser,
     clientType: ClientType,
     requestedTerminalId: string,
+    initialLoad = true,
   ) {
     const { userId, businessId } = authenticatedUser;
     if (!userId || authenticatedUser.isPlatform) {
       throw new UnauthorizedException('A user access token is required');
     }
 
-    const rows = await this.db.transactionWithSession(authenticatedUser, (tx) =>
-      tx
-        .select({
-          userId: users.id,
-          displayName: users.name,
-          status: users.status,
-          membershipBusinessId: businessMemberships.businessId,
-          membershipBranchId: businessMemberships.branchId,
-          roleId: roles.id,
-          roleVersion: roles.version,
-          rolePermissions: roles.permissions,
-          endpointKey: endpointRoleAccess.endpointKey,
-          configuredRoleId: endpointRoleAccess.roleId,
-          terminalId: terminals.id,
-        })
-        .from(users)
-        .leftJoin(
-          businessMemberships,
-          and(
-            eq(businessMemberships.userId, users.id),
-            eq(businessMemberships.isActive, true),
-            businessId
-              ? eq(businessMemberships.businessId, businessId)
-              : sql`false`,
-          ),
-        )
-        .leftJoin(roles, eq(roles.id, businessMemberships.roleId))
-        .leftJoin(
-          endpointRoleAccess,
-          eq(endpointRoleAccess.businessId, businessMemberships.businessId),
-        )
-        .leftJoin(
-          terminals,
-          and(
-            eq(terminals.id, requestedTerminalId),
-            eq(terminals.businessId, businessMemberships.businessId),
-            eq(terminals.status, 'active'),
-            or(
-              isNull(businessMemberships.branchId),
-              eq(terminals.branchId, businessMemberships.branchId),
+    const result = await this.db.transactionWithSession(
+      authenticatedUser,
+      async (tx) => {
+        const rows = await tx
+          .select({
+            userId: users.id,
+            email: users.emailNormalized,
+            displayName: users.name,
+            status: users.status,
+            membershipBusinessId: businessMemberships.businessId,
+            membershipBranchId: businessMemberships.branchId,
+            roleId: roles.id,
+            roleVersion: roles.version,
+            terminalId: terminals.id,
+          })
+          .from(users)
+          .leftJoin(
+            businessMemberships,
+            and(
+              eq(businessMemberships.userId, users.id),
+              eq(businessMemberships.isActive, true),
+              businessId
+                ? eq(businessMemberships.businessId, businessId)
+                : sql`false`,
             ),
-          ),
-        )
-        .where(eq(users.id, userId)),
+          )
+          .leftJoin(roles, eq(roles.id, businessMemberships.roleId))
+          .leftJoin(
+            terminals,
+            and(
+              eq(terminals.id, requestedTerminalId),
+              eq(terminals.businessId, businessMemberships.businessId),
+              eq(terminals.status, 'active'),
+              or(
+                isNull(businessMemberships.branchId),
+                eq(terminals.branchId, businessMemberships.branchId),
+              ),
+            ),
+          )
+          .where(eq(users.id, userId));
+
+        const profile = rows[0];
+        if (!profile || profile.status !== 'active') {
+          throw new UnauthorizedException('User is not active');
+        }
+        if (businessId && !profile.membershipBusinessId) {
+          throw new UnauthorizedException(
+            'Active business membership not found',
+          );
+        }
+        if (businessId && !profile.terminalId) {
+          throw new UnauthorizedException(
+            'Terminal is not active in the authenticated context',
+          );
+        }
+
+        let effectivePermissions: string[] | undefined = initialLoad
+          ? []
+          : undefined;
+        if (initialLoad && profile.roleId && profile.membershipBusinessId) {
+          const permissionRows = await tx
+            .select({
+              rolePermissions: roles.permissions,
+              endpointKey: endpointRoleAccess.endpointKey,
+              configuredRoleId: endpointRoleAccess.roleId,
+            })
+            .from(roles)
+            .leftJoin(
+              endpointRoleAccess,
+              eq(endpointRoleAccess.businessId, profile.membershipBusinessId),
+            )
+            .where(eq(roles.id, profile.roleId));
+
+          const configuredRolesByEndpoint = new Map<string, Set<string>>();
+          for (const row of permissionRows) {
+            if (row.endpointKey && row.configuredRoleId) {
+              const configuredRoles =
+                configuredRolesByEndpoint.get(row.endpointKey) ??
+                new Set<string>();
+              configuredRoles.add(row.configuredRoleId);
+              configuredRolesByEndpoint.set(row.endpointKey, configuredRoles);
+            }
+          }
+
+          const permissions = new Set<string>();
+          const catalog = this.endpointCatalog.list();
+          const catalogKeys = new Set(
+            catalog.map((entry) => entry.endpointKey),
+          );
+          for (const permission of this.readPermissions(
+            permissionRows[0]?.rolePermissions,
+          )) {
+            const configuredRoles = configuredRolesByEndpoint.get(permission);
+            if (
+              !catalogKeys.has(permission) ||
+              !configuredRoles ||
+              configuredRoles.has(profile.roleId)
+            ) {
+              permissions.add(permission);
+            }
+          }
+          for (const endpoint of catalog) {
+            const configuredRoles = configuredRolesByEndpoint.get(
+              endpoint.endpointKey,
+            );
+            if (!configuredRoles || configuredRoles.has(profile.roleId)) {
+              permissions.add(endpoint.endpointKey);
+            }
+          }
+          effectivePermissions = [...permissions].sort();
+        }
+
+        return { profile, effectivePermissions };
+      },
     );
 
-    const profile = rows[0];
-    if (!profile || profile.status !== 'active') {
-      throw new UnauthorizedException('User is not active');
-    }
-    if (businessId && !profile.membershipBusinessId) {
-      throw new UnauthorizedException('Active business membership not found');
-    }
-    if (businessId && !profile.terminalId) {
-      throw new UnauthorizedException(
-        'Terminal is not active in the authenticated context',
-      );
-    }
-
-    const effectivePermissions = new Set<string>();
-    if (profile.roleId) {
-      const configuredRolesByEndpoint = new Map<string, Set<string>>();
-      for (const row of rows) {
-        if (row.endpointKey && row.configuredRoleId) {
-          const configuredRoles =
-            configuredRolesByEndpoint.get(row.endpointKey) ?? new Set<string>();
-          configuredRoles.add(row.configuredRoleId);
-          configuredRolesByEndpoint.set(row.endpointKey, configuredRoles);
-        }
-      }
-
-      const catalog = this.endpointCatalog.list();
-      const catalogKeys = new Set(catalog.map((entry) => entry.endpointKey));
-      for (const permission of this.readPermissions(profile.rolePermissions)) {
-        const configuredRoles = configuredRolesByEndpoint.get(permission);
-        if (
-          !catalogKeys.has(permission) ||
-          !configuredRoles ||
-          configuredRoles.has(profile.roleId)
-        ) {
-          effectivePermissions.add(permission);
-        }
-      }
-      for (const endpoint of catalog) {
-        const configuredRoles = configuredRolesByEndpoint.get(
-          endpoint.endpointKey,
-        );
-        if (!configuredRoles || configuredRoles.has(profile.roleId)) {
-          effectivePermissions.add(endpoint.endpointKey);
-        }
-      }
-    }
+    const { profile, effectivePermissions } = result;
 
     const now = Math.floor(Date.now() / 1000);
     const tokenExpiresAt = authenticatedUser.tokenExpiresAt;
     const issuedAt = authenticatedUser.tokenIssuedAt;
 
     return {
-      id: profile.userId,
-      displayName: profile.displayName,
+      user: {
+        id: profile.userId,
+        email: profile.email,
+        name: profile.displayName,
+      },
       activeContext: profile.membershipBusinessId
         ? {
             businessId: profile.membershipBusinessId,
@@ -286,7 +357,7 @@ export class UserAuthService {
       role_template: profile.roleId,
       role_template_version:
         profile.roleVersion === null ? null : String(profile.roleVersion),
-      effectivePermissions: [...effectivePermissions].sort(),
+      ...(effectivePermissions && { effectivePermissions }),
       session: {
         clientType,
         terminalId: profile.terminalId ?? null,
@@ -334,7 +405,7 @@ export class UserAuthService {
 
     // Fetch user data (similar to login but without password verification)
     // We need to temporarily enable platform user context to fetch the user by ID
-    const userData = await this.db.execute(sql`
+    await this.db.execute(sql`
       SELECT set_config('app.is_platform_user', 'true', true)
     `);
 

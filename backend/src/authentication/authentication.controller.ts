@@ -3,7 +3,6 @@ import {
   Post,
   Body,
   Get,
-  ValidationPipe,
   HttpCode,
   HttpStatus,
   Res as ResDecorator,
@@ -20,6 +19,8 @@ import { RequiredRoles } from './decorators/required_permission.decorator';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';
 import { AuthenticationMeHeadersDto } from './dto/authentication-me-headers.dto';
 import { AuthenticationMeHeaders } from './decorators/authentication-me-headers.decorator';
+import { AuthenticationLoginHeaders } from './decorators/authentication-login-headers.decorator';
+import { AuthenticationLoginHeadersDto } from './dto/authentication-login-headers.dto';
 
 interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
@@ -33,19 +34,14 @@ export class AuthenticationController {
   @RateLimit({ requests: 60, windowMs: 60_000 })
   getCurrentUser(
     @ReqDecorator() request: AuthenticatedRequest,
-    @AuthenticationMeHeaders(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        validateCustomDecorators: true,
-      }),
-    )
+    @AuthenticationMeHeaders()
     headers: AuthenticationMeHeadersDto,
   ) {
     return this.authService.getCurrentUser(
       request.user,
       headers.clientType,
       headers.terminalId,
+      headers.initialLoad,
     );
   }
 
@@ -62,13 +58,16 @@ export class AuthenticationController {
   @RequiredRoles('users.login')
   async login(
     @Body() dto: ClientLoginDTO,
+    @AuthenticationLoginHeaders()
+    headers: AuthenticationLoginHeadersDto,
     @ReqDecorator() req: Request,
     @ResDecorator({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.userLogin(dto);
+    const result = await this.authService.userLogin(dto, headers.terminalId);
+    const clientType = headers.clientType ?? ClientType.WEB;
 
     // For web clients, set the JWT and refresh token as HTTP-only cookies
-    if (dto.client_type === ClientType.WEB || !dto.client_type) {
+    if (clientType === ClientType.WEB) {
       const cookieOptions = {
         httpOnly: true,
         secure: req.secure || req.headers['x-forwarded-proto'] === 'https',

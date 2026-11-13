@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthenticationMeHeadersDto } from '../dto/authentication-me-headers.dto';
+import { AuthenticationLoginHeadersDto } from '../dto/authentication-login-headers.dto';
 
 describe('AuthenticationController', () => {
   let controller: AuthenticationController;
@@ -65,12 +66,14 @@ describe('AuthenticationController', () => {
         controller.getCurrentUser({ user } as never, {
           clientType: ClientType.MOBILE,
           terminalId: '00000000-0000-4000-8000-000000000002',
+          initialLoad: true,
         }),
       ).resolves.toBe(result);
       expect(authServiceMock.getCurrentUser).toHaveBeenCalledWith(
         user,
         ClientType.MOBILE,
         '00000000-0000-4000-8000-000000000002',
+        true,
       );
     });
 
@@ -84,6 +87,7 @@ describe('AuthenticationController', () => {
         {
           clientType: ClientType.WEB,
           terminalId: '00000000-0000-4000-8000-000000000002',
+          initialLoad: 'true',
         },
         { type: 'custom', metatype: AuthenticationMeHeadersDto },
       );
@@ -91,14 +95,44 @@ describe('AuthenticationController', () => {
       expect(headers).toEqual({
         clientType: ClientType.WEB,
         terminalId: '00000000-0000-4000-8000-000000000002',
+        initialLoad: true,
       });
 
       await expect(
         pipe.transform(
-          { clientType: 'invalid', terminalId: 'bad-id' },
+          {
+            clientType: 'invalid',
+            terminalId: 'bad-id',
+            initialLoad: 'not-a-boolean',
+          },
           { type: 'custom', metatype: AuthenticationMeHeadersDto },
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('defaults initialLoad to true and parses false explicitly', async () => {
+      const pipe = new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        validateCustomDecorators: true,
+      });
+      const baseHeaders = {
+        clientType: ClientType.WEB,
+        terminalId: '00000000-0000-4000-8000-000000000002',
+      };
+
+      await expect(
+        pipe.transform(baseHeaders, {
+          type: 'custom',
+          metatype: AuthenticationMeHeadersDto,
+        }),
+      ).resolves.toMatchObject({ initialLoad: true });
+      await expect(
+        pipe.transform(
+          { ...baseHeaders, initialLoad: 'false' },
+          { type: 'custom', metatype: AuthenticationMeHeadersDto },
+        ),
+      ).resolves.toMatchObject({ initialLoad: false });
     });
   });
 
@@ -107,12 +141,15 @@ describe('AuthenticationController', () => {
       email: 'test@example.com',
       password: 'password123',
       remember: true,
-      client_type: ClientType.WEB,
     };
 
     const mockRequest = {
       secure: false,
-      headers: { 'x-forwarded-proto': 'http' },
+      headers: {
+        'x-forwarded-proto': 'http',
+        'x-client-type': 'web',
+        'x-terminal-id': '00000000-0000-4000-8000-000000000002',
+      },
     } as any;
 
     const mockResponse = {
@@ -135,9 +172,20 @@ describe('AuthenticationController', () => {
 
       authServiceMock.userLogin.mockResolvedValue(mockResult);
 
-      const result = await controller.login(mockDto, mockRequest, mockResponse);
+      const result = await controller.login(
+        mockDto,
+        {
+          clientType: ClientType.WEB,
+          terminalId: '00000000-0000-4000-8000-000000000002',
+        },
+        mockRequest,
+        mockResponse,
+      );
 
-      expect(authServiceMock.userLogin).toHaveBeenCalledWith(mockDto);
+      expect(authServiceMock.userLogin).toHaveBeenCalledWith(
+        mockDto,
+        '00000000-0000-4000-8000-000000000002',
+      );
       expect(mockResponse.cookie).toHaveBeenCalledTimes(2);
       expect(mockResponse.cookie).toHaveBeenCalledWith(
         'access_token',
@@ -156,7 +204,10 @@ describe('AuthenticationController', () => {
     });
 
     it('should successfully login and return tokens for mobile client', async () => {
-      const mobileDto = { ...mockDto, client_type: ClientType.MOBILE };
+      const mobileHeaders: AuthenticationLoginHeadersDto = {
+        clientType: ClientType.MOBILE,
+        terminalId: '00000000-0000-4000-8000-000000000002',
+      };
       const mockResult = {
         accessToken: 'mock-access-token',
         refreshToken: 'mock-refresh-token',
@@ -167,12 +218,16 @@ describe('AuthenticationController', () => {
       authServiceMock.userLogin.mockResolvedValue(mockResult);
 
       const result = await controller.login(
-        mobileDto,
+        mockDto,
+        mobileHeaders,
         mockRequest,
         mockResponse,
       );
 
-      expect(authServiceMock.userLogin).toHaveBeenCalledWith(mobileDto);
+      expect(authServiceMock.userLogin).toHaveBeenCalledWith(
+        mockDto,
+        '00000000-0000-4000-8000-000000000002',
+      );
       expect(mockResponse.cookie).not.toHaveBeenCalled();
       expect(result).toEqual(mockResult);
     });
@@ -185,10 +240,24 @@ describe('AuthenticationController', () => {
       );
 
       await expect(
-        controller.login(invalidDto, mockRequest, mockResponse),
+        controller.login(
+          invalidDto,
+          {
+            terminalId: '00000000-0000-4000-8000-000000000002',
+          },
+          mockRequest,
+          mockResponse,
+        ),
       ).rejects.toThrow(BadRequestException);
       await expect(
-        controller.login(invalidDto, mockRequest, mockResponse),
+        controller.login(
+          invalidDto,
+          {
+            terminalId: '00000000-0000-4000-8000-000000000002',
+          },
+          mockRequest,
+          mockResponse,
+        ),
       ).rejects.toThrow('Valid email is required');
     });
 
@@ -200,10 +269,24 @@ describe('AuthenticationController', () => {
       );
 
       await expect(
-        controller.login(invalidDto, mockRequest, mockResponse),
+        controller.login(
+          invalidDto,
+          {
+            terminalId: '00000000-0000-4000-8000-000000000002',
+          },
+          mockRequest,
+          mockResponse,
+        ),
       ).rejects.toThrow(BadRequestException);
       await expect(
-        controller.login(invalidDto, mockRequest, mockResponse),
+        controller.login(
+          invalidDto,
+          {
+            terminalId: '00000000-0000-4000-8000-000000000002',
+          },
+          mockRequest,
+          mockResponse,
+        ),
       ).rejects.toThrow('Valid password is required');
     });
 
@@ -213,10 +296,24 @@ describe('AuthenticationController', () => {
       );
 
       await expect(
-        controller.login(mockDto, mockRequest, mockResponse),
+        controller.login(
+          mockDto,
+          {
+            terminalId: '00000000-0000-4000-8000-000000000002',
+          },
+          mockRequest,
+          mockResponse,
+        ),
       ).rejects.toThrow(UnauthorizedException);
       await expect(
-        controller.login(mockDto, mockRequest, mockResponse),
+        controller.login(
+          mockDto,
+          {
+            terminalId: '00000000-0000-4000-8000-000000000002',
+          },
+          mockRequest,
+          mockResponse,
+        ),
       ).rejects.toThrow('Invalid credentials');
     });
   });

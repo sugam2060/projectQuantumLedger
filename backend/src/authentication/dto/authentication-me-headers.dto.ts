@@ -1,4 +1,5 @@
-import { IsEnum, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsEnum, IsUUID } from 'class-validator';
 import { ClientType } from './clientLogin.dto';
 
 export class AuthenticationMeHeadersDto {
@@ -7,4 +8,16 @@ export class AuthenticationMeHeadersDto {
 
   @IsUUID()
   terminalId!: string;
+
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === undefined || value === 'true') {
+      return true;
+    }
+    if (value === 'false') {
+      return false;
+    }
+    return value;
+  })
+  @IsBoolean()
+  initialLoad = true;
 }

@@ -38,6 +38,7 @@ describe('AuthenticationController (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/authentication/login')
+        .set('x-terminal-id', '00000000-0000-4000-8000-000000000001')
         .send(loginDto)
         .expect(400);
     });
@@ -50,7 +51,24 @@ describe('AuthenticationController (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/authentication/login')
+        .set('x-terminal-id', '00000000-0000-4000-8000-000000000001')
         .send(loginDto)
+        .expect(400);
+    });
+
+    it('requires a terminal ID header', async () => {
+      await request(app.getHttpServer())
+        .post('/authentication/login')
+        .send({ email: 'test@example.com', password: 'password123' })
+        .expect(400);
+    });
+
+    it('validates custom login headers through the registered global pipe', async () => {
+      await request(app.getHttpServer())
+        .post('/authentication/login')
+        .set('x-client-type', 'invalid')
+        .set('x-terminal-id', '00000000-0000-4000-8000-000000000001')
+        .send({ email: 'test@example.com', password: 'password123' })
         .expect(400);
     });
   });
