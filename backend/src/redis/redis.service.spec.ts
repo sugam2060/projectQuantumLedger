@@ -257,6 +257,41 @@ describe('RedisService', () => {
       expect(result).toBe(true);
     });
 
+    describe('setIfAbsent', () => {
+      it('sets a value and expiry atomically only when the key is absent', async () => {
+        mockRedisClient.set.mockResolvedValue('OK');
+
+        await expect(
+          service.setIfAbsent('mail:sent:job-1', 'sent', 86400),
+        ).resolves.toBe(true);
+
+        expect(mockRedisClient.set).toHaveBeenCalledWith(
+          'mail:sent:job-1',
+          'sent',
+          'EX',
+          86400,
+          'NX',
+        );
+      });
+    });
+
+    describe('compareAndDelete', () => {
+      it('deletes a key only when its current value matches', async () => {
+        mockRedisClient.eval.mockResolvedValue(1);
+
+        await expect(
+          service.compareAndDelete('mail:lock:job-1', 'token'),
+        ).resolves.toBe(true);
+
+        expect(mockRedisClient.eval).toHaveBeenCalledWith(
+          expect.stringContaining("redis.call('GET'"),
+          1,
+          'mail:lock:job-1',
+          'token',
+        );
+      });
+    });
+
     it('should call redis.set with NX option and return false when unsuccessful', async () => {
       mockRedisClient.set.mockResolvedValue(null);
 

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <title>Your redemption code</title>
+    <style>
+      /* Fortis brand tokens
+         Navy  #111D25  | Green #496D59 | Light green #7FB596 | Off-white #F2F5F3 */
+      body { margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; }
+      table { border-collapse: collapse; }
+      img { border: 0; outline: none; text-decoration: none; }
+      a { color: #496D59; }
+
+      @media only screen and (max-width: 620px) {
+        .container { width: 100% !important; }
+        .px { padding-left: 24px !important; padding-right: 24px !important; }
+        .headline { font-size: 24px !important; line-height: 30px !important; }
+        .code { font-size: 28px !important; letter-spacing: 6px !important; }
+      }
+
+      .logo-dark { display: none; }
+
+      @media (prefers-color-scheme: dark) {
+        .header-bg { background-color: #111D25 !important; border-color: #22323C !important; }
+        .logo-light { display: none !important; }
+        .logo-dark { display: block !important; }
+        .page-bg { background-color: #0B1318 !important; }
+        .card { background-color: #111D25 !important; border-color: #22323C !important; }
+        .headline { color: #F2F5F3 !important; }
+        .copy { color: #C3CFC8 !important; }
+        .code-box { background-color: #0B1318 !important; border-left-color: #7FB596 !important; }
+        .code { color: #F2F5F3 !important; }
+        .footer-bg { background-color: #0B1318 !important; }
+        .footer-text, .footer-text a { color: #8A9A92 !important; }
+        a { color: #7FB596 !important; }
+      }
+    </style>
+  </head>
+
+  <body style="margin:0; padding:0; background-color:#F2F5F3;">
+    <!-- Preheader: inbox preview text (hidden in the email itself) -->
+    <div style="display:none; max-height:0; overflow:hidden; opacity:0; font-size:1px; line-height:1px; color:#F2F5F3;">
+      Your Fortis redemption code is {{redeemCode}}. Valid until {{expiresAt}}.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="page-bg" style="background-color:#F2F5F3;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="container" style="width:600px; max-width:600px;">
+
+            <!-- Header -->
+            <tr>
+              <td align="left" class="header-bg px" style="background-color:#FFFFFF; padding:28px 40px; border-left:1px solid #DDE4DF; border-right:1px solid #DDE4DF; border-top:1px solid #DDE4DF;">
+                <a href="{{#if homeUrl}}{{homeUrl}}{{else}}#{{/if}}" style="text-decoration:none;">
+                  <!-- Fortis logo (inline SVG). Light version shown by default, dark-background version in dark mode. -->
+                  <svg class="logo-light" width="200" height="55" viewBox="20 20 1210 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fortis" style="display:block; width:200px; height:auto;"><g transform="translate(40 30)"><path fill="#111D25" d="M0 111 183 0l59 35L59 147v125L0 307z"/><path fill="#496D59" d="m99 177 183-111 59 35-183 112v124l-59-35z"/><path fill="#111D25" d="m158 237 101-61 59 35-101 61v96l-59-35z"/></g><g transform="translate(40 0)" fill="none" stroke="#111D25" stroke-width="36" stroke-linejoin="miter" stroke-miterlimit="10"><path d="M394 98V268M376 116H486M394 176H466"/><path d="M564 116H602L638 152V214L602 250H564L528 214V152Z"/><path d="M698 98V268M698 116H770L804 150V176L770 210H698"/><path d="M850 116H990M920 116V268"/><path stroke="#496D59" d="M1032 98V268"/><path d="M1186 134V116H1110L1092 134V165L1110 183H1168L1186 201V232L1168 250H1092V232"/></g><path transform="translate(40 0)" fill="#111D25" d="M738 196H782L834 268H788Z"/></svg>
+                  <svg class="logo-dark" width="200" height="55" viewBox="20 20 1210 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fortis" style="display:none; width:200px; height:auto;"><g transform="translate(40 30)"><path fill="#F2F5F3" d="M0 111 183 0l59 35L59 147v125L0 307z"/><path fill="#7FB596" d="m99 177 183-111 59 35-183 112v124l-59-35z"/><path fill="#F2F5F3" d="m158 237 101-61 59 35-101 61v96l-59-35z"/></g><g transform="translate(40 0)" fill="none" stroke="#F2F5F3" stroke-width="36" stroke-linejoin="miter" stroke-miterlimit="10"><path d="M394 98V268M376 116H486M394 176H466"/><path d="M564 116H602L638 152V214L602 250H564L528 214V152Z"/><path d="M698 98V268M698 116H770L804 150V176L770 210H698"/><path d="M850 116H990M920 116V268"/><path stroke="#7FB596" d="M1032 98V268"/><path d="M1186 134V116H1110L1092 134V165L1110 183H1168L1186 201V232L1168 250H1092V232"/></g><path transform="translate(40 0)" fill="#F2F5F3" d="M738 196H782L834 268H788Z"/></svg>
+                </a>
+              </td>
+            </tr>
+
+            <!-- Accent bar -->
+            <tr>
+              <td height="4" style="height:4px; line-height:4px; font-size:0; background-color:#496D59;">&nbsp;</td>
+            </tr>
+
+            <!-- Card -->
+            <tr>
+              <td class="card px" style="background-color:#FFFFFF; padding:44px 40px 40px; border-left:1px solid #DDE4DF; border-right:1px solid #DDE4DF;">
+
+                <h1 class="headline" style="margin:0 0 20px; font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif; font-size:28px; line-height:36px; font-weight:700; letter-spacing:-0.2px; color:#111D25;">
+                  Your redemption code
+                </h1>
+
+                <!-- Short green rule under the headline -->
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+                  <tr><td width="48" height="3" style="width:48px; height:3px; line-height:3px; font-size:0; background-color:#496D59;">&nbsp;</td></tr>
+                </table>
+
+                <p class="copy" style="margin:0 0 24px; font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif; font-size:16px; line-height:26px; color:#3B4A53;">
+                  Enter this code to redeem your reward:
+                </p>
+
+                <!-- Code -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td class="code-box" align="center" style="background-color:#F2F5F3; border-left:4px solid #496D59; padding:24px 16px;">
+                      <span class="code" style="font-family:'SFMono-Regular',Menlo,Consolas,'Courier New',monospace; font-size:36px; line-height:44px; font-weight:700; letter-spacing:10px; color:#111D25; padding-left:10px;">{{redeemCode}}</span>
+                    </td>
+                  </tr>
+                </table>
+
+                <p class="copy" style="margin:24px 0 0; font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif; font-size:16px; line-height:26px; color:#3B4A53;">
+                  Valid until <strong style="color:#111D25;">{{expiresAt}}</strong>.
+                </p>
+
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td class="footer-bg px" style="background-color:#E7EDE9; padding:24px 40px; border-top:1px solid #DDE4DF;">
+                <p class="footer-text" style="margin:0 0 8px; font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif; font-size:12px; line-height:18px; color:#5E6E66;">
+                  <strong style="color:#111D25;">Fortis</strong> &middot; Reliable point of sale you can trust.
+                </p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
