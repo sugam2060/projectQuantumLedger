@@ -1,0 +1,632 @@
+{
+  "info": {
+    "name": "Fortis POS API v1",
+    "description": "Postman requests for every API route currently declared by the backend controllers. Set credentials, terminal/role IDs, and local document file paths in collection variables before running. Start with the login requests. User login requires a terminal assigned to that user; role-management requests require an owner token and valid role ID. The public business request accepts one multipart submission with all three documents.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "userClientType",
+      "value": "desktop",
+      "type": "string"
+    },
+    {
+      "key": "userEmail",
+      "value": "cashier@example.com",
+      "type": "string"
+    },
+    {
+      "key": "userPassword",
+      "value": "CHANGE_ME",
+      "type": "string"
+    },
+    {
+      "key": "terminalId",
+      "value": "01234567-89ab-4cde-8f01-23456789abcd",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "platformClientType",
+      "value": "mobile",
+      "type": "string"
+    },
+    {
+      "key": "platformUserEmail",
+      "value": "platformmanager@example.com",
+      "type": "string"
+    },
+    {
+      "key": "platformUserPassword",
+      "value": "CHANGE_ME",
+      "type": "string"
+    },
+    {
+      "key": "platformAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "platformRefreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "endpointKey",
+      "value": "users.login",
+      "type": "string"
+    },
+    {
+      "key": "roleId",
+      "value": "9abcde01-2345-4f67-89ab-cdef01234567",
+      "type": "string"
+    },
+    {
+      "key": "panCardFrontPath",
+      "value": "/absolute/path/to/pan-front.pdf",
+      "type": "string"
+    },
+    {
+      "key": "panCardBackPath",
+      "value": "/absolute/path/to/pan-back.pdf",
+      "type": "string"
+    },
+    {
+      "key": "businessRegistrationPath",
+      "value": "/absolute/path/to/registration.pdf",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Application",
+      "item": [
+        {
+          "name": "GET /",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /onboarding",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/onboarding",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"business.created\",\n  \"businessName\": \"Example Store\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 202', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User authentication",
+      "item": [
+        {
+          "name": "POST /authentication/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{userClientType}}",
+                "type": "text"
+              },
+              {
+                "key": "x-terminal-id",
+                "value": "{{terminalId}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/authentication/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\",\n  \"remember\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.expect(body.accessToken).to.be.a('string');",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "if (body.refreshToken) pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "if (body.memberships && body.memberships.length) pm.collectionVariables.set('roleId', body.memberships[0].roleId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /authentication/refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{userClientType}}",
+                "type": "text"
+              },
+              {
+                "key": "x-terminal-id",
+                "value": "{{terminalId}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/authentication/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.expect(body.accessToken).to.be.a('string');",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "if (body.refreshToken) pm.collectionVariables.set('refreshToken', body.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /authentication/me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "{{userClientType}}",
+                "type": "text"
+              },
+              {
+                "key": "x-terminal-id",
+                "value": "{{terminalId}}",
+                "type": "text"
+              },
+              {
+                "key": "x-initial-load",
+                "value": "true",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/authentication/me"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Platform authentication",
+      "item": [
+        {
+          "name": "POST /platform/user/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{platformClientType}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/platform/user/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{platformUserEmail}}\",\n  \"password\": \"{{platformUserPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.expect(body.accessToken).to.be.a('string');",
+                  "pm.collectionVariables.set('platformAccessToken', body.accessToken);",
+                  "if (body.refreshToken) pm.collectionVariables.set('platformRefreshToken', body.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /platform/user/refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "{{platformClientType}}",
+                "type": "text"
+              },
+              {
+                "key": "refresh-token",
+                "value": "{{platformRefreshToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/platform/user/refresh"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.expect(body.accessToken).to.be.a('string');",
+                  "pm.collectionVariables.set('platformAccessToken', body.accessToken);",
+                  "if (body.refreshToken) pm.collectionVariables.set('platformRefreshToken', body.refreshToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Platform business request",
+      "item": [
+        {
+          "name": "POST /platform/businesses/request (multipart with files)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/platform/businesses/request",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "legalName",
+                  "value": "Example Retail Pvt. Ltd.",
+                  "type": "text"
+                },
+                {
+                  "key": "displayName",
+                  "value": "Example Retail",
+                  "type": "text"
+                },
+                {
+                  "key": "country",
+                  "value": "NP",
+                  "type": "text"
+                },
+                {
+                  "key": "city",
+                  "value": "Kathmandu",
+                  "type": "text"
+                },
+                {
+                  "key": "postalCode",
+                  "value": "123123123",
+                  "type": "text"
+                },
+                {
+                  "key": "addressLine1",
+                  "value": "Address line 1",
+                  "type": "text"
+                },
+                {
+                  "key": "addressLine2",
+                  "value": "Address line 2",
+                  "type": "text"
+                },
+                {
+                  "key": "primaryContactName",
+                  "value": "Example Owner",
+                  "type": "text"
+                },
+                {
+                  "key": "primaryContactEmail",
+                  "value": "owner@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "primaryContactPhone",
+                  "value": "+9779812345678",
+                  "type": "text"
+                },
+                {
+                  "key": "panCardFront",
+                  "type": "file",
+                  "src": "{{panCardFrontPath}}"
+                },
+                {
+                  "key": "panCardBack",
+                  "type": "file",
+                  "src": "{{panCardBackPath}}"
+                },
+                {
+                  "key": "businessRegistrationCertificate",
+                  "type": "file",
+                  "src": "{{businessRegistrationPath}}"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.expect(pm.response.json().message).to.include('request has been submitted');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Endpoint role access",
+      "item": [
+        {
+          "name": "GET /business/endpoint-access/endpoints",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/business/endpoint-access/endpoints"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /business/endpoint-access",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/business/endpoint-access"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /business/endpoint-access/:endpointKey",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/business/endpoint-access/{{endpointKey}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleIds\": [\n    \"{{roleId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /business/endpoint-access/:endpointKey",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/business/endpoint-access/{{endpointKey}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
