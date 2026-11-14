@@ -2,9 +2,18 @@ import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { v2 as cloudinary, type UploadApiResponse } from 'cloudinary';
+import {
+  v2 as cloudinary,
+  type UploadApiOptions,
+  type UploadApiResponse,
+} from 'cloudinary';
 import { PassThrough } from 'stream';
 import { CloudinaryObjectStoreService } from '../cloudinary.service';
+
+type UploadStreamMock = (
+  options?: UploadApiOptions,
+  callback?: (error?: unknown, result?: UploadApiResponse) => void,
+) => PassThrough;
 
 describe('CloudinaryObjectStoreService', () => {
   let service: CloudinaryObjectStoreService;
@@ -65,14 +74,16 @@ describe('CloudinaryObjectStoreService', () => {
       format: 'pdf',
     } as UploadApiResponse;
     const stream = new PassThrough();
-    const upload = jest
-      .spyOn(cloudinary.uploader, 'upload_stream')
-      .mockImplementation((options, callback) => {
-        expect(options?.folder).toBe('business-request-documents');
-        expect(options?.access_mode).toBe('authenticated');
-        queueMicrotask(() => callback?.(undefined, uploadResult));
-        return stream;
-      });
+    const upload = jest.spyOn(
+      cloudinary.uploader,
+      'upload_stream',
+    ) as unknown as jest.MockedFunction<UploadStreamMock>;
+    upload.mockImplementation((options, callback) => {
+      expect(options?.folder).toBe('business-request-documents');
+      expect(options?.access_mode).toBe('authenticated');
+      queueMicrotask(() => callback?.(undefined, uploadResult));
+      return stream;
+    });
     const file = {
       buffer: Buffer.from('%PDF-valid'),
       mimetype: 'application/pdf',
@@ -100,16 +111,18 @@ describe('CloudinaryObjectStoreService', () => {
       secure_url: 'https://cdn.example/updated-file.pdf',
     } as UploadApiResponse;
     const stream = new PassThrough();
-    const upload = jest
-      .spyOn(cloudinary.uploader, 'upload_stream')
-      .mockImplementation((options, callback) => {
-        expect(options?.public_id).toBe(existing.public_id);
-        expect(options?.resource_type).toBe('raw');
-        expect(options?.overwrite).toBe(true);
-        expect(options?.access_mode).toBe('authenticated');
-        queueMicrotask(() => callback?.(undefined, uploadResult));
-        return stream;
-      });
+    const upload = jest.spyOn(
+      cloudinary.uploader,
+      'upload_stream',
+    ) as unknown as jest.MockedFunction<UploadStreamMock>;
+    upload.mockImplementation((options, callback) => {
+      expect(options?.public_id).toBe(existing.public_id);
+      expect(options?.resource_type).toBe('raw');
+      expect(options?.overwrite).toBe(true);
+      expect(options?.access_mode).toBe('authenticated');
+      queueMicrotask(() => callback?.(undefined, uploadResult));
+      return stream;
+    });
 
     await expect(
       service.update(existing.public_id, {
