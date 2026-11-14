@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { MailerService } from '@nestjs-modules/mailer';
-import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 import { join } from 'node:path';
 import { UtilsModule } from '../../utils/utils.module';
 import { MAIL_CONFIG, MAILER_CLIENT } from './mail.constants';
@@ -11,6 +10,7 @@ import { MailProcessor } from './processors/mail.processor';
 import { MailDlqMonitor } from './processors/mail-dlq.monitor';
 import { MailService } from './mail.service';
 import { MailWorkerHealthService } from './mail-worker-health.service';
+import { HandlebarsTemplateAdapter } from './handlebars-template.adapter';
 
 @Module({
   imports: [
@@ -37,7 +37,7 @@ import { MailWorkerHealthService } from './mail-worker-health.service';
           },
           template: {
             dir: join(__dirname, 'templates'),
-            adapter: new HandlebarsAdapter(),
+            adapter: new HandlebarsTemplateAdapter(),
             options: { strict: true },
           },
           retry: false,
