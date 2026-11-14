@@ -23,6 +23,22 @@ Feature modules in `src/<feature>/`: `.module.ts`, `.controller.ts`, `.service.t
 Infra modules: `database/` (Drizzle schema), `redis/`, `rabbitmq/`. E2E tests in `test/`.
 Follow existing modules before introducing new patterns.
 
+## Postman API Collection
+
+- Keep `test/postman/fortis-api.postman_collection.json` synchronized with all
+  routes declared by controllers. Whenever an endpoint is added, changed, or
+  removed, update the collection in the same change.
+- Add the exact HTTP method and `/api/v1` path, required headers, auth mode,
+  body/query/path fields, and multipart file parts where applicable.
+- Use collection variables for base URL, tokens, IDs, credentials, and file
+  paths. Do not commit real passwords, access/refresh tokens, or customer data.
+- Add response checks and token extraction where later requests depend on them.
+  Document prerequisites for requests requiring an owner, platform user,
+  terminal, role, database state, or local file.
+- Keep `endpoints-details.md` and the Postman collection aligned. Validate the
+  collection as JSON and confirm its route list covers every controller route
+  before completing API work.
+
 Place unit tests in a `test/` folder inside the same directory as the code they cover. Each folder gets its own `test/`:
 - `auth/` → tests in `auth/test/`
 - `auth/guards/` → tests in `auth/guards/test/`

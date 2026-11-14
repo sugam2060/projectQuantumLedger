@@ -70,3 +70,15 @@ To link with Observe:
 ```bash
 npx @nestjs/observe link
 ```
+
+## Postman API Collection
+
+The importable collection at
+`test/postman/fortis-api.postman_collection.json` is the runnable request
+catalog for the backend API. Update it in the same change whenever a controller
+endpoint is added, modified, or removed. Include request method/path, auth and
+headers, request bodies and multipart file fields, response checks, and
+collection variables needed to run dependent requests. Use placeholders for
+credentials and local file paths; never commit real secrets. Keep
+`endpoints-details.md` synchronized and validate the collection JSON and route
+coverage before considering endpoint work complete.
