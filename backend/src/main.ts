@@ -8,6 +8,7 @@ import { cookieParserMiddleware } from './utils/cookie-parser.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
 
   // Populate req.cookies before the global JWT guard reads web access tokens.
   app.use(cookieParserMiddleware);
