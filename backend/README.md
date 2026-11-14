@@ -128,3 +128,166 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 Added Github action
+
+## RabbitMQ messaging
+
+`RabbitMQService` is provided and exported by `UtilsModule`. Configure either
+`RABBITMQ_URL` or the host, port, username, password, and virtual-host
+variables in `.env`. The service uses one reconnecting `AmqpConnection`, with
+dedicated managed channels for consumers and publisher confirmations. If no
+RabbitMQ connection settings are supplied, the app starts with messaging
+disabled and RabbitMQ operations throw `ServiceUnavailableException`.
+
+Declare infrastructure in a lifecycle provider before consuming:
+
+```typescript
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { RabbitMQService } from '../utils/rabbitmq.service';
+
+@Injectable()
+export class MailTopology implements OnModuleInit {
+  constructor(private readonly rabbit: RabbitMQService) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.rabbit.assertExchange('mail', 'topic', { durable: true });
+    await this.rabbit.assertQueue('mail.send', {
+      durable: true,
+      deadLetterExchange: 'mail.dead',
+      deadLetterRoutingKey: 'mail.failed',
+      messageTtl: 60000,
+    });
+    await this.rabbit.bindQueue('mail.send', 'mail', 'email.send');
+  }
+}
+```
+
+Mail and payment modules inject the shared service; business processing stays
+in the worker. A mail publisher can enqueue a typed job like this:
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { RabbitMQService } from '../utils/rabbitmq.service';
+
+interface EmailJob {
+  to: string;
+  subject: string;
+  template: string;
+}
+
+@Injectable()
+export class MailService {
+  constructor(private readonly rabbit: RabbitMQService) {}
+
+  queueEmail(job: EmailJob): Promise<boolean> {
+    return this.rabbit.publish('mail', 'email.send', job, {
+      persistent: true,
+      contentType: 'application/json',
+      messageId: randomUUID(),
+    });
+  }
+}
+```
+
+Register a mail worker in its provider lifecycle and let a successful handler
+return normally; messages are acknowledged after processing. Failed handlers
+are rejected without requeue by default so a configured dead-letter exchange
+can receive them:
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { RabbitMQService } from '../utils/rabbitmq.service';
+
+@Injectable()
+export class MailWorker implements OnModuleInit {
+  constructor(private readonly rabbit: RabbitMQService) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.rabbit.consume<EmailJob>(
+      'mail-worker',
+      'mail.send',
+      async (job) => this.mailer.send(job),
+    );
+  }
+}
+```
+
+Import the shared utility module from the mail feature module:
+
+```typescript
+import { Module } from '@nestjs/common';
+import { UtilsModule } from '../utils/utils.module';
+
+@Module({
+  imports: [UtilsModule],
+  providers: [MailTopology, MailService, MailWorker],
+})
+export class MailModule {}
+```
+
+A payment module uses the same API without sharing mail-specific code:
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { RabbitMQService } from '../utils/rabbitmq.service';
+
+interface PaymentJob {
+  paymentId: string;
+}
+
+@Injectable()
+export class PaymentService {
+  constructor(private readonly rabbit: RabbitMQService) {}
+
+  queuePayment(job: PaymentJob): Promise<boolean> {
+    return this.rabbit.publish('payments', 'payment.process', job);
+  }
+}
+
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { RabbitMQService } from '../utils/rabbitmq.service';
+
+@Injectable()
+export class PaymentWorker implements OnModuleInit {
+  constructor(private readonly rabbit: RabbitMQService) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.rabbit.assertExchange('payments', 'topic');
+    await this.rabbit.assertQueue('payments.process', {
+      durable: true,
+      deadLetterExchange: 'payments.dead',
+    });
+    await this.rabbit.bindQueue(
+      'payments.process',
+      'payments',
+      'payment.process',
+    );
+    await this.rabbit.consume<PaymentJob>(
+      'payment-worker',
+      'payments.process',
+      async (job) => this.processor.process(job),
+      { prefetchCount: 5 },
+    );
+  }
+}
+```
+
+The payment feature module follows the same dependency-injection pattern:
+
+```typescript
+import { Module } from '@nestjs/common';
+import { UtilsModule } from '../utils/utils.module';
+
+@Module({
+  imports: [UtilsModule],
+  providers: [PaymentService, PaymentWorker],
+})
+export class PaymentModule {}
+```
+
+The exported API includes exchange/queue assert, existence checks, deletion
+and purge; queue and exchange bindings; typed JSON `publish` and `sendToQueue`;
+`consume` and `cancelConsumer`; `serialize`/`deserialize`; and `isConnected`.
+Consumer handlers receive the raw AMQP message and an ACK/NACK/reject context.
+Use `context.nack(true)` for an explicit requeue; automatic application retry
+policies are intentionally outside this infrastructure service.
