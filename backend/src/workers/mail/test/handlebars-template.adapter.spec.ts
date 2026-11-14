@@ -1,17 +1,22 @@
 import { jest } from '@jest/globals';
 import { HandlebarsTemplateAdapter } from '../handlebars-template.adapter';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 describe('HandlebarsTemplateAdapter', () => {
   const adapter = new HandlebarsTemplateAdapter();
   const templateDirectory = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    '../templates',
+    process.cwd(),
+    'src/workers/mail/templates',
   );
 
   it('renders the configured HTML template and escapes interpolated values', () => {
-    const mail = {
+    const mail: {
+      data: {
+        template: string;
+        context: Record<string, unknown>;
+        html?: string;
+      };
+    } = {
       data: {
         template: 'otp-verification.html',
         context: { code: '<img src=x>', expiresInMinutes: 5 },
