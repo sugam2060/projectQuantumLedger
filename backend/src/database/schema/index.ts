@@ -1,5 +1,6 @@
 export * from './Identity_and_tenent/branches';
 export * from './Identity_and_tenent/businesses';
+export * from './Identity_and_tenent/business_provisioning_requests';
 export * from './Identity_and_tenent/business_membership';
 export * from './Identity_and_tenent/endpoint_role_access';
 export * from './Identity_and_tenent/invitations';

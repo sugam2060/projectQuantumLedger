@@ -38,6 +38,7 @@ describe('AuthenticationController (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/authentication/login')
+        .set('x-terminal-id', '00000000-0000-4000-8000-000000000001')
         .send(loginDto)
         .expect(400);
     });
@@ -50,7 +51,24 @@ describe('AuthenticationController (e2e)', () => {
 
       await request(app.getHttpServer())
         .post('/authentication/login')
+        .set('x-terminal-id', '00000000-0000-4000-8000-000000000001')
         .send(loginDto)
+        .expect(400);
+    });
+
+    it('requires a terminal ID header', async () => {
+      await request(app.getHttpServer())
+        .post('/authentication/login')
+        .send({ email: 'test@example.com', password: 'password123' })
+        .expect(400);
+    });
+
+    it('validates custom login headers through the registered global pipe', async () => {
+      await request(app.getHttpServer())
+        .post('/authentication/login')
+        .set('x-client-type', 'invalid')
+        .set('x-terminal-id', '00000000-0000-4000-8000-000000000001')
+        .send({ email: 'test@example.com', password: 'password123' })
         .expect(400);
     });
   });
@@ -67,6 +85,30 @@ describe('AuthenticationController (e2e)', () => {
       await request(app.getHttpServer())
         .post('/platform/user/refresh')
         .expect(400);
+    });
+  });
+
+  describe('GET /authentication/me', () => {
+    it('requires a valid access token', async () => {
+      await request(app.getHttpServer()).get('/authentication/me').expect(401);
+    });
+  });
+
+  describe('POST /authentication/refresh', () => {
+    it('requires the terminal ID header', async () => {
+      await request(app.getHttpServer())
+        .post('/authentication/refresh')
+        .set('x-client-type', 'mobile')
+        .send({ refreshToken: 'refresh-token' })
+        .expect(400);
+    });
+
+    it('rejects a missing refresh token after validating headers', async () => {
+      await request(app.getHttpServer())
+        .post('/authentication/refresh')
+        .set('x-client-type', 'mobile')
+        .set('x-terminal-id', '00000000-0000-4000-8000-000000000001')
+        .expect(401);
     });
   });
 });

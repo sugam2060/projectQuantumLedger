@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm';
 import { accessLogs, auditLogs } from './audit_logs/access_audit_logs';
 import { branches } from './Identity_and_tenent/branches';
 import { business } from './Identity_and_tenent/businesses';
+import { businessProvisioningRequests } from './Identity_and_tenent/business_provisioning_requests';
 import { businessMemberships } from './Identity_and_tenent/business_membership';
 import { endpointRoleAccess } from './Identity_and_tenent/endpoint_role_access';
 import { invitations } from './Identity_and_tenent/invitations';
@@ -28,7 +29,18 @@ export const businessRelations = relations(business, ({ one, many }) => ({
 export const platformUsersRelations = relations(platformUsers, ({ many }) => ({
   businessesCreated: many(business),
   invitationsSent: many(invitations),
+  businessRequestsReviewed: many(businessProvisioningRequests),
 }));
+
+export const businessProvisioningRequestRelations = relations(
+  businessProvisioningRequests,
+  ({ one }) => ({
+    reviewer: one(platformUsers, {
+      fields: [businessProvisioningRequests.reviewedBy],
+      references: [platformUsers.id],
+    }),
+  }),
+);
 
 export const branchesRelations = relations(branches, ({ one, many }) => ({
   business: one(business, {

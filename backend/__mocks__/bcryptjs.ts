@@ -10,3 +10,6 @@ const bcrypt = {
 };
 
 export = bcrypt;
+
+
+//node -e "require('bcryptjs').hash('YOUR_PASSWORD', 10).then(console.log)"

@@ -8,10 +8,16 @@ describe('EndpointAccessService', () => {
   const database = {
     transactionWithSession: jest.fn(),
   };
+  const permissionsCache = {
+    invalidate: jest.fn().mockResolvedValue(undefined),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new EndpointAccessService(database as never);
+    service = new EndpointAccessService(
+      database as never,
+      permissionsCache as never,
+    );
   });
 
   it('rejects configuration changes without an active business owner context', async () => {

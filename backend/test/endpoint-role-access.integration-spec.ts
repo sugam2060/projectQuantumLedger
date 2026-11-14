@@ -110,4 +110,135 @@ describeWithDatabase('Endpoint role access database integration', () => {
     expect(result.rows[0].email_scoped_policy).toBe(true);
     expect(result.rows[0].legacy_lookup_function_removed).toBe(true);
   });
+
+  it('has schema support for role template versioning', async () => {
+    const result = await pool.query<{
+      version_column_exists: boolean;
+      version_trigger_exists: boolean;
+    }>(`
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'roles'
+            AND column_name = 'version'
+            AND is_nullable = 'NO'
+        ) AS version_column_exists,
+        EXISTS (
+          SELECT 1
+          FROM pg_trigger t
+          JOIN pg_class c ON c.oid = t.tgrelid
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = current_schema()
+            AND c.relname = 'roles'
+            AND t.tgname = 'roles_bump_template_version'
+            AND NOT t.tgisinternal
+        ) AS version_trigger_exists
+    `);
+
+    expect(result.rows[0].version_column_exists).toBe(true);
+    expect(result.rows[0].version_trigger_exists).toBe(true);
+  });
+
+  it('allows login terminal validation through the platform terminal-read RLS policy', async () => {
+    const result = await pool.query<{
+      rls_enabled: boolean;
+      select_policy_allows_platform_context: boolean;
+      terminal_branch_is_required: boolean;
+      terminal_has_business_and_branch_foreign_keys: boolean;
+    }>(`
+      SELECT
+        c.relrowsecurity AS rls_enabled,
+        EXISTS (
+          SELECT 1
+          FROM pg_policy p
+          WHERE p.polrelid = c.oid
+            AND p.polname = 'terminals_select'
+            AND pg_get_expr(p.polqual, p.polrelid) ILIKE '%app_is_platform%'
+        ) AS select_policy_allows_platform_context,
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns column_row
+          WHERE column_row.table_schema = current_schema()
+            AND column_row.table_name = 'terminals'
+            AND column_row.column_name = 'branch_id'
+            AND column_row.is_nullable = 'NO'
+        ) AS terminal_branch_is_required,
+        (
+          SELECT count(*) = 2
+          FROM pg_constraint constraint_row
+          WHERE constraint_row.conrelid = c.oid
+            AND constraint_row.contype = 'f'
+            AND constraint_row.conname IN (
+              'terminals_business_id_business_id_fk',
+              'terminals_branch_id_branches_id_fk'
+            )
+        ) AS terminal_has_business_and_branch_foreign_keys
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = current_schema()
+        AND c.relname = 'terminals'
+    `);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].rls_enabled).toBe(true);
+    expect(result.rows[0].select_policy_allows_platform_context).toBe(true);
+    expect(result.rows[0].terminal_branch_is_required).toBe(true);
+    expect(result.rows[0].terminal_has_business_and_branch_foreign_keys).toBe(
+      true,
+    );
+  });
+
+  it('keeps public business requests insert-only and limits reads and reviews to platform users', async () => {
+    const result = await pool.query<{
+      rls_enabled: boolean;
+      public_insert_policy: boolean;
+      platform_select_policy: boolean;
+      platform_update_policy: boolean;
+      reviewer_foreign_key: boolean;
+    }>(`
+      SELECT
+        c.relrowsecurity AS rls_enabled,
+        EXISTS (
+          SELECT 1 FROM pg_policy p
+          WHERE p.polrelid = c.oid
+            AND p.polname = 'business_provisioning_requests_public_insert'
+            AND p.polcmd = 'a'
+            AND pg_get_expr(p.polwithcheck, p.polrelid) = 'true'
+        ) AS public_insert_policy,
+        EXISTS (
+          SELECT 1 FROM pg_policy p
+          WHERE p.polrelid = c.oid
+            AND p.polname = 'business_provisioning_requests_platform_select'
+            AND p.polcmd = 'r'
+            AND pg_get_expr(p.polqual, p.polrelid) ILIKE '%app_is_platform%'
+        ) AS platform_select_policy,
+        EXISTS (
+          SELECT 1 FROM pg_policy p
+          WHERE p.polrelid = c.oid
+            AND p.polname = 'business_provisioning_requests_platform_update'
+            AND p.polcmd = 'w'
+            AND pg_get_expr(p.polqual, p.polrelid) ILIKE '%app_is_platform%'
+            AND pg_get_expr(p.polwithcheck, p.polrelid) ILIKE '%app_is_platform%'
+        ) AS platform_update_policy,
+        EXISTS (
+          SELECT 1 FROM pg_constraint constraint_row
+          WHERE constraint_row.conrelid = c.oid
+            AND constraint_row.conname = 'business_provisioning_requests_reviewed_by_platform_users_id_fk'
+            AND constraint_row.contype = 'f'
+        ) AS reviewer_foreign_key
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = current_schema()
+        AND c.relname = 'business_provisioning_requests'
+    `);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].rls_enabled).toBe(true);
+    expect(result.rows[0].public_insert_policy).toBe(true);
+    expect(result.rows[0].platform_select_policy).toBe(true);
+    expect(result.rows[0].platform_update_policy).toBe(true);
+    expect(result.rows[0].reviewer_foreign_key).toBe(true);
+  });
 });

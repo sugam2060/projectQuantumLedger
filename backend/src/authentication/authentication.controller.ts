@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Body,
+  Get,
   HttpCode,
   HttpStatus,
   Res as ResDecorator,
@@ -10,15 +11,38 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { UserAuthService } from './authentication.service.user';
-import type { ClientLoginDTO } from './dto/clientLogin.dto';
-import { ClientType } from './dto/clientLogin.dto';
+import { ClientLoginDTO, ClientType } from './dto/clientLogin.dto';
 import { Public } from './decorators/public.decorator';
 import { RateLimit } from './decorators/rate-limit.decorator';
 import { RequiredRoles } from './decorators/required_permission.decorator';
+import type { AuthenticatedUser } from './strategies/jwt.strategy';
+import { AuthenticationMeHeadersDto } from './dto/authentication-me-headers.dto';
+import { AuthenticationMeHeaders } from './decorators/authentication-me-headers.decorator';
+import { AuthenticationLoginHeaders } from './decorators/authentication-login-headers.decorator';
+import { AuthenticationLoginHeadersDto } from './dto/authentication-login-headers.dto';
+
+interface AuthenticatedRequest extends Request {
+  user: AuthenticatedUser;
+}
 
 @Controller('authentication')
 export class AuthenticationController {
   constructor(private readonly authService: UserAuthService) {}
+
+  @Get('me')
+  @RateLimit({ requests: 60, windowMs: 60_000 })
+  getCurrentUser(
+    @ReqDecorator() request: AuthenticatedRequest,
+    @AuthenticationMeHeaders()
+    headers: AuthenticationMeHeadersDto,
+  ) {
+    return this.authService.getCurrentUser(
+      request.user,
+      headers.clientType,
+      headers.terminalId,
+      headers.initialLoad,
+    );
+  }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -33,13 +57,16 @@ export class AuthenticationController {
   @RequiredRoles('users.login')
   async login(
     @Body() dto: ClientLoginDTO,
+    @AuthenticationLoginHeaders()
+    headers: AuthenticationLoginHeadersDto,
     @ReqDecorator() req: Request,
     @ResDecorator({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.userLogin(dto);
+    const result = await this.authService.userLogin(dto, headers.terminalId);
+    const clientType = headers.clientType ?? ClientType.WEB;
 
     // For web clients, set the JWT and refresh token as HTTP-only cookies
-    if (dto.client_type === ClientType.WEB || !dto.client_type) {
+    if (clientType === ClientType.WEB) {
       const cookieOptions = {
         httpOnly: true,
         secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
@@ -75,11 +102,12 @@ export class AuthenticationController {
   @Public()
   async refreshToken(
     @Body('refreshToken') refreshToken: string | undefined,
+    @AuthenticationLoginHeaders() headers: AuthenticationLoginHeadersDto,
     @ReqDecorator() req: Request,
     @ResDecorator({ passthrough: true }) res: Response,
   ) {
     // For web clients, try to get refresh token from cookie if not in body
-    const clientType = req.headers['x-client-type'];
+    const clientType = headers.clientType;
     let token = refreshToken;
 
     if (clientType === 'web' && !token) {
@@ -92,7 +120,10 @@ export class AuthenticationController {
 
     try {
       // Validate refresh token and generate new tokens
-      const result = await this.authService.refreshAccessToken(token);
+      const result = await this.authService.refreshAccessToken(
+        token,
+        headers.terminalId,
+      );
 
       // For web clients, set new tokens as cookies
       if (clientType === 'web') {

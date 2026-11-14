@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthenticationController } from './authentication.controller';
@@ -9,6 +9,7 @@ import { PlatformAuthService } from './authentication.service.platform';
 import { UserAuthService } from './authentication.service.user';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PermissionGuard } from './guards/permission.guard';
+import { RateLimitGuard } from './guards/rate-limit.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UtilsModule } from '../utils/utils.module';
 import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.module';
@@ -39,8 +40,21 @@ import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.m
     PlatformAuthService,
     JwtStrategy,
     {
+      provide: APP_PIPE,
+      useFactory: () =>
+        new ValidationPipe({
+          whitelist: true,
+          transform: true,
+          validateCustomDecorators: true,
+        }),
+    },
+    {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
     },
     {
       provide: APP_GUARD,

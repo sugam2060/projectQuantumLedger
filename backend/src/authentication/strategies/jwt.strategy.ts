@@ -6,22 +6,28 @@ import { RequestSession } from '../../database/request_context.service';
 
 export interface AuthenticatedUser extends RequestSession {
   permissions: string[];
-  role?: string;
+  name?: string;
+  roleId?: string;
+  roleVersion?: number;
   isBootstrap?: boolean;
+  tokenIssuedAt?: number;
+  tokenExpiresAt?: number;
 }
 
 interface JwtPayload {
   sub?: unknown;
-  userId?: unknown;
   businessId?: unknown;
   branchId?: unknown;
   platformUserId?: unknown;
   isPlatform?: unknown;
   isBootstrap?: unknown;
   isOwner?: unknown;
-  role?: unknown;
+  name?: unknown;
+  role_id?: unknown;
+  role_version?: unknown;
   permissions?: unknown;
   exp?: unknown;
+  iat?: unknown;
 }
 
 const UUID_PATTERN =
@@ -53,10 +59,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const subject = this.requireUuid(payload.sub, 'sub');
     const isPlatform = payload.isPlatform === true;
-    const claimedUserId = this.optionalUuid(payload.userId, 'userId');
-    if (!isPlatform && claimedUserId && claimedUserId !== subject) {
-      throw new UnauthorizedException('userId claim must match sub');
-    }
 
     const userId = isPlatform ? undefined : subject;
     const platformUserId = isPlatform
@@ -66,17 +68,35 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!this.isStringArray(payload.permissions)) {
       throw new UnauthorizedException('Invalid permissions claim');
     }
+    if (payload.name !== undefined && typeof payload.name !== 'string') {
+      throw new UnauthorizedException('Invalid name claim');
+    }
+    if (
+      payload.role_version !== undefined &&
+      (typeof payload.role_version !== 'number' ||
+        !Number.isInteger(payload.role_version) ||
+        payload.role_version < 1)
+    ) {
+      throw new UnauthorizedException('Invalid role_version claim');
+    }
 
     return {
       userId,
       businessId: this.optionalUuid(payload.businessId, 'businessId'),
       branchId: this.optionalUuid(payload.branchId, 'branchId'),
+      name: typeof payload.name === 'string' ? payload.name : undefined,
+      roleId: this.optionalUuid(payload.role_id, 'role_id'),
+      roleVersion:
+        typeof payload.role_version === 'number'
+          ? payload.role_version
+          : undefined,
       platformUserId,
       isPlatform,
       isOwner: payload.isOwner === true,
       isBootstrap: isPlatform && payload.isBootstrap === true,
-      role: typeof payload.role === 'string' ? payload.role : undefined,
       permissions: payload.permissions ?? [],
+      tokenIssuedAt: typeof payload.iat === 'number' ? payload.iat : undefined,
+      tokenExpiresAt: payload.exp,
     };
   }
 

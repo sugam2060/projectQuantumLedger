@@ -15,6 +15,20 @@
       "when": 1794493767472,
       "tag": "0001_platform_auth_email_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794508206644,
+      "tag": "0002_role_template_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794645926663,
+      "tag": "0003_business_provisioning_requests",
+      "breakpoints": true
     }
   ]
 }

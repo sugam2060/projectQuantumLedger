@@ -8,6 +8,7 @@ import {
   uniqueIndex,
   check,
   jsonb,
+  integer,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { business } from './businesses';
@@ -20,6 +21,7 @@ export const roles = pgTable(
     name: text('name').notNull(),
     description: text('description'),
     permissions: jsonb('permissions').notNull().default('[]'), // Stores list of permitted actions/endpoints
+    version: integer('version').notNull().default(1),
     isSystem: boolean('is_system').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -34,6 +36,7 @@ export const roles = pgTable(
 
     // Check constraint to ensure role name is not empty
     check('roles_name_chk', sql`btrim(name) <> ''`),
+    check('roles_version_chk', sql`version > 0`),
 
     // RLS Policy: Users can view roles belonging to their business session, global system roles, or platform admins can view all
     pgPolicy('roles_select', {

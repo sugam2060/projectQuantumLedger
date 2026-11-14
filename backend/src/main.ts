@@ -1,6 +1,5 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from './redis/redis.service';
 import { RateLimitKeyGenerator } from './utils/rate-limit-key.generator';
@@ -28,14 +27,6 @@ async function bootstrap() {
   );
 
   app.use(rateLimitMiddleware.use.bind(rateLimitMiddleware));
-
-  // Add global validation pipe
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-    }),
-  );
 
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001; // Use port 3001 as fallback
   await app.listen(port);
