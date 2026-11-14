@@ -189,4 +189,56 @@ describeWithDatabase('Endpoint role access database integration', () => {
       true,
     );
   });
+
+  it('keeps public business requests insert-only and limits reads and reviews to platform users', async () => {
+    const result = await pool.query<{
+      rls_enabled: boolean;
+      public_insert_policy: boolean;
+      platform_select_policy: boolean;
+      platform_update_policy: boolean;
+      reviewer_foreign_key: boolean;
+    }>(`
+      SELECT
+        c.relrowsecurity AS rls_enabled,
+        EXISTS (
+          SELECT 1 FROM pg_policy p
+          WHERE p.polrelid = c.oid
+            AND p.polname = 'business_provisioning_requests_public_insert'
+            AND p.polcmd = 'a'
+            AND pg_get_expr(p.polwithcheck, p.polrelid) = 'true'
+        ) AS public_insert_policy,
+        EXISTS (
+          SELECT 1 FROM pg_policy p
+          WHERE p.polrelid = c.oid
+            AND p.polname = 'business_provisioning_requests_platform_select'
+            AND p.polcmd = 'r'
+            AND pg_get_expr(p.polqual, p.polrelid) ILIKE '%app_is_platform%'
+        ) AS platform_select_policy,
+        EXISTS (
+          SELECT 1 FROM pg_policy p
+          WHERE p.polrelid = c.oid
+            AND p.polname = 'business_provisioning_requests_platform_update'
+            AND p.polcmd = 'w'
+            AND pg_get_expr(p.polqual, p.polrelid) ILIKE '%app_is_platform%'
+            AND pg_get_expr(p.polwithcheck, p.polrelid) ILIKE '%app_is_platform%'
+        ) AS platform_update_policy,
+        EXISTS (
+          SELECT 1 FROM pg_constraint constraint_row
+          WHERE constraint_row.conrelid = c.oid
+            AND constraint_row.conname = 'business_provisioning_requests_reviewed_by_platform_users_id_fk'
+            AND constraint_row.contype = 'f'
+        ) AS reviewer_foreign_key
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = current_schema()
+        AND c.relname = 'business_provisioning_requests'
+    `);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].rls_enabled).toBe(true);
+    expect(result.rows[0].public_insert_policy).toBe(true);
+    expect(result.rows[0].platform_select_policy).toBe(true);
+    expect(result.rows[0].platform_update_policy).toBe(true);
+    expect(result.rows[0].reviewer_foreign_key).toBe(true);
+  });
 });

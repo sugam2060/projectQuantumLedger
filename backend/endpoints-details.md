@@ -250,6 +250,54 @@ limited. **Idempotency:** read-only.
 
 ## Platform authentication
 
+### `POST /api/v1/platform/businesses/request`
+
+**Description:** Submits a public business workspace provisioning request for
+platform team verification. Send the application fields and all three document
+files in a single multipart request. The server uploads documents to private,
+authenticated Cloudinary storage and saves their IDs and secure URLs with the
+application. **Auth:** public; only `x-client-type: web` is accepted.
+**Rate limit:** 5 requests per hour. **Errors:** 400 for invalid request data,
+missing/unsupported files, or a non-web client; 413 when a file exceeds 10 MB;
+429 when rate limited; 500 for storage/database failures. **Idempotency:** no;
+each accepted call creates a separate pending request. **Success:** 201.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "POST /api/v1/platform/businesses/request",
+  "requestData": {
+    "pathParams": {},
+    "queryParams": null,
+    "headers": {
+      "X-Client-Type": "web",
+      "Content-Type": "multipart/form-data"
+    },
+    "body": {
+      "legalName": "Example Retail Pvt. Ltd.",
+      "displayName": "Example Retail",
+      "country": "NP",
+      "city": "Kathmandu",
+      "postalCode": "123123123",
+      "addressLine1": "Address line 1",
+      "addressLine2": "Address line 2",
+      "primaryContactName": "Example Owner",
+      "primaryContactEmail": "owner@example.com",
+      "primaryContactPhone": "+9779812345678",
+      "panCardFront": "<JPEG, PNG, or PDF binary; maximum 10 MB>",
+      "panCardBack": "<JPEG, PNG, or PDF binary; maximum 10 MB>",
+      "businessRegistrationCertificate": "<JPEG, PNG, or PDF binary; maximum 10 MB>"
+    }
+  },
+  "responseData": {
+    "httpStatus": 201,
+    "body": {
+      "message": "Your request has been submitted. Our team will contact you for further process."
+    }
+  }
+}
+```
+
 ### `POST /api/v1/platform/user/login`
 
 **Description:** Authenticates a platform user from `platform_users` and issues

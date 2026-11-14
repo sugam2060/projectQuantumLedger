@@ -7,9 +7,23 @@ import {
   pgPolicy,
   uniqueIndex,
   check,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { platformUsers } from './platform_users';
+
+export interface BusinessFileReference {
+  fileId: string;
+  url: string;
+}
+
+export interface BusinessDocuments {
+  panCard: {
+    frontImage: BusinessFileReference;
+    backImage: BusinessFileReference;
+  };
+  businessRegistrationCertificate: BusinessFileReference;
+}
 
 export const business = pgTable(
   'business',
@@ -19,6 +33,14 @@ export const business = pgTable(
     displayName: text('display_name').notNull(),
     pan: text('pan').notNull(),
     address: text('address'),
+    addressDetails: jsonb('address_details').$type<{
+      country: string;
+      city: string;
+      postalCode: string;
+      addressLine1: string;
+      addressLine2?: string | null;
+    }>(),
+    documents: jsonb('documents').$type<BusinessDocuments>(),
     primaryContactNumber: text('primary_contact_number'),
     primaryContactEmail: text('primary_contact_email'),
     isActive: boolean('is_active').notNull().default(false),

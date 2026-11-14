@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { UtilsService } from './utils.service';
 import { RateLimitMiddleware } from './ratelimit.middleware';
+import { ObjectStoreService } from './objectStore.service';
+import { CloudinaryObjectStoreService } from './cloudinary.service';
 import {
   RateLimitKeyGenerator,
   RateLimitKeyGeneratorOptions,
@@ -9,6 +11,8 @@ import {
 @Module({
   providers: [
     UtilsService,
+    CloudinaryObjectStoreService,
+    { provide: ObjectStoreService, useExisting: CloudinaryObjectStoreService },
     RateLimitMiddleware,
     {
       provide: RateLimitKeyGenerator,
@@ -28,6 +32,12 @@ import {
       },
     },
   ],
-  exports: [UtilsService, RateLimitMiddleware, RateLimitKeyGenerator],
+  exports: [
+    UtilsService,
+    ObjectStoreService,
+    CloudinaryObjectStoreService,
+    RateLimitMiddleware,
+    RateLimitKeyGenerator,
+  ],
 })
 export class UtilsModule {}
