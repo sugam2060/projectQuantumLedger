@@ -84,9 +84,7 @@ export class RedisService implements OnModuleDestroy {
     if (!Number.isInteger(ttlSeconds) || ttlSeconds < 1) {
       throw new Error('ttlSeconds must be a positive integer');
     }
-    return (
-      (await this.redis.set(key, value, 'EX', ttlSeconds, 'NX')) === 'OK'
-    );
+    return (await this.redis.set(key, value, 'EX', ttlSeconds, 'NX')) === 'OK';
   }
 
   async compareAndDelete(key: string, expectedValue: string): Promise<boolean> {
