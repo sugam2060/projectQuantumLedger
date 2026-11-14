@@ -76,6 +76,29 @@ export class RedisService implements OnModuleDestroy {
     return result === 'OK';
   }
 
+  async setIfAbsent(
+    key: string,
+    value: string,
+    ttlSeconds: number,
+  ): Promise<boolean> {
+    if (!Number.isInteger(ttlSeconds) || ttlSeconds < 1) {
+      throw new Error('ttlSeconds must be a positive integer');
+    }
+    return (
+      (await this.redis.set(key, value, 'EX', ttlSeconds, 'NX')) === 'OK'
+    );
+  }
+
+  async compareAndDelete(key: string, expectedValue: string): Promise<boolean> {
+    const result = await this.redis.eval(
+      "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
+      1,
+      key,
+      expectedValue,
+    );
+    return result === 1;
+  }
+
   async pexpire(key: string, milliseconds: number): Promise<boolean> {
     return (await this.redis.pexpire(key, milliseconds)) === 1;
   }

@@ -197,6 +197,21 @@ export class RabbitMQService implements OnModuleInit, OnApplicationShutdown {
     }
   }
 
+  getQueueStats(
+    name: string,
+  ): Promise<{ messageCount: number; consumerCount: number }> {
+    return this.runOperation('queue.stats', { queue: name }, async () => {
+      const { messageCount, consumerCount } =
+        await this.getConnection().managedChannel.checkQueue(name);
+      return { messageCount, consumerCount };
+    });
+  }
+
+  async waitForConnection(): Promise<void> {
+    if (this.isConnected) return;
+    await this.getConnection().managedChannel.waitForConnect();
+  }
+
   deleteQueue(name: string, options?: Options.DeleteQueue): Promise<void> {
     return this.runOperation('queue.delete', { queue: name }, async () => {
       await this.getConnection().managedChannel.deleteQueue(name, options);

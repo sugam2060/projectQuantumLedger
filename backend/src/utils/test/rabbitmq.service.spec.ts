@@ -43,6 +43,7 @@ describe('RabbitMQService', () => {
       bindExchange: jest.fn().mockResolvedValue(undefined),
       unbindExchange: jest.fn().mockResolvedValue(undefined),
       sendToQueue: jest.fn().mockResolvedValue(true),
+      waitForConnect: jest.fn().mockResolvedValue(undefined),
     };
     consumerChannel = {
       consume: jest.fn(
