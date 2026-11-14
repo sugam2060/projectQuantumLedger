@@ -9,18 +9,11 @@ import { ConfigService } from '@nestjs/config';
 import type { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import type { ConsumeMessage } from 'amqplib';
 import { EventEmitter } from 'events';
-import type { RabbitMQRuntimeOptions } from '../rabbitmq.config';
-
-class MockAmqpConnection {
-  constructor(readonly configuration: { uri: string }) {}
-}
-
-jest.unstable_mockModule('@golevelup/nestjs-rabbitmq', () => ({
-  AmqpConnection: MockAmqpConnection,
-}));
-
-const { createRabbitMQOptions } = await import('../rabbitmq.config.js');
-const { RabbitMQService } = await import('../rabbitmq.service.js');
+import {
+  createRabbitMQOptions,
+  type RabbitMQRuntimeOptions,
+} from '../rabbitmq.config';
+import { RabbitMQService } from '../rabbitmq.service';
 
 describe('RabbitMQService', () => {
   let service: RabbitMQService;
