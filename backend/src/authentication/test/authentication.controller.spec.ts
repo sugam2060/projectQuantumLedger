@@ -87,7 +87,7 @@ describe('AuthenticationController', () => {
         {
           clientType: ClientType.WEB,
           terminalId: '00000000-0000-4000-8000-000000000002',
-          initialLoad: 'true',
+          initialLoad: true,
         },
         { type: 'custom', metatype: AuthenticationMeHeadersDto },
       );
@@ -98,41 +98,34 @@ describe('AuthenticationController', () => {
         initialLoad: true,
       });
 
+      const falseHeader = await pipe.transform(
+        {
+          clientType: ClientType.WEB,
+          terminalId: '00000000-0000-4000-8000-000000000002',
+          initialLoad: 'false',
+        },
+        { type: 'custom', metatype: AuthenticationMeHeadersDto },
+      );
+      expect(falseHeader.initialLoad).toBe(false);
+
+      const defaultHeaders = await pipe.transform(
+        {
+          clientType: ClientType.WEB,
+          terminalId: '00000000-0000-4000-8000-000000000002',
+        },
+        { type: 'custom', metatype: AuthenticationMeHeadersDto },
+      );
+      expect(defaultHeaders.initialLoad).toBe(true);
+
       await expect(
         pipe.transform(
           {
             clientType: 'invalid',
             terminalId: 'bad-id',
-            initialLoad: 'not-a-boolean',
           },
           { type: 'custom', metatype: AuthenticationMeHeadersDto },
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('defaults initialLoad to true and parses false explicitly', async () => {
-      const pipe = new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        validateCustomDecorators: true,
-      });
-      const baseHeaders = {
-        clientType: ClientType.WEB,
-        terminalId: '00000000-0000-4000-8000-000000000002',
-      };
-
-      await expect(
-        pipe.transform(baseHeaders, {
-          type: 'custom',
-          metatype: AuthenticationMeHeadersDto,
-        }),
-      ).resolves.toMatchObject({ initialLoad: true });
-      await expect(
-        pipe.transform(
-          { ...baseHeaders, initialLoad: 'false' },
-          { type: 'custom', metatype: AuthenticationMeHeadersDto },
-        ),
-      ).resolves.toMatchObject({ initialLoad: false });
     });
   });
 
@@ -162,10 +155,21 @@ describe('AuthenticationController', () => {
       jest.clearAllMocks();
     });
 
+    it('keeps the login DTO class available for global validation', () => {
+      const parameterTypes = Reflect.getMetadata(
+        'design:paramtypes',
+        AuthenticationController.prototype,
+        'login',
+      ) as unknown[];
+
+      expect(parameterTypes[0]).toBe(ClientLoginDTO);
+    });
+
     it('should successfully login and return result for web client with cookies', async () => {
       const mockResult = {
         accessToken: 'mock-access-token',
         refreshToken: 'mock-refresh-token',
+        effectivePermissions: ['inventory.create'],
         user: { id: 'user123', email: 'test@example.com' },
         memberships: [],
       };
@@ -197,7 +201,19 @@ describe('AuthenticationController', () => {
           path: '/',
         }),
       );
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        'mock-refresh-token',
+        expect.objectContaining({
+          httpOnly: true,
+          secure: false,
+          sameSite: 'strict',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+        }),
+      );
       expect(result).toEqual({
+        effectivePermissions: ['inventory.create'],
         user: { id: 'user123', email: 'test@example.com' },
         memberships: [],
       });
@@ -211,6 +227,7 @@ describe('AuthenticationController', () => {
       const mockResult = {
         accessToken: 'mock-access-token',
         refreshToken: 'mock-refresh-token',
+        effectivePermissions: ['inventory.create'],
         user: { id: 'user123', email: 'test@example.com' },
         memberships: [],
       };
@@ -230,6 +247,29 @@ describe('AuthenticationController', () => {
       );
       expect(mockResponse.cookie).not.toHaveBeenCalled();
       expect(result).toEqual(mockResult);
+    });
+
+    it('returns both tokens in the response and sets no cookies for desktop clients', async () => {
+      const desktopHeaders: AuthenticationLoginHeadersDto = {
+        clientType: ClientType.DESKTOP,
+        terminalId: '00000000-0000-4000-8000-000000000002',
+      };
+      const mockResult = {
+        accessToken: 'mock-access-token',
+        refreshToken: 'mock-refresh-token',
+        effectivePermissions: ['inventory.create'],
+        user: { id: 'user123', email: 'test@example.com' },
+        memberships: [],
+      };
+      authServiceMock.userLogin.mockResolvedValue(mockResult);
+
+      await expect(
+        controller.login(mockDto, desktopHeaders, mockRequest, mockResponse),
+      ).resolves.toMatchObject({
+        accessToken: 'mock-access-token',
+        refreshToken: 'mock-refresh-token',
+      });
+      expect(mockResponse.cookie).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when email is missing', async () => {
@@ -339,6 +379,7 @@ describe('AuthenticationController', () => {
       const mockResult = {
         accessToken: 'new-access-token',
         refreshToken: 'new-refresh-token',
+        effectivePermissions: ['inventory.create'],
         user: { id: 'user123', email: 'test@example.com' },
         memberships: [],
       };
@@ -347,15 +388,21 @@ describe('AuthenticationController', () => {
 
       const result = await controller.refreshToken(
         'body-refresh-token',
+        {
+          clientType: ClientType.WEB,
+          terminalId: '00000000-0000-4000-8000-000000000002',
+        },
         mockRequest,
         mockResponse,
       );
 
       expect(authServiceMock.refreshAccessToken).toHaveBeenCalledWith(
         'body-refresh-token',
+        '00000000-0000-4000-8000-000000000002',
       );
       expect(mockResponse.cookie).toHaveBeenCalledTimes(2);
       expect(result).toEqual({
+        effectivePermissions: ['inventory.create'],
         user: { id: 'user123', email: 'test@example.com' },
         memberships: [],
       });
@@ -370,6 +417,7 @@ describe('AuthenticationController', () => {
       const mockResult = {
         accessToken: 'new-access-token',
         refreshToken: 'new-refresh-token',
+        effectivePermissions: ['inventory.create'],
         user: { id: 'user123', email: 'test@example.com' },
         memberships: [],
       };
@@ -378,17 +426,79 @@ describe('AuthenticationController', () => {
 
       const result = await controller.refreshToken(
         undefined,
+        {
+          clientType: ClientType.WEB,
+          terminalId: '00000000-0000-4000-8000-000000000002',
+        },
         mockRequestWithoutBodyToken,
         mockResponse,
       );
 
       expect(authServiceMock.refreshAccessToken).toHaveBeenCalledWith(
         'cookie-refresh-token',
+        '00000000-0000-4000-8000-000000000002',
       );
       expect(result).toEqual({
+        effectivePermissions: ['inventory.create'],
         user: { id: 'user123', email: 'test@example.com' },
         memberships: [],
       });
+    });
+
+    it('returns both refreshed tokens in JSON without setting cookies for desktop clients', async () => {
+      const mockRequestDesktop = {
+        secure: false,
+        headers: { 'x-forwarded-proto': 'http', 'x-client-type': 'desktop' },
+        cookies: {},
+      } as any;
+      const mockResult = {
+        accessToken: 'new-access-token',
+        refreshToken: 'new-refresh-token',
+        effectivePermissions: ['inventory.create'],
+        user: { id: 'user123', email: 'test@example.com' },
+      };
+      authServiceMock.refreshAccessToken.mockResolvedValue(mockResult);
+
+      await expect(
+        controller.refreshToken(
+          'body-refresh-token',
+          {
+            clientType: ClientType.DESKTOP,
+            terminalId: '00000000-0000-4000-8000-000000000002',
+          },
+          mockRequestDesktop,
+          mockResponse,
+        ),
+      ).resolves.toEqual(mockResult);
+      expect(mockResponse.cookie).not.toHaveBeenCalled();
+    });
+
+    it('returns both refreshed tokens in JSON without setting cookies for mobile clients', async () => {
+      const mockRequestMobile = {
+        secure: false,
+        headers: { 'x-forwarded-proto': 'http', 'x-client-type': 'mobile' },
+        cookies: {},
+      } as any;
+      const mockResult = {
+        accessToken: 'new-access-token',
+        refreshToken: 'new-refresh-token',
+        effectivePermissions: ['inventory.create'],
+        user: { id: 'user123', email: 'test@example.com' },
+      };
+      authServiceMock.refreshAccessToken.mockResolvedValue(mockResult);
+
+      await expect(
+        controller.refreshToken(
+          'body-refresh-token',
+          {
+            clientType: ClientType.MOBILE,
+            terminalId: '00000000-0000-4000-8000-000000000002',
+          },
+          mockRequestMobile,
+          mockResponse,
+        ),
+      ).resolves.toEqual(mockResult);
+      expect(mockResponse.cookie).not.toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException when no refresh token provided', async () => {
@@ -400,6 +510,10 @@ describe('AuthenticationController', () => {
       await expect(
         controller.refreshToken(
           undefined,
+          {
+            clientType: ClientType.WEB,
+            terminalId: '00000000-0000-4000-8000-000000000002',
+          },
           mockRequestWithoutToken,
           mockResponse,
         ),
@@ -413,7 +527,15 @@ describe('AuthenticationController', () => {
       authServiceMock.invalidateRefreshToken.mockResolvedValue(undefined);
 
       await expect(
-        controller.refreshToken('invalid-token', mockRequest, mockResponse),
+        controller.refreshToken(
+          'invalid-token',
+          {
+            clientType: ClientType.WEB,
+            terminalId: '00000000-0000-4000-8000-000000000002',
+          },
+          mockRequest,
+          mockResponse,
+        ),
       ).rejects.toThrow(UnauthorizedException);
 
       expect(authServiceMock.invalidateRefreshToken).toHaveBeenCalledWith(

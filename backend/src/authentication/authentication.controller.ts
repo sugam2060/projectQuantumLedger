@@ -11,8 +11,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { UserAuthService } from './authentication.service.user';
-import type { ClientLoginDTO } from './dto/clientLogin.dto';
-import { ClientType } from './dto/clientLogin.dto';
+import { ClientLoginDTO, ClientType } from './dto/clientLogin.dto';
 import { Public } from './decorators/public.decorator';
 import { RateLimit } from './decorators/rate-limit.decorator';
 import { RequiredRoles } from './decorators/required_permission.decorator';
@@ -103,11 +102,12 @@ export class AuthenticationController {
   @Public()
   async refreshToken(
     @Body('refreshToken') refreshToken: string | undefined,
+    @AuthenticationLoginHeaders() headers: AuthenticationLoginHeadersDto,
     @ReqDecorator() req: Request,
     @ResDecorator({ passthrough: true }) res: Response,
   ) {
     // For web clients, try to get refresh token from cookie if not in body
-    const clientType = req.headers['x-client-type'];
+    const clientType = headers.clientType;
     let token = refreshToken;
 
     if (clientType === 'web' && !token) {
@@ -120,7 +120,10 @@ export class AuthenticationController {
 
     try {
       // Validate refresh token and generate new tokens
-      const result = await this.authService.refreshAccessToken(token);
+      const result = await this.authService.refreshAccessToken(
+        token,
+        headers.terminalId,
+      );
 
       // For web clients, set new tokens as cookies
       if (clientType === 'web') {

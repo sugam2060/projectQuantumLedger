@@ -93,4 +93,22 @@ describe('AuthenticationController (e2e)', () => {
       await request(app.getHttpServer()).get('/authentication/me').expect(401);
     });
   });
+
+  describe('POST /authentication/refresh', () => {
+    it('requires the terminal ID header', async () => {
+      await request(app.getHttpServer())
+        .post('/authentication/refresh')
+        .set('x-client-type', 'mobile')
+        .send({ refreshToken: 'refresh-token' })
+        .expect(400);
+    });
+
+    it('rejects a missing refresh token after validating headers', async () => {
+      await request(app.getHttpServer())
+        .post('/authentication/refresh')
+        .set('x-client-type', 'mobile')
+        .set('x-terminal-id', '00000000-0000-4000-8000-000000000001')
+        .expect(401);
+    });
+  });
 });

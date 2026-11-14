@@ -108,6 +108,27 @@ describe('AuthenticationPlatformController', () => {
     ).resolves.toEqual(authResult);
   });
 
+  it('returns tokens in the body without cookies for desktop login', async () => {
+    const dto = {
+      email: 'platform@example.com',
+      password: 'password',
+    };
+    const response = { cookie: jest.fn() };
+    platformAuthService.login.mockResolvedValue(authResult);
+
+    await expect(
+      controller.login(
+        dto,
+        {
+          secure: false,
+          headers: { 'x-client-type': ClientType.DESKTOP },
+        } as never,
+        response as never,
+      ),
+    ).resolves.toEqual(authResult);
+    expect(response.cookie).not.toHaveBeenCalled();
+  });
+
   it('sets replacement cookies when a web client refreshes with its cookie', async () => {
     const response = { cookie: jest.fn() };
     platformAuthService.refresh.mockResolvedValue(authResult);
@@ -138,17 +159,39 @@ describe('AuthenticationPlatformController', () => {
   });
 
   it('uses the refresh-token header for a mobile client', async () => {
+    const response = { cookie: jest.fn() };
     platformAuthService.refresh.mockResolvedValue(authResult);
 
     await expect(
       controller.refresh(
         { 'refresh-token': 'header-refresh-token', 'x-client-type': 'mobile' },
         { headers: {} } as never,
-        { cookie: jest.fn() } as never,
+        response as never,
       ),
     ).resolves.toEqual(authResult);
     expect(platformAuthService.refresh).toHaveBeenCalledWith(
       'header-refresh-token',
     );
+    expect(response.cookie).not.toHaveBeenCalled();
+  });
+
+  it('returns rotated tokens in the body without cookies for a desktop client', async () => {
+    const response = { cookie: jest.fn() };
+    platformAuthService.refresh.mockResolvedValue(authResult);
+
+    await expect(
+      controller.refresh(
+        {
+          'refresh-token': 'desktop-refresh-token',
+          'x-client-type': ClientType.DESKTOP,
+        },
+        { headers: {} } as never,
+        response as never,
+      ),
+    ).resolves.toEqual(authResult);
+    expect(platformAuthService.refresh).toHaveBeenCalledWith(
+      'desktop-refresh-token',
+    );
+    expect(response.cookie).not.toHaveBeenCalled();
   });
 });

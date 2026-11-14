@@ -11,6 +11,7 @@ import {
   endpointRoleAccess,
   roles,
 } from '../database/schema';
+import { EffectivePermissionsCacheService } from './effective-permissions-cache.service';
 
 export interface EndpointRoleConfiguration {
   endpointKey: string;
@@ -21,7 +22,10 @@ const ENDPOINT_KEY_PATTERN = /^[a-z][a-z0-9_.:-]{1,119}$/;
 
 @Injectable()
 export class EndpointAccessService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly permissionsCache: EffectivePermissionsCacheService,
+  ) {}
 
   async listConfigurations(
     session: RequestSession,
@@ -68,46 +72,66 @@ export class EndpointAccessService {
       throw new BadRequestException('Role IDs must not contain duplicates');
     }
 
-    return this.database.transactionWithSession(session, async (tx) => {
-      await this.assertActiveOwner(tx, session);
+    const { configuration, previousRoleIds } =
+      await this.database.transactionWithSession(session, async (tx) => {
+        await this.assertActiveOwner(tx, session);
 
-      const businessRoles = await tx
-        .select({ id: roles.id })
-        .from(roles)
-        .where(
-          and(
-            inArray(roles.id, uniqueRoleIds),
-            or(
-              eq(roles.businessId, session.businessId!),
-              isNull(roles.businessId),
+        const businessRoles = await tx
+          .select({ id: roles.id })
+          .from(roles)
+          .where(
+            and(
+              inArray(roles.id, uniqueRoleIds),
+              or(
+                eq(roles.businessId, session.businessId!),
+                isNull(roles.businessId),
+              ),
             ),
-          ),
-        );
-      if (businessRoles.length !== uniqueRoleIds.length) {
-        throw new BadRequestException(
-          'Every role must belong to the active business',
-        );
-      }
+          );
+        if (businessRoles.length !== uniqueRoleIds.length) {
+          throw new BadRequestException(
+            'Every role must belong to the active business',
+          );
+        }
 
-      await tx
-        .delete(endpointRoleAccess)
-        .where(
-          and(
-            eq(endpointRoleAccess.businessId, session.businessId!),
-            eq(endpointRoleAccess.endpointKey, endpointKey),
-          ),
+        const previousRoles = await tx
+          .select({ roleId: endpointRoleAccess.roleId })
+          .from(endpointRoleAccess)
+          .where(
+            and(
+              eq(endpointRoleAccess.businessId, session.businessId!),
+              eq(endpointRoleAccess.endpointKey, endpointKey),
+            ),
+          );
+
+        await tx
+          .delete(endpointRoleAccess)
+          .where(
+            and(
+              eq(endpointRoleAccess.businessId, session.businessId!),
+              eq(endpointRoleAccess.endpointKey, endpointKey),
+            ),
+          );
+
+        await tx.insert(endpointRoleAccess).values(
+          uniqueRoleIds.map((roleId) => ({
+            businessId: session.businessId!,
+            endpointKey,
+            roleId,
+          })),
         );
 
-      await tx.insert(endpointRoleAccess).values(
-        uniqueRoleIds.map((roleId) => ({
-          businessId: session.businessId!,
-          endpointKey,
-          roleId,
-        })),
-      );
+        return {
+          configuration: { endpointKey, roleIds: uniqueRoleIds },
+          previousRoleIds: previousRoles.map(({ roleId }) => roleId),
+        };
+      });
+    await this.permissionsCache.invalidate(session.businessId!, [
+      ...previousRoleIds,
+      ...configuration.roleIds,
+    ]);
 
-      return { endpointKey, roleIds: uniqueRoleIds };
-    });
+    return configuration;
   }
 
   async clearRequiredRoles(
@@ -117,17 +141,34 @@ export class EndpointAccessService {
     this.requireOwnerClaim(session);
     this.validateEndpointKey(endpointKey);
 
-    await this.database.transactionWithSession(session, async (tx) => {
-      await this.assertActiveOwner(tx, session);
-      await tx
-        .delete(endpointRoleAccess)
-        .where(
-          and(
-            eq(endpointRoleAccess.businessId, session.businessId!),
-            eq(endpointRoleAccess.endpointKey, endpointKey),
-          ),
-        );
-    });
+    const previousRoleIds = await this.database.transactionWithSession(
+      session,
+      async (tx) => {
+        await this.assertActiveOwner(tx, session);
+        const previousRoles = await tx
+          .select({ roleId: endpointRoleAccess.roleId })
+          .from(endpointRoleAccess)
+          .where(
+            and(
+              eq(endpointRoleAccess.businessId, session.businessId!),
+              eq(endpointRoleAccess.endpointKey, endpointKey),
+            ),
+          );
+        await tx
+          .delete(endpointRoleAccess)
+          .where(
+            and(
+              eq(endpointRoleAccess.businessId, session.businessId!),
+              eq(endpointRoleAccess.endpointKey, endpointKey),
+            ),
+          );
+        return previousRoles.map(({ roleId }) => roleId);
+      },
+    );
+    await this.permissionsCache.invalidate(
+      session.businessId!,
+      previousRoleIds,
+    );
   }
 
   async hasAccess(

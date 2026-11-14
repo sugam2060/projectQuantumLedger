@@ -10,6 +10,7 @@ import { ClientLoginDTO, ClientType } from '../dto/clientLogin.dto';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import { EndpointAccessCatalogService } from '../../roles-permissions/endpoint-access-catalog.service';
+import { EffectivePermissionsCacheService } from '../../roles-permissions/effective-permissions-cache.service';
 
 describe('UserAuthService', () => {
   let service: UserAuthService;
@@ -18,6 +19,11 @@ describe('UserAuthService', () => {
   let utilsServiceMock: any;
   let redisServiceMock: any;
   let endpointCatalogMock: { list: jest.Mock };
+  let permissionsCacheMock: {
+    get: jest.Mock;
+    set: jest.Mock;
+    invalidate: jest.Mock;
+  };
 
   beforeEach(async () => {
     // Mock dependencies
@@ -58,7 +64,11 @@ describe('UserAuthService', () => {
           { endpointKey: 'catalog.view' },
         ]),
     };
-
+    permissionsCacheMock = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(undefined),
+      invalidate: jest.fn().mockResolvedValue(undefined),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserAuthService,
@@ -82,6 +92,10 @@ describe('UserAuthService', () => {
           provide: EndpointAccessCatalogService,
           useValue: endpointCatalogMock,
         },
+        {
+          provide: EffectivePermissionsCacheService,
+          useValue: permissionsCacheMock,
+        },
       ],
     }).compile();
 
@@ -100,6 +114,9 @@ describe('UserAuthService', () => {
       userId: '00000000-0000-4000-8000-000000000001',
       businessId: '00000000-0000-4000-8000-000000000002',
       branchId: '00000000-0000-4000-8000-000000000003',
+      name: 'Cashier One',
+      roleId: '00000000-0000-4000-8000-000000000004',
+      roleVersion: 3,
       isOwner: false,
       isPlatform: false,
       permissions: [],
@@ -107,56 +124,11 @@ describe('UserAuthService', () => {
       tokenExpiresAt: 1_800_000_900,
     };
 
-    it('returns nested profile, active role permissions, and session context on initial load', async () => {
-      const rows = [
-        {
-          userId: authenticatedUser.userId,
-          email: 'cashier@example.com',
-          displayName: 'Cashier One',
-          status: 'active',
-          membershipBusinessId: authenticatedUser.businessId,
-          membershipBranchId: authenticatedUser.branchId,
-          isOwner: false,
-          roleId: '00000000-0000-4000-8000-000000000004',
-          roleName: 'Cashier',
-          roleVersion: 3,
-          terminalId: '00000000-0000-4000-8000-000000000005',
-        },
-      ];
-      const profileQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue(rows),
-      };
-      const permissionsQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            rolePermissions: ['products.read'],
-            endpointKey: 'inventory.create',
-            configuredRoleId: '00000000-0000-4000-8000-000000000004',
-          },
-          {
-            rolePermissions: ['products.read'],
-            endpointKey: 'inventory.delete',
-            configuredRoleId: '00000000-0000-4000-8000-000000000006',
-          },
-        ]),
-      };
-      const tx = {
-        select: jest
-          .fn()
-          .mockReturnValueOnce(profileQuery)
-          .mockReturnValueOnce(permissionsQuery),
-      };
-      dbMock.transactionWithSession.mockImplementation(
-        async (
-          _session: unknown,
-          callback: (transaction: unknown) => unknown,
-        ) => callback(tx),
-      );
-
+    it('returns permissions from cache on initial load and profile from JWT claims', async () => {
+      permissionsCacheMock.get.mockResolvedValue({
+        permissions: ['products.read'],
+        roleVersion: 3,
+      });
       await expect(
         service.getCurrentUser(
           authenticatedUser,
@@ -166,21 +138,16 @@ describe('UserAuthService', () => {
       ).resolves.toEqual({
         user: {
           id: authenticatedUser.userId,
-          email: 'cashier@example.com',
-          name: 'Cashier One',
+          name: authenticatedUser.name,
         },
         activeContext: {
           businessId: authenticatedUser.businessId,
           branchId: authenticatedUser.branchId,
         },
         is_owner: false,
-        role_template: '00000000-0000-4000-8000-000000000004',
+        role_template: authenticatedUser.roleId,
         role_template_version: '3',
-        effectivePermissions: [
-          'catalog.view',
-          'inventory.create',
-          'products.read',
-        ],
+        effectivePermissions: ['products.read'],
         session: {
           clientType: ClientType.WEB,
           terminalId: '00000000-0000-4000-8000-000000000005',
@@ -189,55 +156,98 @@ describe('UserAuthService', () => {
           expiresInSeconds: expect.any(Number),
         },
       });
-      expect(dbMock.transactionWithSession).toHaveBeenCalledWith(
-        authenticatedUser,
-        expect.any(Function),
+      expect(permissionsCacheMock.get).toHaveBeenCalledWith(
+        authenticatedUser.businessId,
+        authenticatedUser.roleId,
       );
-      expect(tx.select).toHaveBeenCalledTimes(2);
+      expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
     });
 
-    it('omits effective permissions when initial load is false', async () => {
-      const profileQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            userId: authenticatedUser.userId,
-            email: 'cashier@example.com',
-            displayName: 'Cashier One',
-            status: 'active',
-            membershipBusinessId: authenticatedUser.businessId,
-            membershipBranchId: authenticatedUser.branchId,
-            roleId: '00000000-0000-4000-8000-000000000004',
-            roleVersion: 3,
-            terminalId: '00000000-0000-4000-8000-000000000005',
-          },
-        ]),
-      };
-      const tx = { select: jest.fn().mockReturnValue(profileQuery) };
-      dbMock.transactionWithSession.mockImplementation(
-        async (
-          _session: unknown,
-          callback: (transaction: unknown) => unknown,
-        ) => callback(tx),
-      );
-
+    it('omits permissions and avoids cache and database when initial load is false', async () => {
       const result = await service.getCurrentUser(
         authenticatedUser,
         ClientType.WEB,
         '00000000-0000-4000-8000-000000000005',
         false,
       );
-
       expect(result).not.toHaveProperty('effectivePermissions');
       expect(result).toMatchObject({
         user: {
           id: authenticatedUser.userId,
-          email: 'cashier@example.com',
-          name: 'Cashier One',
+          name: authenticatedUser.name,
         },
       });
-      expect(tx.select).toHaveBeenCalledTimes(1);
+      expect(permissionsCacheMock.get).not.toHaveBeenCalled();
+      expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
+    });
+
+    it('loads permissions from the database and populates cache on cache miss', async () => {
+      const roleQuery = {
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest
+          .fn()
+          .mockResolvedValue([{ permissions: ['products.read'], version: 4 }]),
+      };
+      const endpointQuery = {
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([]),
+      };
+      const tx = {
+        select: jest
+          .fn()
+          .mockReturnValueOnce(roleQuery)
+          .mockReturnValueOnce(endpointQuery),
+      };
+      dbMock.transactionWithSession.mockImplementation(
+        async (_session: unknown, callback: (tx: unknown) => unknown) =>
+          callback(tx),
+      );
+
+      const result = await service.getCurrentUser(
+        authenticatedUser,
+        ClientType.WEB,
+        '00000000-0000-4000-8000-000000000005',
+      );
+
+      expect(result.effectivePermissions).toEqual([
+        'catalog.view',
+        'inventory.create',
+        'inventory.delete',
+        'products.read',
+      ]);
+      expect(result.role_template_version).toBe('4');
+      expect(dbMock.transactionWithSession).toHaveBeenCalledWith(
+        authenticatedUser,
+        expect.any(Function),
+      );
+      expect(permissionsCacheMock.set).toHaveBeenCalledWith(
+        authenticatedUser.businessId,
+        authenticatedUser.roleId,
+        {
+          permissions: [
+            'catalog.view',
+            'inventory.create',
+            'inventory.delete',
+            'products.read',
+          ],
+          roleVersion: 4,
+        },
+      );
+    });
+
+    it('uses the supplied terminal header as session metadata without querying the database', async () => {
+      const result = await service.getCurrentUser(
+        authenticatedUser,
+        ClientType.WEB,
+        '00000000-0000-4000-8000-000000000099',
+        false,
+      );
+
+      expect(result.session.terminalId).toBe(
+        '00000000-0000-4000-8000-000000000099',
+      );
+      expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
     });
 
     it('rejects platform tokens on the user profile endpoint', async () => {
@@ -267,45 +277,45 @@ describe('UserAuthService', () => {
     it('should throw BadRequestException if email is missing', async () => {
       const invalidDto: any = { ...mockDto, email: undefined };
 
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(
-        'Valid email is required',
-      );
+      await expect(
+        service.userLogin(invalidDto, 'terminal123'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.userLogin(invalidDto, 'terminal123'),
+      ).rejects.toThrow('Valid email is required');
     });
 
     it('should throw BadRequestException if password is missing', async () => {
       const invalidDto: any = { ...mockDto, password: undefined };
 
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(
-        'Valid password is required',
-      );
+      await expect(
+        service.userLogin(invalidDto, 'terminal123'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.userLogin(invalidDto, 'terminal123'),
+      ).rejects.toThrow('Valid password is required');
     });
 
     it('should throw BadRequestException if email is not a string', async () => {
       const invalidDto = { ...mockDto, email: 123 as any };
 
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(
-        'Valid email is required',
-      );
+      await expect(
+        service.userLogin(invalidDto, 'terminal123'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.userLogin(invalidDto, 'terminal123'),
+      ).rejects.toThrow('Valid email is required');
     });
 
     it('should throw BadRequestException if password is not a string', async () => {
       const invalidDto = { ...mockDto, password: 123 as any };
 
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.userLogin(invalidDto)).rejects.toThrow(
-        'Valid password is required',
-      );
+      await expect(
+        service.userLogin(invalidDto, 'terminal123'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.userLogin(invalidDto, 'terminal123'),
+      ).rejects.toThrow('Valid password is required');
     });
 
     it('should throw UnauthorizedException for invalid credentials when no user found', async () => {
@@ -326,10 +336,10 @@ describe('UserAuthService', () => {
         return callback(tx);
       });
 
-      await expect(service.userLogin(mockDto)).rejects.toThrow(
+      await expect(service.userLogin(mockDto, 'terminal123')).rejects.toThrow(
         UnauthorizedException,
       );
-      await expect(service.userLogin(mockDto)).rejects.toThrow(
+      await expect(service.userLogin(mockDto, 'terminal123')).rejects.toThrow(
         'Invalid email or password',
       );
     });
@@ -340,11 +350,14 @@ describe('UserAuthService', () => {
         {
           userId: 'user123',
           userEmail: 'test@example.com',
+          userName: 'Test User',
           userPasswordHash: '$2a$10$hashedPassword',
           userStatus: 'active',
           businessId: 'business123',
           branchId: null,
           roleId: 'role123',
+          roleVersion: 4,
+          isOwner: false,
           roleName: 'admin',
           rolePermissions: ['read', 'write'],
         },
@@ -368,12 +381,17 @@ describe('UserAuthService', () => {
             },
           ]),
         };
+        const configurationsQuery = {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockResolvedValue([]),
+        };
         const tx = {
           execute: jest.fn().mockResolvedValue(undefined),
           select: jest
             .fn()
             .mockReturnValueOnce(userQuery)
-            .mockReturnValueOnce(terminalQuery),
+            .mockReturnValueOnce(terminalQuery)
+            .mockReturnValueOnce(configurationsQuery),
         };
         return callback(tx);
       });
@@ -402,16 +420,41 @@ describe('UserAuthService', () => {
         user: {
           id: 'user123',
           email: 'test@example.com',
-          name: undefined,
+          name: 'Test User',
         },
         memberships: expect.any(Array),
+        effectivePermissions: expect.arrayContaining([
+          'catalog.view',
+          'inventory.create',
+          'inventory.delete',
+          'read',
+          'write',
+        ]),
       });
 
       expect(jwtServiceMock.signAsync).toHaveBeenCalled();
       expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
+        name: 'Test User',
         businessId: 'business123',
         branchId: 'branch123',
+        role_id: 'role123',
+        role_version: 4,
       });
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
+        'userId',
+      );
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
+        'email',
+      );
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
+        'permissions',
+      );
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
+        'role',
+      );
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
+        'terminalId',
+      );
       expect(utilsServiceMock.generateRefreshToken).toHaveBeenCalled();
       expect(redisServiceMock.set).toHaveBeenCalledWith(
         `refresh_token:mock-refresh-token`,
@@ -444,13 +487,18 @@ describe('UserAuthService', () => {
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockResolvedValue([]),
       };
+      const configurationsQuery = {
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([]),
+      };
       dbMock.transaction.mockImplementation(async (callback: any) =>
         callback({
           execute: jest.fn().mockResolvedValue(undefined),
           select: jest
             .fn()
             .mockReturnValueOnce(userQuery)
-            .mockReturnValueOnce(terminalQuery),
+            .mockReturnValueOnce(terminalQuery)
+            .mockReturnValueOnce(configurationsQuery),
         }),
       );
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
@@ -491,13 +539,18 @@ describe('UserAuthService', () => {
           },
         ]),
       };
+      const configurationsQuery = {
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([]),
+      };
       dbMock.transaction.mockImplementation(async (callback: any) =>
         callback({
           execute: jest.fn().mockResolvedValue(undefined),
           select: jest
             .fn()
             .mockReturnValueOnce(userQuery)
-            .mockReturnValueOnce(terminalQuery),
+            .mockReturnValueOnce(terminalQuery)
+            .mockReturnValueOnce(configurationsQuery),
         }),
       );
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
@@ -520,7 +573,7 @@ describe('UserAuthService', () => {
       redisServiceMock.get.mockResolvedValue(null);
 
       await expect(
-        service.refreshAccessToken(mockRefreshToken),
+        service.refreshAccessToken(mockRefreshToken, 'terminal123'),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -528,24 +581,51 @@ describe('UserAuthService', () => {
       // Mock Redis response
       redisServiceMock.get.mockResolvedValue('user123');
 
-      // Mock database responses
-      dbMock.execute.mockResolvedValue(undefined);
-
-      // Mock the select method to return user data
-      dbMock.select.mockImplementation(() => ({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([
-              {
-                id: 'user123',
-                emailNormalized: 'test@example.com',
-                name: 'Test User',
-                status: 'active',
-              },
-            ]),
-          }),
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        leftJoinAgain: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            userId: 'user123',
+            email: 'test@example.com',
+            name: 'Test User',
+            status: 'active',
+            businessId: 'business123',
+            branchId: 'branch123',
+            isOwner: false,
+            roleId: 'role123',
+            roleVersion: 4,
+            permissions: ['products.read'],
+          },
+        ]),
+      };
+      userQuery.leftJoin.mockReturnValue(userQuery);
+      const terminalQuery = {
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            terminalId: 'terminal123',
+            businessId: 'business123',
+            branchId: 'branch123',
+          },
+        ]),
+      };
+      const configurationsQuery = {
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([]),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback({
+          execute: jest.fn().mockResolvedValue(undefined),
+          select: jest
+            .fn()
+            .mockReturnValueOnce(userQuery)
+            .mockReturnValueOnce(terminalQuery)
+            .mockReturnValueOnce(configurationsQuery),
         }),
-      }));
+      );
 
       // Mock JWT and token generation
       jwtServiceMock.signAsync.mockResolvedValue('new-access-token');
@@ -555,7 +635,10 @@ describe('UserAuthService', () => {
       redisServiceMock.set.mockResolvedValue(undefined);
       redisServiceMock.delete.mockResolvedValue(undefined);
 
-      const result = await service.refreshAccessToken(mockRefreshToken);
+      const result = await service.refreshAccessToken(
+        mockRefreshToken,
+        'terminal123',
+      );
 
       expect(result).toEqual({
         accessToken: 'new-access-token',
@@ -567,6 +650,19 @@ describe('UserAuthService', () => {
           email: 'test@example.com',
           name: 'Test User',
         },
+        effectivePermissions: expect.arrayContaining([
+          'catalog.view',
+          'inventory.create',
+          'inventory.delete',
+          'products.read',
+        ]),
+      });
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
+        name: 'Test User',
+        businessId: 'business123',
+        branchId: 'branch123',
+        role_id: 'role123',
+        role_version: 4,
       });
 
       expect(redisServiceMock.delete).toHaveBeenCalledWith(

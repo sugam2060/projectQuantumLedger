@@ -10,12 +10,8 @@ export class AuthenticationMeHeadersDto {
   terminalId!: string;
 
   @Transform(({ value }: { value: unknown }) => {
-    if (value === undefined || value === 'true') {
-      return true;
-    }
-    if (value === 'false') {
-      return false;
-    }
+    if (value === undefined || value === 'true') return true;
+    if (value === 'false') return false;
     return value;
   })
   @IsBoolean()

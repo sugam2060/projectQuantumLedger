@@ -81,7 +81,11 @@ token.
 `remember` is optional. `x-terminal-id` is required and must identify an active
 terminal whose business and branch match an active membership. A membership
 with no branch covers all branches within its business; the token is bound to
-the terminal's branch. `x-client-type` may be `web`, `desktop`, or `mobile`; if
+the terminal's branch. The JWT includes the user's name, business and branch
+context, `role_id`, and `role_version`; it omits duplicate `userId`, email,
+permissions, and terminal ID claims. Effective permissions are returned as a
+separate response field for the client to cache. `x-client-type` may be `web`,
+`desktop`, or `mobile`; if
 omitted, it defaults to `web`. With `remember: true`, the response includes a
 refresh token and the access token expires in `7d`; otherwise it expires in
 `15m`. Web clients receive HTTP-only token cookies and the body omits token
@@ -123,10 +127,10 @@ fields. Mobile and desktop clients receive tokens in the JSON body.
           "branchId": "01234567-89ab-4cde-8f01-23456789abcd",
           "isOwner": false,
           "roleId": "9abcde01-2345-4f67-89ab-cdef01234567",
-          "role": "Cashier",
-          "permissions": ["products.read", "inventory.create"]
+          "role": "Cashier"
         }
-      ]
+      ],
+      "effectivePermissions": ["inventory.create", "products.read"]
     }
   }
 }
@@ -137,15 +141,19 @@ fields. Mobile and desktop clients receive tokens in the JSON body.
 **Description:** Rotates a user's refresh token and issues a new access token.
 Web clients may send the refresh token in the `refresh_token` cookie; other
 clients send it in the JSON body. **Auth:** public; possession of a valid
-refresh token is required. **Rate limit:** none currently. **Errors:** 401 for
-a missing or invalid refresh token. **Idempotency:** no; tokens rotate, so a
-refresh token should only be used once.
+refresh token is required. **Rate limit:** none currently. **Errors:** 400 for
+invalid headers, 401 for a missing/invalid refresh token or a terminal that is
+inactive or outside the user's active memberships. **Idempotency:** no; tokens
+rotate, so a refresh token should only be used once.
 
 The `x-client-type` header controls web behavior. For web, the controller sets
 new HTTP-only cookies and omits the tokens from the response body. For desktop
 and mobile, tokens are returned in JSON. `@RequiredRoles('users.refresh')` is
 present in code, but this route is public, so the permission guard skips that
-check.
+check. `x-terminal-id` is required; the server validates that it is active and
+matches one of the user's active memberships before issuing a new token with
+the current role ID and version. The effective permission snapshot is returned
+separately from the JWT so the client can refresh its permission cache.
 
 ```json
 {
@@ -156,7 +164,8 @@ check.
     "queryParams": null,
     "headers": {
       "Content-Type": "application/json",
-      "x-client-type": "mobile"
+      "x-client-type": "mobile",
+      "x-terminal-id": "01234567-89ab-4cde-8f01-23456789abcd"
     },
     "body": {
       "refreshToken": "<redacted>"
@@ -173,7 +182,8 @@ check.
         "id": "45fbee7a-f45f-4738-96bc-32f90a5e34b3",
         "email": "cashier@example.com",
         "name": "Cashier One"
-      }
+      },
+      "effectivePermissions": ["inventory.create", "products.read"]
     }
   }
 }
@@ -183,15 +193,18 @@ check.
 
 **Description:** Returns the signed-in user's profile, active business/branch
 context, owner status, current role template and version, and JWT session
-summary. A supplied terminal must be active and belong to the user's active
-business/branch. Set `x-initial-load: true` to include effective permissions;
-set it to `false` to omit that field and skip the permission query. If omitted,
-it defaults to `true`. Clients can retain permissions in memory and send false
-after the initial load. A token without a business context can return a null
-active context and role. **Auth:** signed-in business user; platform-user tokens
-are rejected. **Rate limit:** 60 requests per minute. **Permission:** no
-endpoint role required. **Errors:** 400 for invalid headers, 401 for an invalid
-user/context/terminal, 429 when rate limited. **Idempotency:** read-only.
+summary from the validated access token. `x-initial-load` defaults to `true`;
+when true, the endpoint also returns effective permissions, using Redis first
+and querying the role and endpoint configuration from the database on a cache
+miss. When false, the permission field is omitted and no permission lookup is
+performed. The profile fields continue to come from the JWT. `x-terminal-id`
+is returned as session metadata and is not revalidated by this endpoint. A
+token without a business context can return a null active context and role.
+**Auth:** signed-in
+business user; platform-user tokens are rejected. **Rate limit:** 60 requests
+per minute. **Permission:** no endpoint role required. **Errors:** 400 for
+invalid headers, 401 for invalid or incomplete user claims, 429 when rate
+limited. **Idempotency:** read-only.
 
 ```json
 {
@@ -213,7 +226,6 @@ user/context/terminal, 429 when rate limited. **Idempotency:** read-only.
     "body": {
       "user": {
         "id": "45fbee7a-f45f-4738-96bc-32f90a5e34b3",
-        "email": "cashier@example.com",
         "name": "Cashier One"
       },
       "activeContext": {
