@@ -84,4 +84,25 @@ describe('PermissionGuard', () => {
       permissions: [],
     };
   });
+
+  it('bypasses endpoint role checks for an active business owner', async () => {
+    reflector.getAllAndOverride
+      .mockReturnValueOnce(false)
+      .mockReturnValue('inventory.create');
+    request.user = {
+      userId: 'user-1',
+      businessId: 'business-1',
+      isOwner: true,
+      permissions: [],
+    };
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(endpointAccess.hasAccess).not.toHaveBeenCalled();
+
+    request.user = {
+      userId: 'user-1',
+      businessId: 'business-1',
+      permissions: [],
+    };
+  });
 });

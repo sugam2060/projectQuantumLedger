@@ -131,6 +131,11 @@ export class UserAuthService {
           'Terminal is not active for an assigned business branch',
         );
       }
+      if (!selectedMembership.isOwner && !selectedMembership.roleId) {
+        throw new UnauthorizedException(
+          'An active role is required for non-owner business members',
+        );
+      }
 
       // Process the joined results to separate user data from memberships
       const user = {
@@ -169,20 +174,24 @@ export class UserAuthService {
         ),
         branchId: terminal.branchId,
       };
-      const effectivePermissions = await this.getEffectivePermissions(
-        tx,
-        activeMembership.businessId,
-        activeMembership.roleId,
-        activeMembership.permissions,
-      );
-      await this.permissionsCache.set(
-        activeMembership.businessId,
-        activeMembership.roleId,
-        {
-          permissions: effectivePermissions,
-          roleVersion: activeMembership.roleVersion ?? null,
-        },
-      );
+      const effectivePermissions = activeMembership.roleId
+        ? await this.getEffectivePermissions(
+            tx,
+            activeMembership.businessId,
+            activeMembership.roleId,
+            activeMembership.permissions,
+          )
+        : [];
+      if (activeMembership.roleId) {
+        await this.permissionsCache.set(
+          activeMembership.businessId,
+          activeMembership.roleId,
+          {
+            permissions: effectivePermissions,
+            roleVersion: activeMembership.roleVersion ?? null,
+          },
+        );
+      }
       await tx.execute(sql`
         SELECT
           set_config('app.is_platform_user', 'false', true),
@@ -196,8 +205,12 @@ export class UserAuthService {
           businessId: activeMembership.businessId,
           branchId: activeMembership.branchId ?? undefined,
           isOwner: activeMembership.isOwner,
-          role_id: activeMembership.roleId,
-          role_version: activeMembership.roleVersion,
+          ...(activeMembership.roleId
+            ? {
+                role_id: activeMembership.roleId,
+                role_version: activeMembership.roleVersion,
+              }
+            : {}),
         },
         { expiresIn },
       );
@@ -463,26 +476,34 @@ export class UserAuthService {
           row.businessId === terminal.businessId &&
           (row.branchId === null || row.branchId === terminal.branchId),
       );
-      if (!terminal || !membership || !membership.roleId) {
+      if (
+        !terminal ||
+        !membership ||
+        (!membership.isOwner && !membership.roleId)
+      ) {
         throw new UnauthorizedException(
           'Terminal is not active for an assigned business branch',
         );
       }
 
-      const effectivePermissions = await this.getEffectivePermissions(
-        tx,
-        membership.businessId!,
-        membership.roleId,
-        this.readPermissions(membership.permissions),
-      );
-      await this.permissionsCache.set(
-        membership.businessId!,
-        membership.roleId,
-        {
-          permissions: effectivePermissions,
-          roleVersion: membership.roleVersion ?? null,
-        },
-      );
+      const effectivePermissions = membership.roleId
+        ? await this.getEffectivePermissions(
+            tx,
+            membership.businessId!,
+            membership.roleId,
+            this.readPermissions(membership.permissions),
+          )
+        : [];
+      if (membership.roleId) {
+        await this.permissionsCache.set(
+          membership.businessId!,
+          membership.roleId,
+          {
+            permissions: effectivePermissions,
+            roleVersion: membership.roleVersion ?? null,
+          },
+        );
+      }
 
       await tx.execute(sql`
         SELECT
@@ -498,8 +519,12 @@ export class UserAuthService {
           businessId: membership.businessId,
           branchId: terminal.branchId,
           isOwner: membership.isOwner,
-          role_id: membership.roleId,
-          role_version: membership.roleVersion,
+          ...(membership.roleId
+            ? {
+                role_id: membership.roleId,
+                role_version: membership.roleVersion,
+              }
+            : {}),
         },
         { expiresIn: '15m' },
       );

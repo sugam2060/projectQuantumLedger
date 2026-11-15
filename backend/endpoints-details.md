@@ -81,10 +81,14 @@ token.
 `remember` is optional. `x-terminal-id` is required and must identify an active
 terminal whose business and branch match an active membership. A membership
 with no branch covers all branches within its business; the token is bound to
-the terminal's branch. The JWT includes the user's name, business and branch
-context, `role_id`, and `role_version`; it omits duplicate `userId`, email,
-permissions, and terminal ID claims. Effective permissions are returned as a
-separate response field for the client to cache. `x-client-type` may be `web`,
+the terminal's branch. The JWT includes the user's name and business/branch
+context; role claims are included when the membership has a role. A business
+owner may have `roleId: null`; the response then has an empty effective
+permission list because owners bypass endpoint role mappings. Non-owner
+memberships must have a role. The JWT omits duplicate `userId`, email,
+permissions, and terminal ID claims. Effective permissions for role-based
+members are returned as a separate response field for the client to cache.
+`x-client-type` may be `web`,
 `desktop`, or `mobile`; if
 omitted, it defaults to `web`. With `remember: true`, the response includes a
 refresh token and the access token expires in `7d`; otherwise it expires in
@@ -127,7 +131,8 @@ fields. Mobile and desktop clients receive tokens in the JSON body.
           "branchId": "01234567-89ab-4cde-8f01-23456789abcd",
           "isOwner": false,
           "roleId": "9abcde01-2345-4f67-89ab-cdef01234567",
-          "role": "Cashier"
+          "role": "Cashier",
+          "roleVersion": 3
         }
       ],
       "effectivePermissions": ["inventory.create", "products.read"]
@@ -152,8 +157,11 @@ and mobile, tokens are returned in JSON. `@RequiredRoles('users.refresh')` is
 present in code, but this route is public, so the permission guard skips that
 check. `x-terminal-id` is required; the server validates that it is active and
 matches one of the user's active memberships before issuing a new token with
-the current role ID and version. The effective permission snapshot is returned
-separately from the JWT so the client can refresh its permission cache.
+the current role ID and version. Owners with a role-free membership can also
+refresh; their response has an empty effective-permission list and the token
+omits role claims. Non-owners need an assigned role. The effective permission
+snapshot is returned separately from the JWT so the client can refresh its
+permission cache.
 
 ```json
 {
@@ -199,7 +207,9 @@ and querying the role and endpoint configuration from the database on a cache
 miss. When false, the permission field is omitted and no permission lookup is
 performed. The profile fields continue to come from the JWT. `x-terminal-id`
 is returned as session metadata and is not revalidated by this endpoint. A
-token without a business context can return a null active context and role.
+token without a business context can return a null active context and role. For
+a role-free owner, `role_template` and `role_template_version` are null, and
+initial-load permissions are an empty array.
 **Auth:** signed-in
 business user; platform-user tokens are rejected. **Rate limit:** 60 requests
 per minute. **Permission:** no endpoint role required. **Errors:** 400 for
