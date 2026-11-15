@@ -27,7 +27,9 @@ export class PermissionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<{
       user?: AuthenticatedUser;
     }>();
-    if (request.user?.isPlatform === true) return true;
+    if (request.user?.isPlatform === true || request.user?.isOwner === true) {
+      return true;
+    }
 
     const endpointKey = this.reflector.getAllAndOverride<string>(
       REQUIRED_ROLES,

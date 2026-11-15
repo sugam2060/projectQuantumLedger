@@ -5,6 +5,8 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { RequestSession } from '../../database/request_context.service';
 
 export interface AuthenticatedUser extends RequestSession {
+  subjectId: string;
+  sub?: string;
   permissions: string[];
   name?: string;
   roleId?: string;
@@ -81,6 +83,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     return {
+      subjectId: subject,
       userId,
       businessId: this.optionalUuid(payload.businessId, 'businessId'),
       branchId: this.optionalUuid(payload.branchId, 'branchId'),

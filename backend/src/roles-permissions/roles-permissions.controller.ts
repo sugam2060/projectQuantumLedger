@@ -57,6 +57,7 @@ export class RolesPermissionsController {
       request.user,
       params.endpointKey,
       dto.roleIds,
+      this.auditContext(request),
     );
   }
 
@@ -69,6 +70,19 @@ export class RolesPermissionsController {
     await this.endpointAccess.clearRequiredRoles(
       request.user,
       params.endpointKey,
+      this.auditContext(request),
     );
+  }
+
+  private auditContext(request: Request) {
+    return {
+      method: request.method,
+      endpointPath: request.route?.path,
+      responseStatus: request.method === 'DELETE' ? 204 : 200,
+      requestId: request.header('x-request-id'),
+      clientType: request.header('x-client-type'),
+      ipAddress: request.ip,
+      userAgent: request.header('user-agent'),
+    };
   }
 }

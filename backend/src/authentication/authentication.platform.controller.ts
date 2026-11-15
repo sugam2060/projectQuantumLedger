@@ -50,7 +50,15 @@ export class AuthenticationPlatformController {
     }
     const clientType = headerClientType ?? dto.client_type;
 
-    const result = await this.platformAuthService.login(dto);
+    const result = await this.platformAuthService.login(dto, {
+      method: request.method,
+      endpointPath: request.route?.path,
+      responseStatus: 200,
+      requestId: request.header('x-request-id'),
+      clientType: typeof clientType === 'string' ? clientType : undefined,
+      ipAddress: request.ip,
+      userAgent: request.header('user-agent'),
+    });
     if (clientType === ClientType.WEB || !clientType) {
       const cookieOptions = {
         httpOnly: true,
@@ -100,7 +108,15 @@ export class AuthenticationPlatformController {
       throw new UnauthorizedException('A refresh token is required');
     }
 
-    const result = await this.platformAuthService.refresh(refreshToken);
+    const result = await this.platformAuthService.refresh(refreshToken, {
+      method: request.method,
+      endpointPath: request.route?.path,
+      responseStatus: 200,
+      requestId: request.header('x-request-id'),
+      clientType: refreshHeaders.clientType,
+      ipAddress: request.ip,
+      userAgent: request.header('user-agent'),
+    });
     if (refreshHeaders.clientType === ClientType.WEB) {
       const cookieOptions = {
         httpOnly: true,

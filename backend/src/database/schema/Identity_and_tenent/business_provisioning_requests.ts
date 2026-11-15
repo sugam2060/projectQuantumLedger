@@ -11,6 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { BusinessDocuments } from './businesses';
 import { platformUsers } from './platform_users';
+import { business } from './businesses';
 
 export interface BusinessRequestAddress {
   country: string;
@@ -35,6 +36,9 @@ export const businessProvisioningRequests = pgTable(
     reviewedBy: uuid('reviewed_by').references(() => platformUsers.id),
     reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     reviewNotes: text('review_notes'),
+    provisionedBusinessId: uuid('provisioned_business_id').references(
+      () => business.id,
+    ),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -50,6 +54,9 @@ export const businessProvisioningRequests = pgTable(
     index('business_provisioning_requests_contact_email_idx').on(
       table.primaryContactEmail,
     ),
+    index('business_provisioning_requests_provisioned_business_uq')
+      .on(table.provisionedBusinessId)
+      .where(sql`provisioned_business_id IS NOT NULL`),
     check(
       'business_provisioning_requests_status_chk',
       sql`status IN ('pending', 'approved', 'rejected')`,

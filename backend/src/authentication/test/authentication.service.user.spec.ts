@@ -11,6 +11,7 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import { EndpointAccessCatalogService } from '../../roles-permissions/endpoint-access-catalog.service';
 import { EffectivePermissionsCacheService } from '../../roles-permissions/effective-permissions-cache.service';
+import { AuditLogService } from '../../database/audit-log.service';
 
 describe('UserAuthService', () => {
   let service: UserAuthService;
@@ -23,6 +24,10 @@ describe('UserAuthService', () => {
     get: jest.Mock;
     set: jest.Mock;
     invalidate: jest.Mock;
+  };
+  const auditLogsMock = {
+    insertUserEvent: jest.fn().mockResolvedValue(undefined),
+    logUserEvent: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -96,6 +101,7 @@ describe('UserAuthService', () => {
           provide: EffectivePermissionsCacheService,
           useValue: permissionsCacheMock,
         },
+        { provide: AuditLogService, useValue: auditLogsMock },
       ],
     }).compile();
 
@@ -103,6 +109,7 @@ describe('UserAuthService', () => {
 
     // Clear all mocks before each test
     jest.clearAllMocks();
+    auditLogsMock.insertUserEvent.mockResolvedValue(undefined);
   });
 
   it('should be defined', () => {
@@ -412,6 +419,17 @@ describe('UserAuthService', () => {
 
       const result = await service.userLogin(mockDto, 'terminal123');
 
+      expect(auditLogsMock.insertUserEvent).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          userId: 'user123',
+          businessId: 'business123',
+          terminalId: 'terminal123',
+          eventType: 'USER_LOGIN_SUCCESS',
+          responseStatus: 200,
+        }),
+      );
+
       expect(result).toEqual({
         accessToken: 'mock-jwt-token',
         refreshToken: 'mock-refresh-token',
@@ -461,6 +479,80 @@ describe('UserAuthService', () => {
         'user123',
         7 * 24 * 60 * 60,
       );
+    });
+
+    it('authenticates an owner with a null membership branch and no role claims', async () => {
+      const ownerDto: ClientLoginDTO = {
+        email: 'owner@example.com',
+        password: 'password123',
+        remember: false,
+      };
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            userId: 'owner-user',
+            userEmail: 'owner@example.com',
+            userName: 'Business Owner',
+            userPasswordHash: '$2a$10$hashedPassword',
+            userStatus: 'active',
+            businessId: 'business123',
+            branchId: null,
+            isOwner: true,
+            roleId: null,
+            roleName: null,
+            roleVersion: null,
+            rolePermissions: null,
+          },
+        ]),
+      };
+      const terminalQuery = {
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            terminalId: 'terminal123',
+            businessId: 'business123',
+            branchId: 'branch123',
+          },
+        ]),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback({
+          execute: jest.fn().mockResolvedValue(undefined),
+          select: jest
+            .fn()
+            .mockReturnValueOnce(userQuery)
+            .mockReturnValueOnce(terminalQuery),
+        }),
+      );
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+      jwtServiceMock.signAsync.mockResolvedValue('owner-access-token');
+
+      const result = await service.userLogin(ownerDto, 'terminal123');
+
+      expect(result).toMatchObject({
+        accessToken: 'owner-access-token',
+        effectivePermissions: [],
+        memberships: [
+          expect.objectContaining({
+            businessId: 'business123',
+            branchId: null,
+            isOwner: true,
+            roleId: null,
+          }),
+        ],
+      });
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
+        isOwner: true,
+        businessId: 'business123',
+        branchId: 'branch123',
+      });
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
+        'role_id',
+      );
+      expect(permissionsCacheMock.set).not.toHaveBeenCalled();
     });
 
     it('rejects login when terminal is not active for a matching membership', async () => {
@@ -559,6 +651,210 @@ describe('UserAuthService', () => {
         UnauthorizedException,
       );
       expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('registerOwner', () => {
+    it('creates a business-wide owner membership, activates business, and consumes the code', async () => {
+      const makeQuery = (rows: object[], lockable = false) => {
+        const query = {
+          from: jest.fn(),
+          where: jest.fn(),
+          limit: jest.fn(),
+          for: jest.fn().mockResolvedValue(rows),
+        };
+        query.from.mockReturnValue(query);
+        query.where.mockReturnValue(query);
+        query.limit.mockReturnValue(lockable ? query : Promise.resolve(rows));
+        return query;
+      };
+      const insertedValues: unknown[] = [];
+      const tx = {
+        execute: jest.fn().mockResolvedValue(undefined),
+        select: jest
+          .fn()
+          .mockReturnValueOnce(
+            makeQuery(
+              [
+                {
+                  id: 'redemption-id',
+                  businessId: 'business-id',
+                  email: 'owner@example.com',
+                },
+              ],
+              true,
+            ),
+          )
+          .mockReturnValueOnce(
+            makeQuery([{ id: 'business-id', isActive: false }]),
+          )
+          .mockReturnValueOnce(makeQuery([]))
+          .mockReturnValueOnce(
+            makeQuery([{ terminalId: 'terminal-id', branchId: 'branch-id' }]),
+          ),
+        insert: jest
+          .fn()
+          .mockImplementationOnce(() => ({
+            values: () => ({
+              returning: jest
+                .fn()
+                .mockResolvedValue([{ id: 'created-owner-id' }]),
+            }),
+          }))
+          .mockImplementationOnce(() => ({
+            values: (value: unknown) => {
+              insertedValues.push(value);
+              return Promise.resolve([]);
+            },
+          })),
+        update: jest.fn().mockImplementation(() => ({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
+        })),
+      };
+      dbMock.transactionWithSession.mockImplementation(
+        async (
+          _session: unknown,
+          callback: (transaction: unknown) => unknown,
+        ) => callback(tx),
+      );
+
+      const result = await service.registerOwner({
+        email: ' OWNER@example.com ',
+        name: 'Business Owner',
+        password: 'secure-password',
+        redeemCode: 'AABBCCDDEEFF001122334455',
+      });
+
+      expect(result).toMatchObject({
+        userId: 'created-owner-id',
+        businessId: 'business-id',
+        isOwner: true,
+        roleId: null,
+        branchId: null,
+        initialTerminalId: 'terminal-id',
+        initialBranchId: 'branch-id',
+      });
+      expect(insertedValues[0]).toMatchObject({
+        businessId: 'business-id',
+        userId: 'created-owner-id',
+        roleId: null,
+        branchId: null,
+        isOwner: true,
+        isActive: true,
+      });
+      expect(tx.update).toHaveBeenCalledTimes(2);
+      expect(tx.execute).toHaveBeenCalledTimes(3);
+    });
+
+    it('rejects a redemption code that is not visible or no longer redeemable', async () => {
+      const query = {
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        for: jest.fn().mockResolvedValue([]),
+      };
+      const tx = {
+        execute: jest.fn().mockResolvedValue(undefined),
+        select: jest.fn().mockReturnValue(query),
+        insert: jest.fn(),
+      };
+      dbMock.transactionWithSession.mockImplementation(
+        async (
+          _session: unknown,
+          callback: (transaction: unknown) => unknown,
+        ) => callback(tx),
+      );
+
+      await expect(
+        service.registerOwner({
+          email: 'owner@example.com',
+          name: 'Business Owner',
+          password: 'secure-password',
+          redeemCode: 'INVALID',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(tx.insert).not.toHaveBeenCalled();
+    });
+
+    it('requires the password to attach an existing global account', async () => {
+      const makeQuery = (rows: object[], lockable = false) => {
+        const query = {
+          from: jest.fn(),
+          where: jest.fn(),
+          limit: jest.fn(),
+          for: jest.fn().mockResolvedValue(rows),
+        };
+        query.from.mockReturnValue(query);
+        query.where.mockReturnValue(query);
+        query.limit.mockReturnValue(lockable ? query : Promise.resolve(rows));
+        return query;
+      };
+      const tx = {
+        execute: jest.fn().mockResolvedValue(undefined),
+        select: jest
+          .fn()
+          .mockReturnValueOnce(
+            makeQuery(
+              [
+                {
+                  id: 'redemption-id',
+                  businessId: 'business-id',
+                  email: 'owner@example.com',
+                },
+              ],
+              true,
+            ),
+          )
+          .mockReturnValueOnce(
+            makeQuery([{ id: 'business-id', isActive: false }]),
+          )
+          .mockReturnValueOnce(
+            makeQuery([
+              {
+                id: 'existing-user-id',
+                passwordHash: 'stored-password-hash',
+                status: 'active',
+              },
+            ]),
+          )
+          .mockReturnValueOnce(
+            makeQuery([{ terminalId: 'terminal-id', branchId: 'branch-id' }]),
+          ),
+        insert: jest.fn(() => ({ values: jest.fn().mockResolvedValue([]) })),
+        update: jest.fn(() => ({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
+        })),
+      };
+      dbMock.transactionWithSession.mockImplementation(
+        async (
+          _session: unknown,
+          callback: (transaction: unknown) => unknown,
+        ) => callback(tx),
+      );
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      const result = await service.registerOwner({
+        email: 'owner@example.com',
+        name: 'Owner Name',
+        password: 'existing-password',
+        redeemCode: 'AABBCCDDEEFF001122334455',
+      });
+
+      expect(bcrypt.compare).toHaveBeenCalledWith(
+        'existing-password',
+        'stored-password-hash',
+      );
+      expect(tx.insert).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({
+        userId: 'existing-user-id',
+        isOwner: true,
+        roleId: null,
+        branchId: null,
+      });
     });
   });
 
@@ -673,6 +969,71 @@ describe('UserAuthService', () => {
         'user123',
         7 * 24 * 60 * 60,
       );
+    });
+
+    it('refreshes a roleless owner without adding a branch assignment or role claim', async () => {
+      redisServiceMock.get.mockResolvedValue('owner-user');
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            userId: 'owner-user',
+            email: 'owner@example.com',
+            name: 'Business Owner',
+            status: 'active',
+            businessId: 'business123',
+            branchId: null,
+            isOwner: true,
+            roleId: null,
+            roleVersion: null,
+            permissions: null,
+          },
+        ]),
+      };
+      const terminalQuery = {
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            terminalId: 'terminal123',
+            businessId: 'business123',
+            branchId: 'branch123',
+          },
+        ]),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback({
+          execute: jest.fn().mockResolvedValue(undefined),
+          select: jest
+            .fn()
+            .mockReturnValueOnce(userQuery)
+            .mockReturnValueOnce(terminalQuery),
+        }),
+      );
+      jwtServiceMock.signAsync.mockResolvedValue('owner-access-token');
+      utilsServiceMock.generateRefreshToken.mockReturnValue(
+        'owner-new-refresh',
+      );
+      redisServiceMock.set.mockResolvedValue(undefined);
+      redisServiceMock.delete.mockResolvedValue(undefined);
+
+      await expect(
+        service.refreshAccessToken(mockRefreshToken, 'terminal123'),
+      ).resolves.toMatchObject({
+        accessToken: 'owner-access-token',
+        effectivePermissions: [],
+        user: { id: 'owner-user', email: 'owner@example.com' },
+      });
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
+        isOwner: true,
+        businessId: 'business123',
+        branchId: 'branch123',
+      });
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
+        'role_id',
+      );
+      expect(permissionsCacheMock.set).not.toHaveBeenCalled();
     });
   });
 

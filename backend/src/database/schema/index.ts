@@ -1,6 +1,8 @@
 export * from './Identity_and_tenent/branches';
 export * from './Identity_and_tenent/businesses';
 export * from './Identity_and_tenent/business_provisioning_requests';
+export * from './Identity_and_tenent/owner_redemptions';
+export * from './Identity_and_tenent/mail_outbox';
 export * from './Identity_and_tenent/business_membership';
 export * from './Identity_and_tenent/endpoint_role_access';
 export * from './Identity_and_tenent/invitations';
@@ -9,4 +11,5 @@ export * from './Identity_and_tenent/roles';
 export * from './Identity_and_tenent/terminals';
 export * from './Identity_and_tenent/users';
 export * from './audit_logs/access_audit_logs';
+export * from './audit_logs/platform_audit_logs';
 export * from './relations';

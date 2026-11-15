@@ -50,4 +50,23 @@ describe('JwtStrategy', () => {
       }),
     ).toThrow(UnauthorizedException);
   });
+
+  it('maps platform claims to a platform actor and verified subject', () => {
+    const now = Math.floor(Date.now() / 1000);
+    const platformUserId = '00000000-0000-4000-8000-000000000009';
+    const user = strategy.validate({
+      sub: platformUserId,
+      platformUserId,
+      isPlatform: true,
+      isBootstrap: true,
+      exp: now + 900,
+    });
+
+    expect(user).toMatchObject({
+      subjectId: platformUserId,
+      platformUserId,
+      isPlatform: true,
+      isBootstrap: true,
+    });
+  });
 });

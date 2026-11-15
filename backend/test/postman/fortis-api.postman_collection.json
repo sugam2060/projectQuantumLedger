@@ -89,6 +89,31 @@
       "key": "businessRegistrationPath",
       "value": "/absolute/path/to/registration.pdf",
       "type": "string"
+    },
+    {
+      "key": "requestedBusinessId",
+      "value": "00000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "provisioningIdempotencyKey",
+      "value": "provision-business-req-1092",
+      "type": "string"
+    },
+    {
+      "key": "ownerEmail",
+      "value": "owner@example.com",
+      "type": "string"
+    },
+    {
+      "key": "ownerPassword",
+      "value": "CHANGE_ME",
+      "type": "string"
+    },
+    {
+      "key": "ownerRedeemCode",
+      "value": "PASTE_CODE_FROM_EMAIL",
+      "type": "string"
     }
   ],
   "item": [
@@ -309,6 +334,53 @@
               }
             }
           ]
+        },
+        {
+          "name": "POST /authentication/register-owner",
+          "request": {
+            "method": "POST",
+            "description": "Web-only owner activation. First provision a business, then paste the code received by email into ownerRedeemCode. The response includes the initial terminal ID for subsequent login.",
+            "header": [
+              {
+                "key": "X-Client-Type",
+                "value": "web",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/authentication/register-owner",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"name\": \"Example Owner\",\n  \"password\": \"{{ownerPassword}}\",\n  \"redeemCode\": \"{{ownerRedeemCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.expect(body.isOwner).to.eql(true);",
+                  "pm.expect(body.roleId).to.eql(null);",
+                  "pm.expect(body.branchId).to.eql(null);",
+                  "pm.collectionVariables.set(\"userId\", body.userId);",
+                  "if (body.initialTerminalId) pm.collectionVariables.set(\"terminalId\", body.initialTerminalId);"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -491,6 +563,65 @@
                 "exec": [
                   "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
                   "pm.expect(pm.response.json().message).to.include('request has been submitted');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /platform/businesses/create",
+          "request": {
+            "method": "POST",
+            "description": "Platform-only, web-client provisioning. Requires a pending request ID, PAN, and platform access token. Creates the initial branch and terminal and queues the owner redemption email.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{platformAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "web",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{provisioningIdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/platform/businesses/create?requested_business_id={{requestedBusinessId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pan\": \"ABCDE1234F\",\n  \"ownerEmail\": \"{{ownerEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.expect(pm.response.code, `Provisioning failed (${pm.response.code}): ${pm.response.text()}`).to.eql(201));",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test(\"Response includes business ID and queued invitation\", () => {",
+                  "    pm.expect(body.businessId, `Unexpected response: ${pm.response.text()}`).to.be.a(\"string\");",
+                  "    pm.expect(body.ownerActivationInvitationStatus).to.eql(\"queued\");",
+                  "  });",
+                  "  pm.collectionVariables.set(\"provisionedBusinessId\", body.businessId);",
+                  "}"
                 ]
               }
             }

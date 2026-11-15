@@ -298,6 +298,100 @@ each accepted call creates a separate pending request. **Success:** 201.
 }
 ```
 
+### `POST /api/v1/platform/businesses/create`
+
+**Description:** Provisions a business after platform review of an existing
+request. Creates the business inactive, creates its initial MAIN branch and
+POS-01 terminal, approves and links the request, records an audit event, and
+queues a single-use owner redemption email. The email is sent asynchronously;
+the API does not wait for delivery. The owner’s email defaults to the request
+contact and may be overridden. PAN is required. **Auth:** signed-in platform
+user; only `x-client-type: web` is accepted. **Rate limit:** 20 requests per
+hour. **Errors:** 400 for invalid headers/body; 401 when signed out; 403 for a
+non-platform user; 404 if the request does not exist; 409 for an already
+provisioned request, duplicate PAN, or idempotency-key payload mismatch; 429
+when rate limited. **Idempotency:** required; reuse of a key with the same
+payload replays the original response. **Audit:** required. **Success:** 201.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "POST /api/v1/platform/businesses/create",
+  "requestData": {
+    "pathParams": {},
+    "queryParams": {
+      "requested_business_id": "4ab7a3c1-7451-459e-9e89-37a917628fee"
+    },
+    "headers": {
+      "Authorization": "Bearer <platform-access-token>",
+      "X-Client-Type": "web",
+      "Idempotency-Key": "provision-business-req-1092",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "pan": "ABCDE1234F",
+      "ownerEmail": "owner@example.com"
+    }
+  },
+  "responseData": {
+    "httpStatus": 201,
+    "body": {
+      "message": "Business Example Retail has been verified. Redeem code has been sent to owner.",
+      "businessId": "8b6dd8d2-53d4-4f52-87a1-5e8187423d56",
+      "ownerActivationInvitationStatus": "queued"
+    }
+  }
+}
+```
+
+### `POST /api/v1/authentication/register-owner`
+
+**Description:** Registers the invited business owner using the emailed,
+single-use redemption code. Creates a new user or verifies the password for an
+existing account, adds an owner membership with no role and no branch
+assignment, then activates the business. It returns the pre-created branch and
+terminal IDs so the client can use the existing terminal-based login flow.
+**Auth:** public; only `x-client-type: web` is accepted. **Rate limit:** 10
+requests per hour. **Errors:** 400 for invalid registration data or client
+type; 401 for an invalid, expired, consumed, email-mismatched code or invalid
+existing-account password; 409 if already activated or already a member; 429
+when rate limited. **Idempotency:** no; the single-use code makes registration
+one-time. **Success:** 201.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "POST /api/v1/authentication/register-owner",
+  "requestData": {
+    "pathParams": {},
+    "queryParams": null,
+    "headers": {
+      "X-Client-Type": "web",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "email": "owner@example.com",
+      "name": "Example Owner",
+      "password": "<redacted>",
+      "redeemCode": "<code-from-email>"
+    }
+  },
+  "responseData": {
+    "httpStatus": 201,
+    "body": {
+      "message": "Owner account registered and business activated.",
+      "userId": "45fbee7a-f45f-4738-96bc-32f90a5e34b3",
+      "businessId": "8b6dd8d2-53d4-4f52-87a1-5e8187423d56",
+      "isOwner": true,
+      "roleId": null,
+      "branchId": null,
+      "initialTerminalId": "6f806a43-405a-44e8-81be-27a68379c646",
+      "initialBranchId": "01234567-89ab-4cde-8f01-23456789abcd"
+    }
+  }
+}
+```
+
 ### `POST /api/v1/platform/user/login`
 
 **Description:** Authenticates a platform user from `platform_users` and issues
