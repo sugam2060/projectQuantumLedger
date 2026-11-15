@@ -181,6 +181,30 @@ describe('UserAuthService', () => {
       expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
     });
 
+    it('returns an empty permission list for an owner without a role', async () => {
+      const owner = {
+        ...authenticatedUser,
+        isOwner: true,
+        roleId: undefined,
+        roleVersion: undefined,
+      };
+
+      await expect(
+        service.getCurrentUser(
+          owner,
+          ClientType.WEB,
+          '00000000-0000-4000-8000-000000000005',
+        ),
+      ).resolves.toMatchObject({
+        is_owner: true,
+        role_template: null,
+        role_template_version: null,
+        effectivePermissions: [],
+      });
+      expect(permissionsCacheMock.get).not.toHaveBeenCalled();
+      expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
+    });
+
     it('loads permissions from the database and populates cache on cache miss', async () => {
       const roleQuery = {
         from: jest.fn().mockReturnThis(),
@@ -463,6 +487,126 @@ describe('UserAuthService', () => {
       );
     });
 
+    it('authenticates an owner whose membership has no role', async () => {
+      const ownerRecord = {
+        userId: 'owner123',
+        userEmail: 'owner@example.com',
+        userName: 'Business Owner',
+        userPasswordHash: '$2a$10$hashedPassword',
+        userStatus: 'active',
+        businessId: 'business123',
+        branchId: null,
+        isOwner: true,
+        roleId: null,
+        roleName: null,
+        roleVersion: null,
+        rolePermissions: null,
+      };
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([ownerRecord]),
+      };
+      const terminalQuery = {
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            terminalId: 'terminal123',
+            businessId: 'business123',
+            branchId: 'branch123',
+          },
+        ]),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback({
+          execute: jest.fn().mockResolvedValue(undefined),
+          select: jest
+            .fn()
+            .mockReturnValueOnce(userQuery)
+            .mockReturnValueOnce(terminalQuery),
+        }),
+      );
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+      jwtServiceMock.signAsync.mockResolvedValue('owner-access-token');
+      utilsServiceMock.generateRefreshToken.mockReturnValue(
+        'owner-refresh-token',
+      );
+
+      const result = await service.userLogin(mockDto, 'terminal123');
+
+      expect(result.effectivePermissions).toEqual([]);
+      expect(result.memberships).toEqual([
+        expect.objectContaining({
+          businessId: 'business123',
+          isOwner: true,
+          roleId: null,
+          role: null,
+          roleVersion: null,
+        }),
+      ]);
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
+        businessId: 'business123',
+        isOwner: true,
+      });
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
+        'role_id',
+      );
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
+        'role_version',
+      );
+      expect(permissionsCacheMock.set).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-owner whose active membership has no role', async () => {
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            userId: 'user123',
+            userEmail: 'staff@example.com',
+            userName: 'Staff User',
+            userPasswordHash: '$2a$10$hashedPassword',
+            userStatus: 'active',
+            businessId: 'business123',
+            branchId: null,
+            isOwner: false,
+            roleId: null,
+            roleName: null,
+            roleVersion: null,
+            rolePermissions: null,
+          },
+        ]),
+      };
+      const terminalQuery = {
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            terminalId: 'terminal123',
+            businessId: 'business123',
+            branchId: 'branch123',
+          },
+        ]),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback({
+          execute: jest.fn().mockResolvedValue(undefined),
+          select: jest
+            .fn()
+            .mockReturnValueOnce(userQuery)
+            .mockReturnValueOnce(terminalQuery),
+        }),
+      );
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await expect(service.userLogin(mockDto, 'terminal123')).rejects.toThrow(
+        'An active role is required for non-owner business members',
+      );
+      expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
+    });
+
     it('rejects login when terminal is not active for a matching membership', async () => {
       const mockUserData = [
         {
@@ -673,6 +817,72 @@ describe('UserAuthService', () => {
         'user123',
         7 * 24 * 60 * 60,
       );
+    });
+
+    it('refreshes a role-free owner session without loading or caching role permissions', async () => {
+      redisServiceMock.get.mockResolvedValue('owner123');
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        leftJoinAgain: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            userId: 'owner123',
+            email: 'owner@example.com',
+            name: 'Business Owner',
+            status: 'active',
+            businessId: 'business123',
+            branchId: null,
+            isOwner: true,
+            roleId: null,
+            roleVersion: null,
+            permissions: null,
+          },
+        ]),
+      };
+      userQuery.leftJoin.mockReturnValue(userQuery);
+      const terminalQuery = {
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            terminalId: 'terminal123',
+            businessId: 'business123',
+            branchId: 'branch123',
+          },
+        ]),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback({
+          execute: jest.fn().mockResolvedValue(undefined),
+          select: jest
+            .fn()
+            .mockReturnValueOnce(userQuery)
+            .mockReturnValueOnce(terminalQuery),
+        }),
+      );
+      jwtServiceMock.signAsync.mockResolvedValue('owner-access-token');
+      utilsServiceMock.generateRefreshToken.mockReturnValue(
+        'rotated-owner-refresh-token',
+      );
+
+      const result = await service.refreshAccessToken(
+        mockRefreshToken,
+        'terminal123',
+      );
+
+      expect(result.effectivePermissions).toEqual([]);
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
+        isOwner: true,
+        businessId: 'business123',
+      });
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
+        'role_id',
+      );
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
+        'role_version',
+      );
+      expect(permissionsCacheMock.set).not.toHaveBeenCalled();
     });
   });
 

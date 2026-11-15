@@ -29,6 +29,13 @@
       "when": 1794645926663,
       "tag": "0003_business_provisioning_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794725159370,
+      "tag": "0004_roleless_business_owners",
+      "breakpoints": true
     }
   ]
 }

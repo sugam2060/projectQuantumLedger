@@ -209,7 +209,8 @@
                   "pm.expect(body.accessToken).to.be.a('string');",
                   "pm.collectionVariables.set('accessToken', body.accessToken);",
                   "if (body.refreshToken) pm.collectionVariables.set('refreshToken', body.refreshToken);",
-                  "if (body.memberships && body.memberships.length) pm.collectionVariables.set('roleId', body.memberships[0].roleId);"
+                  "const roleId = body.memberships?.find((membership) => membership.roleId)?.roleId;",
+                  "if (roleId) pm.collectionVariables.set('roleId', roleId); else pm.collectionVariables.unset('roleId');"
                 ]
               }
             }
