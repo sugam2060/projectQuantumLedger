@@ -33,27 +33,36 @@
     {
       "idx": 4,
       "version": "7",
-<<<<<<< HEAD
+      "when": 1794725159370,
+      "tag": "0004_roleless_business_owners",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
       "when": 1794731370437,
       "tag": "0004_owner_activation_flow",
       "breakpoints": true
     },
     {
-      "idx": 5,
+      "idx": 6,
       "version": "7",
       "when": 1794731952774,
       "tag": "0005_overjoyed_overlord",
       "breakpoints": true
     },
     {
-      "idx": 6,
+      "idx": 7,
       "version": "7",
       "when": 1794733304000,
       "tag": "0006_idempotency_redis_activity_audit",
-=======
-      "when": 1794725159370,
-      "tag": "0004_roleless_business_owners",
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794834000000,
+      "tag": "0007_platform_user_invitations",
       "breakpoints": true
     }
   ]
