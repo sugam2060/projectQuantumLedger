@@ -118,6 +118,7 @@ describe('UserAuthService', () => {
 
   describe('getCurrentUser', () => {
     const authenticatedUser = {
+      subjectId: '00000000-0000-4000-8000-000000000001',
       userId: '00000000-0000-4000-8000-000000000001',
       businessId: '00000000-0000-4000-8000-000000000002',
       branchId: '00000000-0000-4000-8000-000000000003',
@@ -260,7 +261,11 @@ describe('UserAuthService', () => {
     it('rejects platform tokens on the user profile endpoint', async () => {
       await expect(
         service.getCurrentUser(
-          { isPlatform: true, permissions: [] },
+          {
+            subjectId: '00000000-0000-4000-8000-000000000006',
+            isPlatform: true,
+            permissions: [],
+          },
           ClientType.MOBILE,
           '00000000-0000-4000-8000-000000000005',
         ),

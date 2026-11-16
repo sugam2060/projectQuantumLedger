@@ -14,7 +14,12 @@ describe('PermissionGuard', () => {
     hasAccess: jest.fn(),
   };
   const request: { user?: AuthenticatedUser } = {
-    user: { userId: 'user-1', businessId: 'business-1', permissions: [] },
+    user: {
+      subjectId: 'user-1',
+      userId: 'user-1',
+      businessId: 'business-1',
+      permissions: [],
+    },
   };
   const context = {
     getHandler: jest.fn(),
@@ -69,6 +74,7 @@ describe('PermissionGuard', () => {
 
   it('bypasses endpoint role checks for an authenticated platform user', async () => {
     request.user = {
+      subjectId: 'platform-user-1',
       userId: undefined,
       platformUserId: 'platform-user-1',
       isPlatform: true,
@@ -79,6 +85,7 @@ describe('PermissionGuard', () => {
     expect(endpointAccess.hasAccess).not.toHaveBeenCalled();
 
     request.user = {
+      subjectId: 'user-1',
       userId: 'user-1',
       businessId: 'business-1',
       permissions: [],
@@ -90,6 +97,7 @@ describe('PermissionGuard', () => {
       .mockReturnValueOnce(false)
       .mockReturnValue('inventory.create');
     request.user = {
+      subjectId: 'owner-user-1',
       userId: 'owner-user-1',
       businessId: 'business-1',
       isOwner: true,
@@ -99,6 +107,7 @@ describe('PermissionGuard', () => {
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(endpointAccess.hasAccess).not.toHaveBeenCalled();
     request.user = {
+      subjectId: 'user-1',
       userId: 'user-1',
       businessId: 'business-1',
       permissions: [],
