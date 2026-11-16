@@ -43,6 +43,7 @@ export const users = pgTable(
             EXISTS (
                 SELECT 1 FROM invitations 
                 WHERE email_normalized = ${table.emailNormalized}
+                AND invitation_type = 'business_user'
                 AND consumed_at IS NULL
                 AND revoked_at IS NULL
             )

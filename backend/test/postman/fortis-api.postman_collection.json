@@ -101,6 +101,11 @@
       "type": "string"
     },
     {
+      "key": "platformUserInviteIdempotencyKey",
+      "value": "platform-user-inv-123",
+      "type": "string"
+    },
+    {
       "key": "ownerEmail",
       "value": "owner@example.com",
       "type": "string"
@@ -805,6 +810,63 @@
                   "  });",
                   "  pm.collectionVariables.set(\"provisionedBusinessId\", body.businessId);",
                   "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Platform users",
+      "item": [
+        {
+          "name": "POST /platform/users/invite",
+          "request": {
+            "method": "POST",
+            "description": "Platform-only invitation. Requires an unused email address, a platform access token, and a unique x-idempotency-key.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{platformAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{platformClientType}}",
+                "type": "text"
+              },
+              {
+                "key": "x-idempotency-key",
+                "value": "{{platformUserInviteIdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/platform/users/invite",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Manager\",\n  \"email\": \"jane@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.deep.equal({ message: 'Invite sent to Jane Manager' });"
                 ]
               }
             }

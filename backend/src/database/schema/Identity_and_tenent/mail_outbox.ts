@@ -18,12 +18,10 @@ export const mailOutbox = pgTable(
   'mail_outbox',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    businessId: uuid('business_id')
-      .notNull()
-      .references(() => business.id),
-    requestId: uuid('request_id')
-      .notNull()
-      .references(() => businessProvisioningRequests.id),
+    businessId: uuid('business_id').references(() => business.id),
+    requestId: uuid('request_id').references(
+      () => businessProvisioningRequests.id,
+    ),
     payload: jsonb('payload').$type<MailJob>().notNull(),
     status: text('status').notNull().default('pending'),
     attempts: integer('attempts').notNull().default(0),

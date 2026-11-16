@@ -18,14 +18,12 @@ export const invitations = pgTable(
   'invitations',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    businessId: uuid('business_id')
-      .notNull()
-      .references(() => business.id),
+    businessId: uuid('business_id').references(() => business.id),
     emailNormalized: text('email_normalized').notNull(),
-    roleId: uuid('role_id')
-      .notNull()
-      .references(() => roles.id),
+    roleId: uuid('role_id').references(() => roles.id),
     branchId: uuid('branch_id').references(() => branches.id), // NULL = business-wide invite
+    invitationType: text('invitation_type').notNull().default('business_user'),
+    inviteeName: text('invitee_name'),
     tokenHash: text('token_hash').notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     consumedAt: timestamp('consumed_at', { withTimezone: true }),
@@ -48,9 +46,24 @@ export const invitations = pgTable(
     // Unique index: One open invitation per business + email
     uniqueIndex('invitations_one_open_per_email_uq')
       .on(table.businessId, table.emailNormalized)
-      .where(sql`consumed_at IS NULL AND revoked_at IS NULL`),
+      .where(
+        sql`invitation_type = 'business_user' AND consumed_at IS NULL AND revoked_at IS NULL`,
+      ),
+    uniqueIndex('platform_user_invitations_one_open_per_email_uq')
+      .on(table.emailNormalized)
+      .where(
+        sql`invitation_type = 'platform_user' AND consumed_at IS NULL AND revoked_at IS NULL`,
+      ),
 
     // Check constraints
+    check(
+      'invitations_type_chk',
+      sql`invitation_type IN ('business_user', 'platform_user')`,
+    ),
+    check(
+      'invitations_target_chk',
+      sql`(invitation_type = 'business_user' AND business_id IS NOT NULL AND role_id IS NOT NULL) OR (invitation_type = 'platform_user' AND business_id IS NULL AND role_id IS NULL AND branch_id IS NULL AND invitee_name IS NOT NULL AND btrim(invitee_name) <> '' AND invited_by_platform_user_id IS NOT NULL)`,
+    ),
     check(
       'invitations_email_chk',
       sql`email_normalized = lower(btrim(email_normalized))`,

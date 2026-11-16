@@ -398,6 +398,47 @@ payload replays the original response. **Audit:** required. **Success:** 201.
 }
 ```
 
+### `POST /api/v1/platform/users/invite`
+
+**Description:** Creates a platform-user invitation and queues a magic-link
+email. The invite is stored with a SHA-256 token hash and expires after seven
+days. The link opens
+`FRONTEND_BASE_URL/accept/invite/<token-hash>`. **Auth:** signed-in platform
+user; `x-client-type` must be `web`, `desktop`, or `mobile`. **Errors:** 400
+for invalid body or headers; 401 when signed out; 403 for a non-platform user;
+409 if the email already belongs to a platform user, has an open invite, or the
+idempotency key is in use with a different payload; 429 when rate limited.
+**Rate limit:** 20 invitations per hour.
+**Idempotency:** required via `x-idempotency-key`; reuse with the same payload
+replays the original response. **Success:** 200.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "POST /api/v1/platform/users/invite",
+  "requestData": {
+    "pathParams": {},
+    "queryParams": null,
+    "headers": {
+      "Authorization": "Bearer <platform-access-token>",
+      "Content-Type": "application/json",
+      "x-client-type": "web",
+      "x-idempotency-key": "platform-user-inv-123"
+    },
+    "body": {
+      "name": "Jane Manager",
+      "email": "jane@example.com"
+    }
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": {
+      "message": "Invite sent to Jane Manager"
+    }
+  }
+}
+```
+
 ### `POST /api/v1/authentication/register-owner`
 
 **Description:** Registers the invited business owner using the emailed,
