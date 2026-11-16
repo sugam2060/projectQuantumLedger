@@ -67,6 +67,50 @@ and logs each request.
 
 ## User authentication
 
+### `POST /api/v1/auth/logout`
+
+**Description:** Ends the authenticated session by deleting its refresh token
+from Redis when a refresh token is supplied and belongs to the authenticated
+user. Web clients may use the `refresh_token` cookie; desktop and mobile
+clients may send `refreshToken` in the JSON body and clear their locally stored
+tokens themselves. Web logout clears the `access_token` and `refresh_token`
+cookies. **Auth:** signed-in user or platform user (JWT). **Errors:** 400 for
+an invalid `x-client-type`; 401 for a missing or invalid access token.
+**Idempotency:** safe to repeat; a missing or already revoked refresh token
+does not prevent a successful response.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "POST /api/v1/auth/logout",
+  "requestData": {
+    "pathParams": {},
+    "queryParams": null,
+    "headers": {
+      "Authorization": "Bearer <access-token>",
+      "x-client-type": "web",
+      "Content-Type": "application/json"
+    },
+    "body": null
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": {
+      "revoked": true
+    }
+  }
+}
+```
+
+For desktop and mobile clients, include the current `refreshToken` in the
+request body if it should also be revoked server-side:
+
+```json
+{
+  "refreshToken": "<redacted>"
+}
+```
+
 ### `POST /api/v1/authentication/login`
 
 **Description:** Authenticates a business user with email and password, then

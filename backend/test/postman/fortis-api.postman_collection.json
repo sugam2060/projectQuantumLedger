@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Fortis POS API v1",
-    "description": "Postman requests for every API route currently declared by the backend controllers. Set credentials, terminal/role IDs, and local document file paths in collection variables before running. Start with the login requests. User login requires a terminal assigned to that user; role-management requests require an owner token and valid role ID. The public business request accepts one multipart submission with all three documents.",
+    "description": "Postman requests for every API route currently declared by the backend controllers. Set credentials, terminal/role IDs, and local document file paths in collection variables before running. Start with the login requests. User login requires a terminal assigned to that user; role-management requests require an owner token and valid role ID. The public business request accepts one multipart submission with all three documents. Logout requests support web cookies and desktop/mobile refresh tokens.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -206,8 +206,7 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "pm.expect(body.accessToken).to.be.a('string');",
-                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "if (body.accessToken) pm.collectionVariables.set('accessToken', body.accessToken);",
                   "if (body.refreshToken) pm.collectionVariables.set('refreshToken', body.refreshToken);",
                   "const roleId = body.memberships?.find((membership) => membership.roleId)?.roleId;",
                   "if (roleId) pm.collectionVariables.set('roleId', roleId); else pm.collectionVariables.unset('roleId');"
@@ -257,9 +256,101 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "pm.expect(body.accessToken).to.be.a('string');",
-                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "if (body.accessToken) pm.collectionVariables.set('accessToken', body.accessToken);",
                   "if (body.refreshToken) pm.collectionVariables.set('refreshToken', body.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout (web cookies)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/auth/logout"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout (desktop/mobile)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{userClientType}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/auth/logout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
                 ]
               }
             }
@@ -352,8 +443,7 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "pm.expect(body.accessToken).to.be.a('string');",
-                  "pm.collectionVariables.set('platformAccessToken', body.accessToken);",
+                  "if (body.accessToken) pm.collectionVariables.set('platformAccessToken', body.accessToken);",
                   "if (body.refreshToken) pm.collectionVariables.set('platformRefreshToken', body.refreshToken);"
                 ]
               }
@@ -387,9 +477,101 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "pm.expect(body.accessToken).to.be.a('string');",
-                  "pm.collectionVariables.set('platformAccessToken', body.accessToken);",
+                  "if (body.accessToken) pm.collectionVariables.set('platformAccessToken', body.accessToken);",
                   "if (body.refreshToken) pm.collectionVariables.set('platformRefreshToken', body.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout (platform web cookies)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{platformAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/auth/logout"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout (platform desktop/mobile)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{platformClientType}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{platformAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/auth/logout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{platformRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
                 ]
               }
             }

@@ -898,5 +898,19 @@ describe('UserAuthService', () => {
         `refresh_token:${mockRefreshToken}`,
       );
     });
+
+    it('only invalidates a refresh token owned by the authenticated user', async () => {
+      redisServiceMock.compareAndDelete = jest.fn().mockResolvedValue(true);
+
+      await service.invalidateRefreshTokenForSession(
+        mockRefreshToken,
+        'user-id',
+      );
+
+      expect(redisServiceMock.compareAndDelete).toHaveBeenCalledWith(
+        `refresh_token:${mockRefreshToken}`,
+        'user-id',
+      );
+    });
   });
 });
