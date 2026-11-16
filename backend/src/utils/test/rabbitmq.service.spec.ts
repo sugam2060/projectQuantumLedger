@@ -89,6 +89,30 @@ describe('RabbitMQService', () => {
     expect(manager.listenerCount('connectFailed')).toBe(1);
   });
 
+  it('notifies subscribers when the broker reconnects', async () => {
+    Object.assign(connection, { connected: false });
+    const onConnected = jest.fn();
+    const unsubscribe = service.onConnected(onConnected);
+    await service.onModuleInit();
+
+    Object.assign(connection, { connected: true });
+    manager.emit('connect');
+    expect(onConnected).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+    manager.emit('connect');
+    expect(onConnected).toHaveBeenCalledTimes(1);
+  });
+
+  it('notifies a subscriber immediately when already connected', async () => {
+    const onConnected = jest.fn();
+    service.onConnected(onConnected);
+
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
+
+    expect(onConnected).toHaveBeenCalledTimes(1);
+  });
+
   it('logs connection failures reported by the reconnecting manager', async () => {
     const logger = jest
       .spyOn(Logger.prototype, 'error')

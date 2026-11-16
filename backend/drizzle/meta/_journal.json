@@ -64,6 +64,20 @@
       "when": 1794834000000,
       "tag": "0007_platform_user_invitations",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794864431000,
+      "tag": "0008_owner_redemption_business_select",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794864600000,
+      "tag": "0009_owner_redemption_membership_insert",
+      "breakpoints": true
     }
   ]
 }

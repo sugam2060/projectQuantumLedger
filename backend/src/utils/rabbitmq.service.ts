@@ -58,6 +58,7 @@ export class RabbitMQService implements OnModuleInit, OnApplicationShutdown {
   private readonly inFlight = new Map<string, Set<Promise<void>>>();
   private shuttingDown = false;
   private shutdownPromise?: Promise<void>;
+  private readonly connectedListeners = new Set<() => void>();
 
   constructor(
     @Inject(RABBITMQ_OPTIONS)
@@ -66,6 +67,12 @@ export class RabbitMQService implements OnModuleInit, OnApplicationShutdown {
 
   get isConnected(): boolean {
     return this.options.connection?.connected ?? false;
+  }
+
+  onConnected(listener: () => void): () => void {
+    this.connectedListeners.add(listener);
+    if (this.isConnected) queueMicrotask(listener);
+    return () => this.connectedListeners.delete(listener);
   }
 
   async onModuleInit(): Promise<void> {
@@ -81,6 +88,7 @@ export class RabbitMQService implements OnModuleInit, OnApplicationShutdown {
     const manager = connection.managedConnection;
     manager.on('connect', () => {
       this.logger.log(JSON.stringify({ event: 'rabbitmq.connected' }));
+      for (const listener of this.connectedListeners) listener();
     });
     manager.on('connectFailed', ({ err }) => {
       this.logger.error(

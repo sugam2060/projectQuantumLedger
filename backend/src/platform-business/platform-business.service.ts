@@ -24,6 +24,7 @@ import type { BusinessRequestDto } from './dto/business-request.dto';
 import type { ProvisionBusinessDto } from './dto/provision-business.dto';
 import type { MailJob } from '../workers/mail/mail.types';
 import { RedisService } from '../redis/redis.service';
+import { MailOutboxPublisher } from './mail-outbox.publisher';
 import {
   AuditLogService,
   type AuditRequestContext,
@@ -44,6 +45,7 @@ export class PlatformBusinessService {
     private readonly objectStore: ObjectStoreService,
     private readonly redis: RedisService,
     private readonly auditLogs: AuditLogService,
+    private readonly outboxPublisher: MailOutboxPublisher,
   ) {}
 
   async submitBusinessRequest(
@@ -351,6 +353,7 @@ export class PlatformBusinessService {
           return response;
         },
       );
+      this.outboxPublisher.notifyOutboxAvailable();
       try {
         await this.redis.set(
           `${redisKey}:result`,

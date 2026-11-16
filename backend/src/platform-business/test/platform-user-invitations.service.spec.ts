@@ -18,6 +18,7 @@ describe('PlatformUserInvitationsService', () => {
   const config = {
     get: jest.fn().mockReturnValue('https://frontend.example/'),
   };
+  const outboxPublisher = { notifyOutboxAvailable: jest.fn() };
   let service: PlatformUserInvitationsService;
 
   beforeEach(() => {
@@ -46,6 +47,7 @@ describe('PlatformUserInvitationsService', () => {
       database as unknown as DatabaseService,
       redis as unknown as RedisService,
       config as unknown as ConfigService,
+      outboxPublisher as never,
     );
   });
 
@@ -116,6 +118,7 @@ describe('PlatformUserInvitationsService', () => {
     });
     expect(invitation.tokenHash).toMatch(/^[a-f0-9]{64}$/);
     expect(invitation.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    expect(outboxPublisher.notifyOutboxAvailable).toHaveBeenCalledTimes(1);
     expect(redis.set).toHaveBeenCalledWith(
       expect.stringContaining(':result'),
       expect.stringContaining('requestHash'),

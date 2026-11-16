@@ -21,7 +21,7 @@ interface AuthenticatedLogoutRequest extends Request {
   user: AuthenticatedUser;
 }
 
-@Controller('auth')
+@Controller('authentication')
 export class AuthenticationLogoutController {
   constructor(
     private readonly userAuthService: UserAuthService,

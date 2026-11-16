@@ -67,7 +67,7 @@ and logs each request.
 
 ## User authentication
 
-### `POST /api/v1/auth/logout`
+### `POST /api/v1/authentication/logout`
 
 **Description:** Ends the authenticated session by deleting its refresh token
 from Redis when a refresh token is supplied and belongs to the authenticated
@@ -82,7 +82,7 @@ does not prevent a successful response.
 ```json
 {
   "phase": 1,
-  "endpoint": "POST /api/v1/auth/logout",
+  "endpoint": "POST /api/v1/authentication/logout",
   "requestData": {
     "pathParams": {},
     "queryParams": null,

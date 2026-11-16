@@ -7,7 +7,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:3001/api/v1",
+      "value": "http://localhost:3000/api/v1",
       "type": "string"
     },
     {
@@ -118,6 +118,16 @@
     {
       "key": "ownerRedeemCode",
       "value": "PASTE_CODE_FROM_EMAIL",
+      "type": "string"
+    },
+    {
+      "key": "logoutTestAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "logoutTestRefreshToken",
+      "value": "",
       "type": "string"
     }
   ],
@@ -294,7 +304,7 @@
           ]
         },
         {
-          "name": "POST /auth/logout (web cookies)",
+          "name": "POST /authentication/logout (web cookies)",
           "request": {
             "method": "POST",
             "header": [
@@ -319,7 +329,7 @@
                 }
               ]
             },
-            "url": "{{baseUrl}}/auth/logout"
+            "url": "{{baseUrl}}/authentication/logout"
           },
           "response": [],
           "event": [
@@ -336,7 +346,7 @@
           ]
         },
         {
-          "name": "POST /auth/logout (desktop/mobile)",
+          "name": "POST /authentication/logout (desktop/mobile)",
           "request": {
             "method": "POST",
             "header": [
@@ -361,7 +371,7 @@
                 }
               ]
             },
-            "url": "{{baseUrl}}/auth/logout",
+            "url": "{{baseUrl}}/authentication/logout",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
@@ -478,6 +488,160 @@
               }
             }
           ]
+        },
+        {
+          "name": "Normal user logout test",
+          "description": "Run these three requests in order. Requires a normal active user assigned to terminalId, and userEmail/userPassword set. The flow logs in, revokes the refresh token, then verifies that refresh is rejected.",
+          "item": [
+            {
+              "name": "1. Login normal user for logout test",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-client-type",
+                    "value": "{{userClientType}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-terminal-id",
+                    "value": "{{terminalId}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/authentication/login",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\",\n  \"remember\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Login succeeds for the normal user', () => pm.response.to.have.status(200));",
+                      "const body = pm.response.json();",
+                      "pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+                      "pm.expect(body.refreshToken).to.be.a('string').and.not.empty;",
+                      "pm.collectionVariables.set('logoutTestAccessToken', body.accessToken);",
+                      "pm.collectionVariables.set('logoutTestRefreshToken', body.refreshToken);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2. Logout normal user",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-client-type",
+                    "value": "{{userClientType}}",
+                    "type": "text"
+                  }
+                ],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{logoutTestAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "url": "{{baseUrl}}/authentication/logout",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"{{logoutTestRefreshToken}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Logout succeeds', () => pm.response.to.have.status(200));",
+                      "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3. Verify revoked refresh token is rejected",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-client-type",
+                    "value": "{{userClientType}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-terminal-id",
+                    "value": "{{terminalId}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/authentication/refresh",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"{{logoutTestRefreshToken}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Revoked refresh token is rejected', () => pm.response.to.have.status(401));",
+                      "pm.collectionVariables.unset('logoutTestAccessToken');",
+                      "pm.collectionVariables.unset('logoutTestRefreshToken');"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -562,7 +726,7 @@
           ]
         },
         {
-          "name": "POST /auth/logout (platform web cookies)",
+          "name": "POST /authentication/logout (platform web cookies)",
           "request": {
             "method": "POST",
             "header": [
@@ -587,7 +751,7 @@
                 }
               ]
             },
-            "url": "{{baseUrl}}/auth/logout"
+            "url": "{{baseUrl}}/authentication/logout"
           },
           "response": [],
           "event": [
@@ -604,7 +768,7 @@
           ]
         },
         {
-          "name": "POST /auth/logout (platform desktop/mobile)",
+          "name": "POST /authentication/logout (platform desktop/mobile)",
           "request": {
             "method": "POST",
             "header": [
@@ -629,7 +793,7 @@
                 }
               ]
             },
-            "url": "{{baseUrl}}/auth/logout",
+            "url": "{{baseUrl}}/authentication/logout",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{platformRefreshToken}}\"\n}",
