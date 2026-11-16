@@ -11,6 +11,10 @@ import { platformUsers } from '../database/schema';
 import { RedisService } from '../redis/redis.service';
 import { UtilsService } from '../utils/utils.service';
 import { PlatformUserLoginDto } from './dto/platform-user-login.dto';
+import {
+  AuditLogService,
+  type AuditRequestContext,
+} from '../database/audit-log.service';
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -39,9 +43,13 @@ export class PlatformAuthService {
     private readonly jwtService: JwtService,
     private readonly utilsService: UtilsService,
     private readonly redisService: RedisService,
+    private readonly auditLogs: AuditLogService,
   ) {}
 
-  async login(dto: PlatformUserLoginDto): Promise<PlatformAuthResult> {
+  async login(
+    dto: PlatformUserLoginDto,
+    auditContext: AuditRequestContext = {},
+  ): Promise<PlatformAuthResult> {
     if (typeof dto.email !== 'string' || !dto.email.trim()) {
       throw new BadRequestException('Valid email is required');
     }
@@ -70,17 +78,41 @@ export class PlatformAuthService {
       credential.status !== 'active' ||
       !(await bcrypt.compare(dto.password, credential.passwordHash))
     ) {
+      if (credential) {
+        await this.auditLogs.logPlatformEvent({
+          ...auditContext,
+          platformUserId: credential.id,
+          action: 'platform.login.failed',
+          responseStatus: 401,
+          metadata: {
+            reason:
+              credential.status !== 'active'
+                ? 'inactive_account'
+                : 'invalid_credentials',
+          },
+        });
+      }
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    return this.createSession({
+    const result = await this.createSession({
       id: credential.id,
       name: credential.name,
       isBootstrap: credential.isBootstrap,
     });
+    await this.auditLogs.logPlatformEvent({
+      ...auditContext,
+      platformUserId: credential.id,
+      action: 'platform.login.succeeded',
+      responseStatus: 200,
+    });
+    return result;
   }
 
-  async refresh(refreshToken: string): Promise<PlatformAuthResult> {
+  async refresh(
+    refreshToken: string,
+    auditContext: AuditRequestContext = {},
+  ): Promise<PlatformAuthResult> {
     if (!refreshToken?.trim()) {
       throw new UnauthorizedException('Refresh token is required');
     }
@@ -108,6 +140,15 @@ export class PlatformAuthService {
 
     if (!platformUser || platformUser.status !== 'active') {
       await this.redisService.delete(oldKey);
+      if (platformUser) {
+        await this.auditLogs.logPlatformEvent({
+          ...auditContext,
+          platformUserId: platformUser.id,
+          action: 'platform.token.refresh_failed',
+          responseStatus: 401,
+          metadata: { reason: 'inactive_account' },
+        });
+      }
       throw new UnauthorizedException('Platform user is not active');
     }
 
@@ -117,6 +158,12 @@ export class PlatformAuthService {
       isBootstrap: platformUser.isBootstrap,
     });
     await this.redisService.delete(oldKey);
+    await this.auditLogs.logPlatformEvent({
+      ...auditContext,
+      platformUserId: platformUser.id,
+      action: 'platform.token.refreshed',
+      responseStatus: 200,
+    });
     return session;
   }
 

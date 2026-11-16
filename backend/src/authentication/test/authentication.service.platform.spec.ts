@@ -8,6 +8,7 @@ import { UtilsService } from '../../utils/utils.service';
 import { PlatformAuthService } from '../authentication.service.platform';
 import { PlatformUserLoginDto } from '../dto/platform-user-login.dto';
 import bcrypt from 'bcryptjs';
+import { AuditLogService } from '../../database/audit-log.service';
 
 describe('PlatformAuthService', () => {
   const database = {
@@ -21,6 +22,9 @@ describe('PlatformAuthService', () => {
     delete: jest.fn(),
     compareAndDelete: jest.fn(),
   };
+  const auditLogs = {
+    logPlatformEvent: jest.fn().mockResolvedValue(undefined),
+  };
   let service: PlatformAuthService;
 
   beforeEach(() => {
@@ -30,6 +34,7 @@ describe('PlatformAuthService', () => {
       jwt as unknown as JwtService,
       utils as unknown as UtilsService,
       redis as unknown as RedisService,
+      auditLogs as unknown as AuditLogService,
     );
   });
 
@@ -95,6 +100,12 @@ describe('PlatformAuthService', () => {
       isPlatform: true,
       isBootstrap: true,
     });
+    expect(auditLogs.logPlatformEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platformUserId: '00000000-0000-4000-8000-000000000001',
+        action: 'platform.login.succeeded',
+      }),
+    );
   });
 
   it('rejects unknown or inactive platform users with a generic error', async () => {

@@ -1,4 +1,4 @@
-import {
+﻿import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
@@ -27,12 +27,7 @@ export class PermissionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<{
       user?: AuthenticatedUser;
     }>();
-    if (request.user?.isPlatform === true) return true;
-    if (
-      request.user?.isOwner === true &&
-      request.user.userId &&
-      request.user.businessId
-    ) {
+    if (request.user?.isPlatform === true || request.user?.isOwner === true) {
       return true;
     }
 

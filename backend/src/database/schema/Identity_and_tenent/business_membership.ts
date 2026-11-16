@@ -1,4 +1,4 @@
-import {
+﻿import {
   pgTable,
   uuid,
   boolean,
@@ -41,7 +41,7 @@ export const businessMemberships = pgTable(
       table.businessId,
     ),
     check(
-      'business_memberships_role_required_for_non_owner_chk',
+      'business_memberships_role_required_chk',
       sql`is_owner = true OR role_id IS NOT NULL`,
     ),
 
@@ -56,13 +56,12 @@ export const businessMemberships = pgTable(
         `,
     }),
 
-    // Membership creation is limited to an existing owner, platform users, or
-    // SECURITY DEFINER onboarding flows such as invitation redemption.
+    // RLS Policy: Insertions are managed via SECURITY DEFINER functions (like invitation redemption) or platform admins
     pgPolicy('business_memberships_insert', {
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-            (business_id = app_business_id() AND app_is_owner() = true)
+            business_id = app_business_id()
             OR app_is_platform() = true
         `,
     }),

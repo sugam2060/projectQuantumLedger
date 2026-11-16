@@ -2,7 +2,6 @@ import {
   pgTable,
   uuid,
   text,
-  boolean,
   timestamp,
   pgPolicy,
   uniqueIndex,
@@ -47,6 +46,14 @@ export const users = pgTable(
                 AND consumed_at IS NULL
                 AND revoked_at IS NULL
             )
+            OR EXISTS (
+                SELECT 1 FROM owner_redemptions r
+                WHERE r.email_normalized = users.email_normalized
+                  AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
+                  AND r.consumed_at IS NULL
+                  AND r.revoked_at IS NULL
+                  AND r.expires_at > now()
+            )
             OR public.app_is_platform() = true
         `,
     }),
@@ -60,6 +67,17 @@ export const users = pgTable(
       to: 'fortis_app',
       using: sql`
             id = public.app_user_id()
+            OR (
+              email_normalized = NULLIF(current_setting('app.registration_email', true), '')
+              AND EXISTS (
+                SELECT 1 FROM owner_redemptions r
+                WHERE r.email_normalized = users.email_normalized
+                  AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
+                  AND r.consumed_at IS NULL
+                  AND r.revoked_at IS NULL
+                  AND r.expires_at > now()
+              )
+            )
             OR EXISTS (
                 SELECT 1 FROM business_memberships m1
                 JOIN business_memberships m2 ON m1.business_id = m2.business_id

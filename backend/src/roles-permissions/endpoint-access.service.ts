@@ -12,6 +12,10 @@ import {
   roles,
 } from '../database/schema';
 import { EffectivePermissionsCacheService } from './effective-permissions-cache.service';
+import {
+  AuditLogService,
+  type AuditRequestContext,
+} from '../database/audit-log.service';
 
 export interface EndpointRoleConfiguration {
   endpointKey: string;
@@ -25,6 +29,7 @@ export class EndpointAccessService {
   constructor(
     private readonly database: DatabaseService,
     private readonly permissionsCache: EffectivePermissionsCacheService,
+    private readonly auditLogs: AuditLogService,
   ) {}
 
   async listConfigurations(
@@ -60,6 +65,7 @@ export class EndpointAccessService {
     session: RequestSession,
     endpointKey: string,
     roleIds: string[],
+    auditContext: AuditRequestContext = {},
   ): Promise<EndpointRoleConfiguration> {
     this.requireOwnerClaim(session);
     this.validateEndpointKey(endpointKey);
@@ -120,6 +126,18 @@ export class EndpointAccessService {
             roleId,
           })),
         );
+        await this.auditLogs.insertUserEvent(tx, {
+          ...auditContext,
+          userId: session.userId,
+          businessId: session.businessId,
+          eventType: 'ENDPOINT_ROLES_UPDATED',
+          responseStatus: 200,
+          metadata: {
+            endpointKey,
+            previousRoleIds: previousRoles.map(({ roleId }) => roleId),
+            roleIds: uniqueRoleIds,
+          },
+        });
 
         return {
           configuration: { endpointKey, roleIds: uniqueRoleIds },
@@ -137,6 +155,7 @@ export class EndpointAccessService {
   async clearRequiredRoles(
     session: RequestSession,
     endpointKey: string,
+    auditContext: AuditRequestContext = {},
   ): Promise<void> {
     this.requireOwnerClaim(session);
     this.validateEndpointKey(endpointKey);
@@ -162,6 +181,17 @@ export class EndpointAccessService {
               eq(endpointRoleAccess.endpointKey, endpointKey),
             ),
           );
+        await this.auditLogs.insertUserEvent(tx, {
+          ...auditContext,
+          userId: session.userId,
+          businessId: session.businessId,
+          eventType: 'ENDPOINT_ROLES_CLEARED',
+          responseStatus: 204,
+          metadata: {
+            endpointKey,
+            previousRoleIds: previousRoles.map(({ roleId }) => roleId),
+          },
+        });
         return previousRoles.map(({ roleId }) => roleId);
       },
     );

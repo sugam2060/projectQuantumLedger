@@ -20,6 +20,9 @@ import { AuthenticationMeHeadersDto } from './dto/authentication-me-headers.dto'
 import { AuthenticationMeHeaders } from './decorators/authentication-me-headers.decorator';
 import { AuthenticationLoginHeaders } from './decorators/authentication-login-headers.decorator';
 import { AuthenticationLoginHeadersDto } from './dto/authentication-login-headers.dto';
+import { OwnerRegistrationDto } from './dto/owner-registration.dto';
+import { OwnerRegistrationHeadersDto } from './dto/owner-registration-headers.dto';
+import { OwnerRegistrationHeaders } from './decorators/owner-registration-headers.decorator';
 
 interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
@@ -28,6 +31,30 @@ interface AuthenticatedRequest extends Request {
 @Controller('authentication')
 export class AuthenticationController {
   constructor(private readonly authService: UserAuthService) {}
+
+  @Post('register-owner')
+  @HttpCode(HttpStatus.CREATED)
+  @Public()
+  @RateLimit({
+    requests: 10,
+    windowMs: 60 * 60_000,
+    errorMessage: 'Too many owner registration attempts. Try again later.',
+  })
+  registerOwner(
+    @Body() dto: OwnerRegistrationDto,
+    @OwnerRegistrationHeaders() headers: OwnerRegistrationHeadersDto,
+    @ReqDecorator() request: Request,
+  ) {
+    return this.authService.registerOwner(dto, {
+      method: 'POST',
+      endpointPath: request.route?.path,
+      responseStatus: 201,
+      requestId: request.header('x-request-id'),
+      clientType: headers.clientType,
+      ipAddress: request.ip,
+      userAgent: request.header('user-agent'),
+    });
+  }
 
   @Get('me')
   @RateLimit({ requests: 60, windowMs: 60_000 })
@@ -62,7 +89,16 @@ export class AuthenticationController {
     @ReqDecorator() req: Request,
     @ResDecorator({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.userLogin(dto, headers.terminalId);
+    const result = await this.authService.userLogin(dto, headers.terminalId, {
+      method: req.method,
+      endpointPath: req.route?.path,
+      responseStatus: 200,
+      requestId: req.header('x-request-id'),
+      clientType: headers.clientType,
+      terminalId: headers.terminalId,
+      ipAddress: req.ip,
+      userAgent: req.header('user-agent'),
+    });
     const clientType = headers.clientType ?? ClientType.WEB;
 
     // For web clients, set the JWT and refresh token as HTTP-only cookies
@@ -123,6 +159,16 @@ export class AuthenticationController {
       const result = await this.authService.refreshAccessToken(
         token,
         headers.terminalId,
+        {
+          method: req.method,
+          endpointPath: req.route?.path,
+          responseStatus: 200,
+          requestId: req.header('x-request-id'),
+          clientType,
+          terminalId: headers.terminalId,
+          ipAddress: req.ip,
+          userAgent: req.header('user-agent'),
+        },
       );
 
       // For web clients, set new tokens as cookies
