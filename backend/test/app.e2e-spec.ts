@@ -5,6 +5,7 @@ import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { JwtService } from '@nestjs/jwt';
 import { REDIS_CLIENT } from '../src/redis/redis.config';
+import { RABBITMQ_OPTIONS } from '../src/utils/rabbitmq.config';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -16,6 +17,8 @@ describe('AppController (e2e)', () => {
     })
       .overrideProvider(REDIS_CLIENT)
       .useValue({ quit: async () => 'OK' })
+      .overrideProvider(RABBITMQ_OPTIONS)
+      .useValue({ connection: null, prefetchCount: 10 })
       .compile();
 
     app = moduleFixture.createNestApplication();

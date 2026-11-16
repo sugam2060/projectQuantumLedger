@@ -171,6 +171,16 @@ export class PlatformAuthService {
     await this.redisService.delete(`${REFRESH_TOKEN_PREFIX}${refreshToken}`);
   }
 
+  async invalidateRefreshTokenForSession(
+    refreshToken: string,
+    platformUserId: string,
+  ): Promise<void> {
+    await this.redisService.compareAndDelete(
+      `${REFRESH_TOKEN_PREFIX}${refreshToken}`,
+      platformUserId,
+    );
+  }
+
   private async createSession(
     user: PlatformUserIdentity,
   ): Promise<PlatformAuthResult> {

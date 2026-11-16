@@ -16,7 +16,12 @@ describe('PlatformAuthService', () => {
   };
   const jwt = { signAsync: jest.fn() };
   const utils = { generateRefreshToken: jest.fn() };
-  const redis = { set: jest.fn(), get: jest.fn(), delete: jest.fn() };
+  const redis = {
+    set: jest.fn(),
+    get: jest.fn(),
+    delete: jest.fn(),
+    compareAndDelete: jest.fn(),
+  };
   const auditLogs = {
     logPlatformEvent: jest.fn().mockResolvedValue(undefined),
   };
@@ -115,6 +120,18 @@ describe('PlatformAuthService', () => {
     await expect(
       service.login({ email: 'manager@example.com', password: 'password' }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('only invalidates a refresh token owned by the authenticated platform user', async () => {
+    await service.invalidateRefreshTokenForSession(
+      'platform-refresh-token',
+      'platform-user-id',
+    );
+
+    expect(redis.compareAndDelete).toHaveBeenCalledWith(
+      'platform_refresh_token:platform-refresh-token',
+      'platform-user-id',
+    );
   });
 
   it('rejects invalid refresh tokens', async () => {

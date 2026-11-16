@@ -609,6 +609,16 @@ export class UserAuthService {
     await this.redisService.delete(`refresh_token:${refreshToken}`);
   }
 
+  async invalidateRefreshTokenForSession(
+    refreshToken: string,
+    userId: string,
+  ): Promise<void> {
+    await this.redisService.compareAndDelete(
+      `refresh_token:${refreshToken}`,
+      userId,
+    );
+  }
+
   /**
    * Refreshes the access token using a valid refresh token
    * @param refreshToken Refresh token
