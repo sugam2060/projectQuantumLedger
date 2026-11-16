@@ -112,9 +112,84 @@ export class UserAuthService {
             and(eq(users.emailNormalized, email), eq(users.status, 'active')),
           );
 
+<<<<<<< HEAD
         // Check if user exists
         if (userData.length === 0 || !userData[0].userId) {
           throw new UnauthorizedException('Invalid email or password');
+=======
+      // Check if user exists
+      if (userData.length === 0 || !userData[0].userId) {
+        throw new UnauthorizedException('Invalid email or password');
+      }
+
+      // Verify password using the first record
+      const firstRecord = userData[0];
+      if (!(await bcrypt.compare(dto.password, firstRecord.userPasswordHash))) {
+        throw new UnauthorizedException('Invalid email or password');
+      }
+
+      const [terminal] = await tx
+        .select({
+          terminalId: terminals.id,
+          businessId: terminals.businessId,
+          branchId: terminals.branchId,
+        })
+        .from(terminals)
+        .innerJoin(
+          branches,
+          and(
+            eq(branches.id, terminals.branchId),
+            eq(branches.businessId, terminals.businessId),
+          ),
+        )
+        .where(
+          and(
+            eq(terminals.id, requestedTerminalId),
+            eq(terminals.status, 'active'),
+          ),
+        );
+
+      const selectedMembership = userData.find(
+        (record) =>
+          terminal &&
+          record.businessId === terminal.businessId &&
+          (record.branchId === null || record.branchId === terminal.branchId),
+      );
+      if (!terminal || !selectedMembership) {
+        throw new UnauthorizedException(
+          'Terminal is not active for an assigned business branch',
+        );
+      }
+      if (!selectedMembership.isOwner && !selectedMembership.roleId) {
+        throw new UnauthorizedException(
+          'An active role is required for non-owner business members',
+        );
+      }
+
+      // Process the joined results to separate user data from memberships
+      const user = {
+        id: firstRecord.userId,
+        email: firstRecord.userEmail,
+        name: firstRecord.userName,
+      };
+
+      // Group membership data by businessId to avoid duplicates
+      const membershipMap = new Map();
+      userData.forEach((record) => {
+        if (record.businessId) {
+          const key = `${record.businessId}-${record.roleId}`;
+          if (!membershipMap.has(key)) {
+            membershipMap.set(key, {
+              businessId: record.businessId,
+              branchId: record.branchId,
+              isOwner: record.isOwner,
+              roleId: record.roleId,
+              role: record.roleName,
+              roleVersion: record.roleVersion,
+              permissions: this.readPermissions(record.rolePermissions),
+            });
+          }
+>>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
         }
 
         // Verify password using the first record
@@ -128,6 +203,7 @@ export class UserAuthService {
           throw new UnauthorizedException('Invalid email or password');
         }
 
+<<<<<<< HEAD
         const [terminal] = await tx
           .select({
             terminalId: terminals.id,
@@ -217,6 +293,36 @@ export class UserAuthService {
           );
         }
         await tx.execute(sql`
+=======
+      const activeMembership = {
+        ...membershipsWithRoles.find(
+          (membership) =>
+            membership.businessId === selectedMembership.businessId &&
+            (membership.branchId === null ||
+              membership.branchId === terminal.branchId),
+        ),
+        branchId: terminal.branchId,
+      };
+      const effectivePermissions = activeMembership.roleId
+        ? await this.getEffectivePermissions(
+            tx,
+            activeMembership.businessId,
+            activeMembership.roleId,
+            activeMembership.permissions,
+          )
+        : [];
+      if (activeMembership.roleId) {
+        await this.permissionsCache.set(
+          activeMembership.businessId,
+          activeMembership.roleId,
+          {
+            permissions: effectivePermissions,
+            roleVersion: activeMembership.roleVersion ?? null,
+          },
+        );
+      }
+      await tx.execute(sql`
+>>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
         SELECT
           set_config('app.is_platform_user', 'false', true),
           set_config('app.user_id', ${firstRecord.userId}, true),
@@ -227,6 +333,7 @@ export class UserAuthService {
           ...auditContext,
           userId: user.id,
           businessId: activeMembership.businessId,
+<<<<<<< HEAD
           terminalId: requestedTerminalId,
           eventType: 'USER_LOGIN_SUCCESS',
           responseStatus: 200,
@@ -248,6 +355,19 @@ export class UserAuthService {
           },
           { expiresIn },
         );
+=======
+          branchId: activeMembership.branchId ?? undefined,
+          isOwner: activeMembership.isOwner,
+          ...(activeMembership.roleId
+            ? {
+                role_id: activeMembership.roleId,
+                role_version: activeMembership.roleVersion,
+              }
+            : {}),
+        },
+        { expiresIn },
+      );
+>>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
 
         // Generate refresh token if remember is true
         let refreshToken: string | undefined;
@@ -701,6 +821,7 @@ export class UserAuthService {
           );
         }
 
+<<<<<<< HEAD
         const effectivePermissions = membership.roleId
           ? await this.getEffectivePermissions(
               tx,
@@ -721,6 +842,44 @@ export class UserAuthService {
         }
 
         await tx.execute(sql`
+=======
+      const membership = userRows.find(
+        (row) =>
+          terminal &&
+          row.businessId === terminal.businessId &&
+          (row.branchId === null || row.branchId === terminal.branchId),
+      );
+      if (
+        !terminal ||
+        !membership ||
+        (!membership.isOwner && !membership.roleId)
+      ) {
+        throw new UnauthorizedException(
+          'Terminal is not active for an assigned business branch',
+        );
+      }
+
+      const effectivePermissions = membership.roleId
+        ? await this.getEffectivePermissions(
+            tx,
+            membership.businessId!,
+            membership.roleId,
+            this.readPermissions(membership.permissions),
+          )
+        : [];
+      if (membership.roleId) {
+        await this.permissionsCache.set(
+          membership.businessId!,
+          membership.roleId,
+          {
+            permissions: effectivePermissions,
+            roleVersion: membership.roleVersion ?? null,
+          },
+        );
+      }
+
+      await tx.execute(sql`
+>>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
         SELECT
           set_config('app.is_platform_user', 'false', true),
           set_config('app.user_id', ${user.userId}, true),
@@ -731,10 +890,24 @@ export class UserAuthService {
           ...auditContext,
           userId: user.userId,
           businessId: membership.businessId,
+<<<<<<< HEAD
           terminalId: requestedTerminalId,
           eventType: 'USER_TOKEN_REFRESHED',
           responseStatus: 200,
         });
+=======
+          branchId: terminal.branchId,
+          isOwner: membership.isOwner,
+          ...(membership.roleId
+            ? {
+                role_id: membership.roleId,
+                role_version: membership.roleVersion,
+              }
+            : {}),
+        },
+        { expiresIn: '15m' },
+      );
+>>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
 
         const accessToken = await this.jwtService.signAsync(
           {

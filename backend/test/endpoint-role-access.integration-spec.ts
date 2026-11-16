@@ -10,6 +10,59 @@ describeWithDatabase('Endpoint role access database integration', () => {
     await pool.end();
   });
 
+  it('allows nullable roles only for owner business memberships', async () => {
+    const result = await pool.query<{
+      role_nullable: boolean;
+      owner_or_role_check_exists: boolean;
+    }>(`
+      SELECT
+        (
+          SELECT is_nullable = 'YES'
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'business_memberships'
+            AND column_name = 'role_id'
+        ) AS role_nullable,
+        EXISTS (
+          SELECT 1
+          FROM pg_constraint constraint_row
+          JOIN pg_class table_row ON table_row.oid = constraint_row.conrelid
+          JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
+          WHERE schema_row.nspname = current_schema()
+            AND table_row.relname = 'business_memberships'
+            AND constraint_row.conname = 'business_memberships_role_required_for_non_owner_chk'
+            AND constraint_row.contype = 'c'
+            AND pg_get_constraintdef(constraint_row.oid) ILIKE '%is_owner%'
+            AND pg_get_constraintdef(constraint_row.oid) ILIKE '%role_id%'
+        ) AS owner_or_role_check_exists
+    `);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].role_nullable).toBe(true);
+    expect(result.rows[0].owner_or_role_check_exists).toBe(true);
+  });
+
+  it('limits direct membership inserts to owners and platform users', async () => {
+    const result = await pool.query<{
+      policy_requires_owner_or_platform: boolean;
+    }>(`
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_policy policy_row
+        JOIN pg_class table_row ON table_row.oid = policy_row.polrelid
+        JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
+        WHERE schema_row.nspname = current_schema()
+          AND table_row.relname = 'business_memberships'
+          AND policy_row.polname = 'business_memberships_insert'
+          AND policy_row.polcmd = 'a'
+          AND pg_get_expr(policy_row.polwithcheck, policy_row.polrelid) ILIKE '%app_is_owner%'
+          AND pg_get_expr(policy_row.polwithcheck, policy_row.polrelid) ILIKE '%app_is_platform%'
+      ) AS policy_requires_owner_or_platform
+    `);
+
+    expect(result.rows[0].policy_requires_owner_or_platform).toBe(true);
+  });
+
   it('has tenant RLS enabled with scoped reads and owner-only writes', async () => {
     const result = await pool.query<{
       relrowsecurity: boolean;

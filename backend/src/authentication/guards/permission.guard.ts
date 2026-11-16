@@ -27,7 +27,16 @@ export class PermissionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<{
       user?: AuthenticatedUser;
     }>();
+<<<<<<< HEAD
     if (request.user?.isPlatform === true || request.user?.isOwner === true) {
+=======
+    if (request.user?.isPlatform === true) return true;
+    if (
+      request.user?.isOwner === true &&
+      request.user.userId &&
+      request.user.businessId
+    ) {
+>>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
       return true;
     }
 

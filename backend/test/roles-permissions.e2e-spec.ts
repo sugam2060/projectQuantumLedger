@@ -165,4 +165,13 @@ describe('Roles and permissions endpoint access (e2e)', () => {
     endpointAccess.hasAccess.mockResolvedValueOnce(false);
     await request(app.getHttpServer()).get('/test/role-protected').expect(403);
   });
+
+  it('lets a business owner access decorated endpoints without a role lookup', async () => {
+    await request(app.getHttpServer())
+      .get('/test/role-protected')
+      .set('x-test-owner', 'true')
+      .expect(200);
+
+    expect(endpointAccess.hasAccess).not.toHaveBeenCalled();
+  });
 });
