@@ -4,7 +4,10 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
   Post,
+  Query,
+  Req,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
@@ -16,6 +19,16 @@ import { BusinessUploadHeaders } from './decorators/business-upload-headers.deco
 import { BusinessUploadHeaderDto } from './dto/business-upload-header.dto';
 import { BusinessRequestDto } from './dto/business-request.dto';
 import { PlatformBusinessService } from './platform-business.service';
+import { ProvisionBusinessDto } from './dto/provision-business.dto';
+import { ProvisionBusinessHeadersDto } from './dto/provision-business-headers.dto';
+import { ProvisionBusinessQueryDto } from './dto/provision-business-query.dto';
+import { ProvisionBusinessHeaders } from './decorators/provision-business-headers.decorator';
+import type { AuthenticatedUser } from '../authentication/strategies/jwt.strategy';
+import type { Request } from 'express';
+
+interface PlatformAuthenticatedRequest extends Request {
+  user: AuthenticatedUser;
+}
 
 export interface BusinessRequestFiles {
   panCardFront?: Express.Multer.File[];
@@ -26,6 +39,45 @@ export interface BusinessRequestFiles {
 @Controller('platform/businesses')
 export class PlatformBusinessController {
   constructor(private readonly platformBusiness: PlatformBusinessService) {}
+
+  @Post('create')
+  @HttpCode(HttpStatus.CREATED)
+  @RateLimit({
+    requests: 20,
+    windowMs: 60 * 60_000,
+    errorMessage: 'Too many provisioning requests. Try again later.',
+  })
+  async provisionBusiness(
+    @Query() query: ProvisionBusinessQueryDto,
+    @Body() body: ProvisionBusinessDto,
+    @ProvisionBusinessHeaders() headers: ProvisionBusinessHeadersDto,
+    @Req() request: PlatformAuthenticatedRequest,
+  ) {
+    const isPlatformUser = request.user?.isPlatform === true;
+    const platformUserId = isPlatformUser
+      ? (request.user.platformUserId ??
+        request.user.subjectId ??
+        request.user.userId ??
+        request.user.sub)
+      : undefined;
+    if (!platformUserId) {
+      throw new ForbiddenException('Platform user authentication required');
+    }
+    return this.platformBusiness.provisionBusiness(
+      query.requested_business_id,
+      body,
+      headers.idempotencyKey,
+      platformUserId,
+      {
+        method: request.method,
+        endpointPath: request.route?.path,
+        requestId: request.header('x-request-id'),
+        clientType: request.header('x-client-type'),
+        ipAddress: request.ip,
+        userAgent: request.header('user-agent'),
+      },
+    );
+  }
 
   @Post('request')
   @HttpCode(HttpStatus.CREATED)
@@ -52,6 +104,7 @@ export class PlatformBusinessController {
     @BusinessUploadHeaders() _headers: BusinessUploadHeaderDto,
     @Body() request: BusinessRequestDto,
     @UploadedFiles() files: BusinessRequestFiles | undefined,
+    @Req() req: Request,
   ) {
     if (
       !files?.panCardFront?.[0] ||
@@ -63,11 +116,23 @@ export class PlatformBusinessController {
       );
     }
 
-    await this.platformBusiness.submitBusinessRequest(request, {
-      panCardFront: files.panCardFront[0],
-      panCardBack: files.panCardBack[0],
-      businessRegistrationCertificate: files.businessRegistrationCertificate[0],
-    });
+    await this.platformBusiness.submitBusinessRequest(
+      request,
+      {
+        panCardFront: files.panCardFront[0],
+        panCardBack: files.panCardBack[0],
+        businessRegistrationCertificate:
+          files.businessRegistrationCertificate[0],
+      },
+      {
+        method: req.method,
+        endpointPath: req.route?.path,
+        requestId: req.header('x-request-id'),
+        clientType: req.header('x-client-type'),
+        ipAddress: req.ip,
+        userAgent: req.header('user-agent'),
+      },
+    );
     return {
       message:
         'Your request has been submitted. Our team will contact you for further process.',

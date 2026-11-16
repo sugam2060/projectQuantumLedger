@@ -1,8 +1,11 @@
 import { relations } from 'drizzle-orm';
 import { accessLogs, auditLogs } from './audit_logs/access_audit_logs';
+import { platformAuditLogs } from './audit_logs/platform_audit_logs';
 import { branches } from './Identity_and_tenent/branches';
 import { business } from './Identity_and_tenent/businesses';
 import { businessProvisioningRequests } from './Identity_and_tenent/business_provisioning_requests';
+import { ownerRedemptions } from './Identity_and_tenent/owner_redemptions';
+import { mailOutbox } from './Identity_and_tenent/mail_outbox';
 import { businessMemberships } from './Identity_and_tenent/business_membership';
 import { endpointRoleAccess } from './Identity_and_tenent/endpoint_role_access';
 import { invitations } from './Identity_and_tenent/invitations';
@@ -24,21 +27,35 @@ export const businessRelations = relations(business, ({ one, many }) => ({
   accessLogs: many(accessLogs),
   auditLogs: many(auditLogs),
   endpointRoleAccess: many(endpointRoleAccess),
+  ownerRedemptions: many(ownerRedemptions),
+  platformAuditLogs: many(platformAuditLogs),
+  mailOutbox: many(mailOutbox),
 }));
 
 export const platformUsersRelations = relations(platformUsers, ({ many }) => ({
   businessesCreated: many(business),
   invitationsSent: many(invitations),
   businessRequestsReviewed: many(businessProvisioningRequests),
+  ownerRedemptionsCreated: many(ownerRedemptions),
+  platformAuditLogs: many(platformAuditLogs),
 }));
 
 export const businessProvisioningRequestRelations = relations(
   businessProvisioningRequests,
-  ({ one }) => ({
+  ({ one, many }) => ({
     reviewer: one(platformUsers, {
       fields: [businessProvisioningRequests.reviewedBy],
       references: [platformUsers.id],
     }),
+    provisionedBusiness: one(business, {
+      fields: [businessProvisioningRequests.provisionedBusinessId],
+      references: [business.id],
+    }),
+    ownerRedemption: one(ownerRedemptions, {
+      fields: [businessProvisioningRequests.id],
+      references: [ownerRedemptions.requestId],
+    }),
+    mailOutbox: many(mailOutbox),
   }),
 );
 
@@ -58,6 +75,58 @@ export const usersRelations = relations(users, ({ many }) => ({
   invitationsSent: many(invitations),
   accessLogs: many(accessLogs),
   auditLogs: many(auditLogs),
+  ownerRedemptionsConsumed: many(ownerRedemptions),
+}));
+
+export const ownerRedemptionsRelations = relations(
+  ownerRedemptions,
+  ({ one }) => ({
+    business: one(business, {
+      fields: [ownerRedemptions.businessId],
+      references: [business.id],
+    }),
+    request: one(businessProvisioningRequests, {
+      fields: [ownerRedemptions.requestId],
+      references: [businessProvisioningRequests.id],
+    }),
+    createdByPlatformUser: one(platformUsers, {
+      fields: [ownerRedemptions.createdByPlatformUserId],
+      references: [platformUsers.id],
+    }),
+    consumedByUser: one(users, {
+      fields: [ownerRedemptions.consumedByUserId],
+      references: [users.id],
+    }),
+  }),
+);
+
+export const platformAuditLogsRelations = relations(
+  platformAuditLogs,
+  ({ one }) => ({
+    platformUser: one(platformUsers, {
+      fields: [platformAuditLogs.platformUserId],
+      references: [platformUsers.id],
+    }),
+    business: one(business, {
+      fields: [platformAuditLogs.businessId],
+      references: [business.id],
+    }),
+    request: one(businessProvisioningRequests, {
+      fields: [platformAuditLogs.requestId],
+      references: [businessProvisioningRequests.id],
+    }),
+  }),
+);
+
+export const mailOutboxRelations = relations(mailOutbox, ({ one }) => ({
+  business: one(business, {
+    fields: [mailOutbox.businessId],
+    references: [business.id],
+  }),
+  request: one(businessProvisioningRequests, {
+    fields: [mailOutbox.requestId],
+    references: [businessProvisioningRequests.id],
+  }),
 }));
 
 export const rolesRelations = relations(roles, ({ one, many }) => ({
@@ -124,6 +193,7 @@ export const terminalsRelations = relations(terminals, ({ one, many }) => ({
     fields: [terminals.branchId],
     references: [branches.id],
   }),
+  accessLogs: many(accessLogs),
   auditLogs: many(auditLogs),
 }));
 
@@ -135,6 +205,10 @@ export const accessLogsRelations = relations(accessLogs, ({ one }) => ({
   user: one(users, {
     fields: [accessLogs.userId],
     references: [users.id],
+  }),
+  terminal: one(terminals, {
+    fields: [accessLogs.terminalId],
+    references: [terminals.id],
   }),
 }));
 

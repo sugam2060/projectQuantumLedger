@@ -194,6 +194,68 @@ describeWithDatabase('Endpoint role access database integration', () => {
     expect(result.rows[0].version_trigger_exists).toBe(true);
   });
 
+  it('supports roleless business owners and protects redemption/outbox records with RLS', async () => {
+    const result = await pool.query<{
+      membership_role_nullable: boolean;
+      owner_membership_constraint_exists: boolean;
+      redemption_rls_enabled: boolean;
+      redemption_policy_scoped_to_code: boolean;
+      outbox_rls_enabled: boolean;
+      outbox_platform_policy_exists: boolean;
+      provision_request_links_business: boolean;
+    }>(`
+      SELECT
+        (
+          SELECT is_nullable = 'YES'
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'business_memberships'
+            AND column_name = 'role_id'
+        ) AS membership_role_nullable,
+        EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conrelid = 'business_memberships'::regclass
+            AND conname = 'business_memberships_role_required_chk'
+        ) AS owner_membership_constraint_exists,
+        (
+          SELECT relrowsecurity FROM pg_class
+          WHERE oid = 'owner_redemptions'::regclass
+        ) AS redemption_rls_enabled,
+        EXISTS (
+          SELECT 1 FROM pg_policy
+          WHERE polrelid = 'owner_redemptions'::regclass
+            AND polname = 'owner_redemptions_select'
+            AND pg_get_expr(polqual, polrelid) ILIKE '%app.owner_redemption_hash%'
+        ) AS redemption_policy_scoped_to_code,
+        (
+          SELECT relrowsecurity FROM pg_class
+          WHERE oid = 'mail_outbox'::regclass
+        ) AS outbox_rls_enabled,
+        EXISTS (
+          SELECT 1 FROM pg_policy
+          WHERE polrelid = 'mail_outbox'::regclass
+            AND polname = 'mail_outbox_insert'
+            AND pg_get_expr(polwithcheck, polrelid) ILIKE '%app_is_platform%'
+        ) AS outbox_platform_policy_exists,
+        EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'business_provisioning_requests'
+            AND column_name = 'provisioned_business_id'
+        ) AS provision_request_links_business
+    `);
+
+    expect(result.rows[0]).toEqual({
+      membership_role_nullable: true,
+      owner_membership_constraint_exists: true,
+      redemption_rls_enabled: true,
+      redemption_policy_scoped_to_code: true,
+      outbox_rls_enabled: true,
+      outbox_platform_policy_exists: true,
+      provision_request_links_business: true,
+    });
+  });
+
   it('allows login terminal validation through the platform terminal-read RLS policy', async () => {
     const result = await pool.query<{
       rls_enabled: boolean;
@@ -293,5 +355,39 @@ describeWithDatabase('Endpoint role access database integration', () => {
     expect(result.rows[0].platform_select_policy).toBe(true);
     expect(result.rows[0].platform_update_policy).toBe(true);
     expect(result.rows[0].reviewer_foreign_key).toBe(true);
+  });
+
+  it('stores request audit fields and removes database idempotency storage', async () => {
+    const result = await pool.query<{
+      idempotency_table_removed: boolean;
+      access_audit_fields: string[];
+      platform_audit_fields: string[];
+      access_logs_rls_enabled: boolean;
+      platform_audit_rls_enabled: boolean;
+    }>(`
+      SELECT
+        to_regclass(format('%I.%I', current_schema(), 'api_idempotency')) IS NULL
+          AS idempotency_table_removed,
+        ARRAY(
+          SELECT column_name FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = 'access_logs'
+            AND column_name IN ('http_method', 'endpoint_path', 'response_status', 'request_id', 'client_type', 'terminal_id')
+        ) AS access_audit_fields,
+        ARRAY(
+          SELECT column_name FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = 'platform_audit_logs'
+            AND column_name IN ('http_method', 'endpoint_path', 'response_status', 'correlation_id', 'client_type', 'ip_address', 'user_agent')
+        ) AS platform_audit_fields,
+        (SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass(format('%I.%I', current_schema(), 'access_logs')))
+          AS access_logs_rls_enabled,
+        (SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass(format('%I.%I', current_schema(), 'platform_audit_logs')))
+          AS platform_audit_rls_enabled
+    `);
+
+    expect(result.rows[0].idempotency_table_removed).toBe(true);
+    expect(result.rows[0].access_audit_fields).toHaveLength(6);
+    expect(result.rows[0].platform_audit_fields).toHaveLength(7);
+    expect(result.rows[0].access_logs_rls_enabled).toBe(true);
+    expect(result.rows[0].platform_audit_rls_enabled).toBe(true);
   });
 });

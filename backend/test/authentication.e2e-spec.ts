@@ -73,6 +73,35 @@ describe('AuthenticationController (e2e)', () => {
     });
   });
 
+  describe('POST /authentication/register-owner', () => {
+    it('requires web client type and all registration fields', async () => {
+      await request(app.getHttpServer())
+        .post('/authentication/register-owner')
+        .set('x-client-type', 'desktop')
+        .send({})
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .post('/authentication/register-owner')
+        .set('x-client-type', 'web')
+        .send({})
+        .expect(400);
+    });
+
+    it('rejects malformed owner registration data before service processing', async () => {
+      await request(app.getHttpServer())
+        .post('/authentication/register-owner')
+        .set('x-client-type', 'web')
+        .send({
+          email: 'not-an-email',
+          name: 'Owner',
+          password: 'short',
+          redeemCode: '',
+        })
+        .expect(400);
+    });
+  });
+
   describe('platform authentication endpoints', () => {
     it('validates platform login payloads', async () => {
       await request(app.getHttpServer())

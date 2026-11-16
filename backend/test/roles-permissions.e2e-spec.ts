@@ -24,6 +24,7 @@ class TestSessionGuard implements CanActivate {
       user?: AuthenticatedUser;
     }>();
     request.user = {
+      subjectId: request.headers['x-test-user'] ?? 'user-1',
       userId: request.headers['x-test-user'] ?? 'user-1',
       businessId: '00000000-0000-4000-8000-000000000001',
       isOwner: request.headers['x-test-owner'] === 'true',

@@ -6,6 +6,7 @@ import { createDatabaseOptions } from './database.provider';
 import { DatabaseService } from './database.service';
 import { RequestContextService } from './request_context.service';
 import { RlsContextInterceptor } from './rls_context.interceptor';
+import { AuditLogService } from './audit-log.service';
 
 @Global()
 @Module({
@@ -19,11 +20,12 @@ import { RlsContextInterceptor } from './rls_context.interceptor';
   providers: [
     RequestContextService,
     DatabaseService,
+    AuditLogService,
     {
       provide: APP_INTERCEPTOR,
       useClass: RlsContextInterceptor,
     },
   ],
-  exports: [DatabaseService, DrizzleModule],
+  exports: [DatabaseService, AuditLogService, DrizzleModule],
 })
 export class DatabaseModule {}

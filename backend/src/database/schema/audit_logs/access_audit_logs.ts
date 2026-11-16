@@ -6,6 +6,7 @@ import {
   pgPolicy,
   jsonb,
   index,
+  integer,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { business } from '../Identity_and_tenent/businesses';
@@ -23,6 +24,12 @@ export const accessLogs = pgTable(
     businessId: uuid('business_id').references(() => business.id), // Nullable for platform logins
     userId: uuid('user_id').references(() => users.id),
     eventType: text('event_type').notNull(), // e.g., 'LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGOUT', 'TOKEN_REFRESH'
+    httpMethod: text('http_method'),
+    endpointPath: text('endpoint_path'),
+    responseStatus: integer('response_status'),
+    requestId: text('request_id'),
+    clientType: text('client_type'),
+    terminalId: uuid('terminal_id').references(() => terminals.id),
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
     metadata: jsonb('metadata').notNull().default('{}'), // Additional contextual data

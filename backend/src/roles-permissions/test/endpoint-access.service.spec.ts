@@ -11,12 +11,14 @@ describe('EndpointAccessService', () => {
   const permissionsCache = {
     invalidate: jest.fn().mockResolvedValue(undefined),
   };
+  const auditLogs = { insertUserEvent: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(() => {
     jest.clearAllMocks();
     service = new EndpointAccessService(
       database as never,
       permissionsCache as never,
+      auditLogs as never,
     );
   });
 

@@ -57,6 +57,10 @@ describe('AuthenticationPlatformController', () => {
         dto,
         {
           secure: true,
+          method: 'POST',
+          route: { path: '/platform/user/login' },
+          ip: '127.0.0.1',
+          header: jest.fn().mockReturnValue(undefined),
           headers: { 'x-client-type': ClientType.WEB },
         } as never,
         response as never,
@@ -84,7 +88,10 @@ describe('AuthenticationPlatformController', () => {
         maxAge: 7 * 24 * 60 * 60 * 1000,
       }),
     );
-    expect(platformAuthService.login).toHaveBeenCalledWith(dto);
+    expect(platformAuthService.login).toHaveBeenCalledWith(
+      dto,
+      expect.objectContaining({ endpointPath: '/platform/user/login' }),
+    );
   });
 
   it('returns tokens in the body for mobile login', async () => {
@@ -99,6 +106,10 @@ describe('AuthenticationPlatformController', () => {
         dto,
         {
           secure: false,
+          method: 'POST',
+          route: { path: '/platform/user/login' },
+          ip: '127.0.0.1',
+          header: jest.fn().mockReturnValue(undefined),
           headers: { 'x-client-type': ClientType.MOBILE },
         } as never,
         {
@@ -121,6 +132,10 @@ describe('AuthenticationPlatformController', () => {
         dto,
         {
           secure: false,
+          method: 'POST',
+          route: { path: '/platform/user/login' },
+          ip: '127.0.0.1',
+          header: jest.fn().mockReturnValue(undefined),
           headers: { 'x-client-type': ClientType.DESKTOP },
         } as never,
         response as never,
@@ -139,6 +154,10 @@ describe('AuthenticationPlatformController', () => {
           'x-client-type': 'web',
         },
         {
+          method: 'POST',
+          route: { path: '/platform/user/refresh' },
+          ip: '127.0.0.1',
+          header: jest.fn().mockReturnValue(undefined),
           cookies: { refresh_token: 'cookie-refresh-token' },
           secure: true,
           headers: {},
@@ -154,6 +173,7 @@ describe('AuthenticationPlatformController', () => {
     });
     expect(platformAuthService.refresh).toHaveBeenCalledWith(
       'cookie-refresh-token',
+      expect.objectContaining({ endpointPath: '/platform/user/refresh' }),
     );
     expect(response.cookie).toHaveBeenCalledTimes(2);
   });
@@ -165,12 +185,19 @@ describe('AuthenticationPlatformController', () => {
     await expect(
       controller.refresh(
         { 'refresh-token': 'header-refresh-token', 'x-client-type': 'mobile' },
-        { headers: {} } as never,
+        {
+          headers: {},
+          method: 'POST',
+          route: { path: '/platform/user/refresh' },
+          ip: '127.0.0.1',
+          header: jest.fn().mockReturnValue(undefined),
+        } as never,
         response as never,
       ),
     ).resolves.toEqual(authResult);
     expect(platformAuthService.refresh).toHaveBeenCalledWith(
       'header-refresh-token',
+      expect.objectContaining({ endpointPath: '/platform/user/refresh' }),
     );
     expect(response.cookie).not.toHaveBeenCalled();
   });
@@ -185,12 +212,19 @@ describe('AuthenticationPlatformController', () => {
           'refresh-token': 'desktop-refresh-token',
           'x-client-type': ClientType.DESKTOP,
         },
-        { headers: {} } as never,
+        {
+          headers: {},
+          method: 'POST',
+          route: { path: '/platform/user/refresh' },
+          ip: '127.0.0.1',
+          header: jest.fn().mockReturnValue(undefined),
+        } as never,
         response as never,
       ),
     ).resolves.toEqual(authResult);
     expect(platformAuthService.refresh).toHaveBeenCalledWith(
       'desktop-refresh-token',
+      expect.objectContaining({ endpointPath: '/platform/user/refresh' }),
     );
     expect(response.cookie).not.toHaveBeenCalled();
   });

@@ -21,6 +21,7 @@ describe('AuthenticationController', () => {
   beforeEach(async () => {
     // Mock the UserAuthService
     authServiceMock = {
+      registerOwner: jest.fn(),
       userLogin: jest.fn(),
       getCurrentUser: jest.fn(),
       refreshAccessToken: jest.fn(),
@@ -42,6 +43,39 @@ describe('AuthenticationController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('POST /authentication/register-owner', () => {
+    it('is public, rate limited, web-only, and delegates registration', async () => {
+      const handler = AuthenticationController.prototype.registerOwner;
+      expect(Reflect.getMetadata('isPublic', handler)).toBe(true);
+      expect(Reflect.getMetadata('rateLimit', handler)).toEqual(
+        expect.objectContaining({ requests: 10, windowMs: 60 * 60_000 }),
+      );
+      const dto = {
+        email: 'owner@example.com',
+        name: 'Business Owner',
+        password: 'correct-horse',
+        redeemCode: 'AABBCCDDEEFF001122334455',
+      };
+      const result = { userId: 'user-id', businessId: 'business-id' };
+      authServiceMock.registerOwner.mockResolvedValue(result);
+
+      await expect(
+        controller.registerOwner(dto, { clientType: 'web' }, {
+          method: 'POST',
+          route: { path: '/authentication/register-owner' },
+          header: jest.fn().mockReturnValue(undefined),
+          ip: '127.0.0.1',
+        } as never),
+      ).resolves.toBe(result);
+      expect(authServiceMock.registerOwner).toHaveBeenCalledWith(
+        dto,
+        expect.objectContaining({
+          endpointPath: '/authentication/register-owner',
+        }),
+      );
+    });
   });
 
   describe('GET /authentication/me', () => {
@@ -138,6 +172,10 @@ describe('AuthenticationController', () => {
 
     const mockRequest = {
       secure: false,
+      method: 'POST',
+      route: { path: '/authentication/login' },
+      ip: '127.0.0.1',
+      header: jest.fn().mockReturnValue(undefined),
       headers: {
         'x-forwarded-proto': 'http',
         'x-client-type': 'web',
@@ -189,6 +227,7 @@ describe('AuthenticationController', () => {
       expect(authServiceMock.userLogin).toHaveBeenCalledWith(
         mockDto,
         '00000000-0000-4000-8000-000000000002',
+        expect.objectContaining({ endpointPath: '/authentication/login' }),
       );
       expect(mockResponse.cookie).toHaveBeenCalledTimes(2);
       expect(mockResponse.cookie).toHaveBeenCalledWith(
@@ -244,6 +283,7 @@ describe('AuthenticationController', () => {
       expect(authServiceMock.userLogin).toHaveBeenCalledWith(
         mockDto,
         '00000000-0000-4000-8000-000000000002',
+        expect.objectContaining({ endpointPath: '/authentication/login' }),
       );
       expect(mockResponse.cookie).not.toHaveBeenCalled();
       expect(result).toEqual(mockResult);
@@ -361,6 +401,10 @@ describe('AuthenticationController', () => {
   describe('refreshToken', () => {
     const mockRequest = {
       secure: false,
+      method: 'POST',
+      route: { path: '/authentication/refresh' },
+      ip: '127.0.0.1',
+      header: jest.fn().mockReturnValue(undefined),
       headers: { 'x-forwarded-proto': 'http', 'x-client-type': 'web' },
       cookies: { refresh_token: 'cookie-refresh-token' },
     } as any;
@@ -399,6 +443,7 @@ describe('AuthenticationController', () => {
       expect(authServiceMock.refreshAccessToken).toHaveBeenCalledWith(
         'body-refresh-token',
         '00000000-0000-4000-8000-000000000002',
+        expect.objectContaining({ endpointPath: '/authentication/refresh' }),
       );
       expect(mockResponse.cookie).toHaveBeenCalledTimes(2);
       expect(result).toEqual({
@@ -437,6 +482,7 @@ describe('AuthenticationController', () => {
       expect(authServiceMock.refreshAccessToken).toHaveBeenCalledWith(
         'cookie-refresh-token',
         '00000000-0000-4000-8000-000000000002',
+        expect.objectContaining({ endpointPath: '/authentication/refresh' }),
       );
       expect(result).toEqual({
         effectivePermissions: ['inventory.create'],
@@ -448,6 +494,10 @@ describe('AuthenticationController', () => {
     it('returns both refreshed tokens in JSON without setting cookies for desktop clients', async () => {
       const mockRequestDesktop = {
         secure: false,
+        method: 'POST',
+        route: { path: '/authentication/refresh' },
+        ip: '127.0.0.1',
+        header: jest.fn().mockReturnValue(undefined),
         headers: { 'x-forwarded-proto': 'http', 'x-client-type': 'desktop' },
         cookies: {},
       } as any;
@@ -476,6 +526,10 @@ describe('AuthenticationController', () => {
     it('returns both refreshed tokens in JSON without setting cookies for mobile clients', async () => {
       const mockRequestMobile = {
         secure: false,
+        method: 'POST',
+        route: { path: '/authentication/refresh' },
+        ip: '127.0.0.1',
+        header: jest.fn().mockReturnValue(undefined),
         headers: { 'x-forwarded-proto': 'http', 'x-client-type': 'mobile' },
         cookies: {},
       } as any;
