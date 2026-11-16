@@ -26,6 +26,7 @@ describe('PlatformBusinessService', () => {
     insertPlatformEvent: jest.fn().mockResolvedValue(undefined),
     logUserEvent: jest.fn().mockResolvedValue(undefined),
   };
+  const outboxPublisher = { notifyOutboxAvailable: jest.fn() };
   let service: PlatformBusinessService;
 
   const request = {
@@ -77,6 +78,7 @@ describe('PlatformBusinessService', () => {
       objectStore as unknown as ObjectStoreService,
       redis as unknown as RedisService,
       auditLogs as unknown as AuditLogService,
+      outboxPublisher as never,
     );
   });
 
@@ -308,6 +310,7 @@ describe('PlatformBusinessService', () => {
       tx,
       expect.objectContaining({ action: 'business.provisioned' }),
     );
+    expect(outboxPublisher.notifyOutboxAvailable).toHaveBeenCalledTimes(1);
     expect(redis.set).toHaveBeenCalledWith(
       expect.stringContaining(':result'),
       expect.stringContaining('requestHash'),

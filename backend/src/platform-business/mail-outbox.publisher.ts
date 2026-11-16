@@ -11,7 +11,7 @@ import { mailOutbox } from '../database/schema';
 import { RabbitMQService } from '../utils/rabbitmq.service';
 
 const CLAIM_DURATION_MS = 60_000;
-const DISPATCH_INTERVAL_MS = 5_000;
+const RECOVERY_INTERVAL_MS = 60_000;
 const BATCH_SIZE = 20;
 
 @Injectable()
@@ -19,8 +19,15 @@ export class MailOutboxPublisher
   implements OnModuleInit, OnApplicationShutdown
 {
   private readonly logger = new Logger(MailOutboxPublisher.name);
-  private timer?: NodeJS.Timeout;
+  private recoveryTimer?: NodeJS.Timeout;
+  private dispatchTimer?: NodeJS.Timeout;
+  private retryTimer?: NodeJS.Timeout;
+  private retryDeadlines: number[] = [];
+  private retryTimerDueAt?: number;
   private dispatching = false;
+  private dispatchRequested = false;
+  private shuttingDown = false;
+  private unsubscribeFromRabbit?: () => void;
 
   constructor(
     private readonly database: DatabaseService,
@@ -29,17 +36,41 @@ export class MailOutboxPublisher
   ) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(() => void this.dispatch(), DISPATCH_INTERVAL_MS);
-    this.timer.unref();
-    void this.dispatch();
+    this.unsubscribeFromRabbit = this.rabbit.onConnected(() =>
+      this.notifyOutboxAvailable(),
+    );
+    this.recoveryTimer = setInterval(
+      () => void this.dispatch(),
+      RECOVERY_INTERVAL_MS,
+    );
+    this.recoveryTimer.unref();
+    this.notifyOutboxAvailable();
   }
 
   onApplicationShutdown(): void {
-    if (this.timer) clearInterval(this.timer);
+    this.shuttingDown = true;
+    this.unsubscribeFromRabbit?.();
+    if (this.recoveryTimer) clearInterval(this.recoveryTimer);
+    if (this.dispatchTimer) clearTimeout(this.dispatchTimer);
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+  }
+
+  notifyOutboxAvailable(): void {
+    if (this.shuttingDown) return;
+    if (this.dispatchTimer) clearTimeout(this.dispatchTimer);
+    this.dispatchTimer = setTimeout(() => {
+      this.dispatchTimer = undefined;
+      void this.dispatch();
+    }, 0);
+    this.dispatchTimer.unref();
   }
 
   async dispatch(): Promise<void> {
-    if (this.dispatching) return;
+    if (this.dispatching) {
+      this.dispatchRequested = true;
+      return;
+    }
+    if (this.shuttingDown) return;
     const exchange = this.config.get<string>('MAIL_EXCHANGE_NAME')?.trim();
     const routingKey = this.config.get<string>('MAIL_ROUTING_KEY')?.trim();
     if (!exchange || !routingKey || !this.rabbit.isConnected) return;
@@ -126,8 +157,10 @@ export class MailOutboxPublisher
               outboxId: row.id,
             }),
           );
+          this.scheduleRetry(retryDelayMs);
         }
       }
+      if (claimed.length === BATCH_SIZE) this.notifyOutboxAvailable();
     } catch (error) {
       this.logger.error(
         JSON.stringify({
@@ -137,6 +170,39 @@ export class MailOutboxPublisher
       );
     } finally {
       this.dispatching = false;
+      if (this.dispatchRequested && !this.shuttingDown) {
+        this.dispatchRequested = false;
+        this.notifyOutboxAvailable();
+      }
     }
+  }
+
+  private scheduleRetry(delayMs: number): void {
+    this.retryDeadlines.push(Date.now() + delayMs);
+    this.retryDeadlines.sort((left, right) => left - right);
+    this.scheduleNextRetry();
+  }
+
+  private scheduleNextRetry(): void {
+    const nextDueAt = this.retryDeadlines[0];
+    if (nextDueAt === undefined || this.shuttingDown) return;
+    if (this.retryTimer && this.retryTimerDueAt! <= nextDueAt) return;
+
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimerDueAt = nextDueAt;
+    this.retryTimer = setTimeout(
+      () => {
+        this.retryTimer = undefined;
+        this.retryTimerDueAt = undefined;
+        const now = Date.now();
+        this.retryDeadlines = this.retryDeadlines.filter(
+          (dueAt) => dueAt > now,
+        );
+        this.notifyOutboxAvailable();
+        this.scheduleNextRetry();
+      },
+      Math.max(0, nextDueAt - Date.now()),
+    );
+    this.retryTimer.unref();
   }
 }

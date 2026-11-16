@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import { invitations, mailOutbox, platformUsers } from '../database/schema';
 import { RedisService } from '../redis/redis.service';
+import { MailOutboxPublisher } from './mail-outbox.publisher';
 import type { InvitePlatformUserDto } from './dto/invite-platform-user.dto';
 
 const INVITE_OPERATION = 'platform.users.invite';
@@ -29,6 +30,7 @@ export class PlatformUserInvitationsService {
     private readonly database: DatabaseService,
     private readonly redis: RedisService,
     private readonly config: ConfigService,
+    private readonly outboxPublisher: MailOutboxPublisher,
   ) {}
 
   async invitePlatformUser(
@@ -161,6 +163,7 @@ export class PlatformUserInvitationsService {
           });
         },
       );
+      this.outboxPublisher.notifyOutboxAvailable();
     } catch (error) {
       if (postgresErrorCode(error) === '23505') {
         throw new ConflictException(

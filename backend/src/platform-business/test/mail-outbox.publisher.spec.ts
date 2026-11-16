@@ -6,7 +6,11 @@ import { MailOutboxPublisher } from '../mail-outbox.publisher';
 
 describe('MailOutboxPublisher', () => {
   const database = { transactionWithSession: jest.fn() };
-  const rabbit = { isConnected: true, publish: jest.fn() };
+  const rabbit = {
+    isConnected: true,
+    publish: jest.fn(),
+    onConnected: jest.fn(() => jest.fn()),
+  };
   const config = {
     get: jest.fn((key: string) =>
       key === 'MAIL_EXCHANGE_NAME' ? 'mail.events' : 'mail.send',
