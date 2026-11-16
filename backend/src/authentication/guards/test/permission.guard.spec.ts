@@ -1,4 +1,4 @@
-import { jest as jestGlobal } from '@jest/globals';
+﻿import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -85,20 +85,12 @@ describe('PermissionGuard', () => {
     };
   });
 
-<<<<<<< HEAD
   it('bypasses endpoint role checks for an authenticated business owner', async () => {
-=======
-  it('bypasses endpoint role checks for an active business owner', async () => {
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
     reflector.getAllAndOverride
       .mockReturnValueOnce(false)
       .mockReturnValue('inventory.create');
     request.user = {
-<<<<<<< HEAD
       userId: 'owner-user-1',
-=======
-      userId: 'user-1',
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
       businessId: 'business-1',
       isOwner: true,
       permissions: [],
@@ -106,10 +98,6 @@ describe('PermissionGuard', () => {
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(endpointAccess.hasAccess).not.toHaveBeenCalled();
-<<<<<<< HEAD
-=======
-
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
     request.user = {
       userId: 'user-1',
       businessId: 'business-1',
