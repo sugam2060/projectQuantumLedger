@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  Get,
   Post,
   Query,
   Req,
@@ -23,6 +24,9 @@ import { ProvisionBusinessDto } from './dto/provision-business.dto';
 import { ProvisionBusinessHeadersDto } from './dto/provision-business-headers.dto';
 import { ProvisionBusinessQueryDto } from './dto/provision-business-query.dto';
 import { ProvisionBusinessHeaders } from './decorators/provision-business-headers.decorator';
+import { BusinessListHeaders } from './decorators/business-list-headers.decorator';
+import { BusinessListHeadersDto } from './dto/business-list-headers.dto';
+import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import type { AuthenticatedUser } from '../authentication/strategies/jwt.strategy';
 import type { Request } from 'express';
 
@@ -39,6 +43,26 @@ export interface BusinessRequestFiles {
 @Controller('platform/businesses')
 export class PlatformBusinessController {
   constructor(private readonly platformBusiness: PlatformBusinessService) {}
+
+  @Get()
+  async listBusinesses(
+    @Query() query: ListBusinessesQueryDto,
+    @BusinessListHeaders() _headers: BusinessListHeadersDto,
+    @Req() request: PlatformAuthenticatedRequest,
+  ) {
+    const user = request.user;
+    const platformUserId = user?.isPlatform
+      ? (user.platformUserId ?? user.subjectId ?? user.userId ?? user.sub)
+      : undefined;
+    if (!platformUserId) {
+      throw new ForbiddenException('Platform user authentication required');
+    }
+
+    return this.platformBusiness.listBusinesses(
+      { page: query.page, limit: query.limit },
+      platformUserId,
+    );
+  }
 
   @Post('create')
   @HttpCode(HttpStatus.CREATED)
