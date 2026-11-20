@@ -5,6 +5,9 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  Get,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
   Req,
@@ -36,11 +39,50 @@ export interface BusinessRequestFiles {
   businessRegistrationCertificate?: Express.Multer.File[];
 }
 
-@Controller('platform/businesses')
+@Controller('platform')
 export class PlatformBusinessController {
   constructor(private readonly platformBusiness: PlatformBusinessService) {}
 
-  @Post('create')
+  @Get('business/:business_id')
+  @HttpCode(HttpStatus.OK)
+  async getBusiness(
+    @Param('business_id', new ParseUUIDPipe()) businessId: string,
+    @Req() request: PlatformAuthenticatedRequest,
+  ) {
+    const clientType = request.header('x-client-type');
+    if (
+      typeof clientType !== 'string' ||
+      !['web', 'mobile', 'desktop'].includes(clientType)
+    ) {
+      throw new BadRequestException('A valid x-client-type header is required');
+    }
+
+    const isPlatformUser = request.user?.isPlatform === true;
+    const platformUserId = isPlatformUser
+      ? (request.user.platformUserId ??
+        request.user.subjectId ??
+        request.user.userId ??
+        request.user.sub)
+      : undefined;
+    if (!platformUserId) {
+      throw new ForbiddenException('Platform user authentication required');
+    }
+
+    return this.platformBusiness.getBusinessDetails(
+      businessId,
+      platformUserId,
+      {
+        method: request.method,
+        endpointPath: request.route?.path,
+        requestId: request.header('x-request-id'),
+        clientType,
+        ipAddress: request.ip,
+        userAgent: request.header('user-agent'),
+      },
+    );
+  }
+
+  @Post('businesses/create')
   @HttpCode(HttpStatus.CREATED)
   @RateLimit({
     requests: 20,
@@ -79,7 +121,7 @@ export class PlatformBusinessController {
     );
   }
 
-  @Post('request')
+  @Post('businesses/request')
   @HttpCode(HttpStatus.CREATED)
   @Public()
   @RateLimit({

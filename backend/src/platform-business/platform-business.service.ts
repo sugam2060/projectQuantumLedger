@@ -12,10 +12,13 @@ import { DatabaseService } from '../database/database.service';
 import {
   branches,
   business,
+  businessMemberships,
   businessProvisioningRequests,
   mailOutbox,
   ownerRedemptions,
+  roles,
   terminals,
+  users,
 } from '../database/schema';
 import type { BusinessDocuments } from '../database/schema/Identity_and_tenent/businesses';
 import { ObjectStoreService } from '../utils/objectStore.service';
@@ -47,6 +50,83 @@ export class PlatformBusinessService {
     private readonly auditLogs: AuditLogService,
     private readonly outboxPublisher: MailOutboxPublisher,
   ) {}
+
+  async getBusinessDetails(
+    businessId: string,
+    platformUserId: string,
+    auditContext: AuditRequestContext = {},
+  ) {
+    return this.database.transactionWithSession(
+      { isPlatform: true, platformUserId },
+      async (tx) => {
+        const [businessRow] = await tx
+          .select()
+          .from(business)
+          .where(eq(business.id, businessId))
+          .limit(1);
+        if (!businessRow) {
+          throw new NotFoundException('Business was not found');
+        }
+
+        const businessBranches = await tx
+          .select()
+          .from(branches)
+          .where(eq(branches.businessId, businessId));
+
+        const membershipRows = await tx
+          .select({
+            id: businessMemberships.id,
+            isOwner: businessMemberships.isOwner,
+            isActive: businessMemberships.isActive,
+            branchId: businessMemberships.branchId,
+            roleId: businessMemberships.roleId,
+            createdAt: businessMemberships.createdAt,
+            updatedAt: businessMemberships.updatedAt,
+            user: {
+              id: users.id,
+              email: users.emailNormalized,
+              name: users.name,
+              status: users.status,
+            },
+            role: {
+              id: roles.id,
+              name: roles.name,
+              description: roles.description,
+              isSystem: roles.isSystem,
+            },
+            branch: {
+              id: branches.id,
+              name: branches.name,
+              code: branches.code,
+              isActive: branches.isActive,
+            },
+          })
+          .from(businessMemberships)
+          .leftJoin(users, eq(businessMemberships.userId, users.id))
+          .leftJoin(roles, eq(businessMemberships.roleId, roles.id))
+          .leftJoin(branches, eq(businessMemberships.branchId, branches.id))
+          .where(eq(businessMemberships.businessId, businessId));
+
+        await this.auditLogs.insertPlatformEvent(tx, {
+          ...auditContext,
+          platformUserId,
+          businessId,
+          action: 'business.details.viewed',
+          responseStatus: 200,
+          metadata: {
+            branchCount: businessBranches.length,
+            membershipCount: membershipRows.length,
+          },
+        });
+
+        return {
+          business: businessRow,
+          branches: businessBranches,
+          memberships: membershipRows,
+        };
+      },
+    );
+  }
 
   async submitBusinessRequest(
     request: BusinessRequestDto,
