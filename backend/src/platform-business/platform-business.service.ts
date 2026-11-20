@@ -7,15 +7,18 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
   branches,
   business,
+  businessMemberships,
   businessProvisioningRequests,
   mailOutbox,
   ownerRedemptions,
+  roles,
   terminals,
+  users,
 } from '../database/schema';
 import type { BusinessDocuments } from '../database/schema/Identity_and_tenent/businesses';
 import { ObjectStoreService } from '../utils/objectStore.service';
@@ -47,6 +50,184 @@ export class PlatformBusinessService {
     private readonly auditLogs: AuditLogService,
     private readonly outboxPublisher: MailOutboxPublisher,
   ) {}
+
+  async getBusinessDetails(
+    businessId: string,
+    platformUserId: string,
+    auditContext: AuditRequestContext = {},
+  ) {
+    return this.database.transactionWithSession(
+      { isPlatform: true, platformUserId },
+      async (tx) => {
+        const [businessRow] = await tx
+          .select()
+          .from(business)
+          .where(eq(business.id, businessId))
+          .limit(1);
+        if (!businessRow) {
+          throw new NotFoundException('Business was not found');
+        }
+
+        const businessBranches = await tx
+          .select()
+          .from(branches)
+          .where(eq(branches.businessId, businessId));
+
+        const membershipRows = await tx
+          .select({
+            id: businessMemberships.id,
+            isOwner: businessMemberships.isOwner,
+            isActive: businessMemberships.isActive,
+            branchId: businessMemberships.branchId,
+            roleId: businessMemberships.roleId,
+            createdAt: businessMemberships.createdAt,
+            updatedAt: businessMemberships.updatedAt,
+            user: {
+              id: users.id,
+              email: users.emailNormalized,
+              name: users.name,
+              status: users.status,
+            },
+            role: {
+              id: roles.id,
+              name: roles.name,
+              description: roles.description,
+              isSystem: roles.isSystem,
+            },
+            branch: {
+              id: branches.id,
+              name: branches.name,
+              code: branches.code,
+              isActive: branches.isActive,
+            },
+          })
+          .from(businessMemberships)
+          .leftJoin(users, eq(businessMemberships.userId, users.id))
+          .leftJoin(roles, eq(businessMemberships.roleId, roles.id))
+          .leftJoin(branches, eq(businessMemberships.branchId, branches.id))
+          .where(eq(businessMemberships.businessId, businessId));
+
+        await this.auditLogs.insertPlatformEvent(tx, {
+          ...auditContext,
+          platformUserId,
+          businessId,
+          action: 'business.details.viewed',
+          responseStatus: 200,
+          metadata: {
+            branchCount: businessBranches.length,
+            membershipCount: membershipRows.length,
+          },
+        });
+
+        return {
+          business: businessRow,
+          branches: businessBranches,
+          memberships: membershipRows,
+        };
+      },
+    );
+  }
+
+  async getBranchDetails(
+    businessId: string,
+    branchId: string,
+    platformUserId: string,
+    auditContext: AuditRequestContext = {},
+  ) {
+    return this.database.transactionWithSession(
+      { isPlatform: true, platformUserId },
+      async (tx) => {
+        const [branchRow] = await tx
+          .select()
+          .from(branches)
+          .where(
+            and(eq(branches.id, branchId), eq(branches.businessId, businessId)),
+          )
+          .limit(1);
+        if (!branchRow) {
+          throw new NotFoundException('Branch was not found for this business');
+        }
+
+        const branchTerminals = await tx
+          .select()
+          .from(terminals)
+          .where(
+            and(
+              eq(terminals.businessId, businessId),
+              eq(terminals.branchId, branchId),
+            ),
+          );
+
+        const activeEmployees = await tx
+          .select({
+            membershipId: businessMemberships.id,
+            isOwner: businessMemberships.isOwner,
+            branchId: businessMemberships.branchId,
+            createdAt: businessMemberships.createdAt,
+            user: {
+              id: users.id,
+              email: users.emailNormalized,
+              name: users.name,
+              status: users.status,
+            },
+            role: {
+              id: roles.id,
+              name: roles.name,
+              description: roles.description,
+              isSystem: roles.isSystem,
+            },
+          })
+          .from(businessMemberships)
+          .leftJoin(users, eq(businessMemberships.userId, users.id))
+          .leftJoin(roles, eq(businessMemberships.roleId, roles.id))
+          .where(
+            and(
+              eq(businessMemberships.businessId, businessId),
+              eq(businessMemberships.isActive, true),
+              or(
+                eq(businessMemberships.branchId, branchId),
+                isNull(businessMemberships.branchId),
+              ),
+            ),
+          );
+
+        const terminalCounts = {
+          total: branchTerminals.length,
+          active: branchTerminals.filter(
+            (terminal) => terminal.status === 'active',
+          ).length,
+          inactive: branchTerminals.filter(
+            (terminal) => terminal.status === 'inactive',
+          ).length,
+          maintenance: branchTerminals.filter(
+            (terminal) => terminal.status === 'maintenance',
+          ).length,
+        };
+
+        await this.auditLogs.insertPlatformEvent(tx, {
+          ...auditContext,
+          platformUserId,
+          businessId,
+          action: 'business.branch.details.viewed',
+          responseStatus: 200,
+          metadata: {
+            branchId,
+            activeEmployeeCount: activeEmployees.length,
+            terminalCount: terminalCounts.total,
+          },
+        });
+
+        return {
+          branch: branchRow,
+          activeEmployeeCount: activeEmployees.length,
+          activeEmployees,
+          terminalCount: terminalCounts.total,
+          terminalCounts,
+          terminals: branchTerminals,
+        };
+      },
+    );
+  }
 
   async submitBusinessRequest(
     request: BusinessRequestDto,

@@ -11,6 +11,8 @@ describe('PlatformBusinessController', () => {
   const platformBusiness = {
     submitBusinessRequest: jest.fn(),
     provisionBusiness: jest.fn(),
+    getBusinessDetails: jest.fn(),
+    getBranchDetails: jest.fn(),
   };
   let controller: PlatformBusinessController;
 
@@ -23,6 +25,91 @@ describe('PlatformBusinessController', () => {
       ],
     }).compile();
     controller = module.get(PlatformBusinessController);
+  });
+
+  it('allows only platform users to read business details', async () => {
+    const result = {
+      business: { id: '00000000-0000-4000-8000-000000000010' },
+      branches: [],
+      memberships: [],
+    };
+    platformBusiness.getBusinessDetails.mockResolvedValue(result);
+    const request = {
+      user: { isPlatform: true, platformUserId: 'platform-user-id' },
+      method: 'GET',
+      route: { path: '/platform/business/:business_id' },
+      ip: '127.0.0.1',
+      header: jest
+        .fn()
+        .mockImplementation((name: string) =>
+          name === 'x-client-type' ? 'mobile' : undefined,
+        ),
+    };
+
+    await expect(
+      controller.getBusiness(
+        '00000000-0000-4000-8000-000000000010',
+        request as never,
+      ),
+    ).resolves.toBe(result);
+    expect(platformBusiness.getBusinessDetails).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000010',
+      'platform-user-id',
+      expect.objectContaining({
+        method: 'GET',
+        clientType: 'mobile',
+      }),
+    );
+
+    await expect(
+      controller.getBusiness('00000000-0000-4000-8000-000000000010', {
+        ...request,
+        user: { isPlatform: false },
+      } as never),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('allows platform users to read branch details for a business', async () => {
+    const result = {
+      branch: { id: '00000000-0000-4000-8000-000000000011' },
+      activeEmployeeCount: 2,
+      terminals: [],
+      terminalCounts: { total: 0, active: 0, inactive: 0, maintenance: 0 },
+    };
+    platformBusiness.getBranchDetails.mockResolvedValue(result);
+    const request = {
+      user: { isPlatform: true, platformUserId: 'platform-user-id' },
+      method: 'GET',
+      route: { path: '/platform/business/:business_id/:branch_id' },
+      ip: '127.0.0.1',
+      header: jest
+        .fn()
+        .mockImplementation((name: string) =>
+          name === 'x-client-type' ? 'desktop' : undefined,
+        ),
+    };
+
+    await expect(
+      controller.getBranch(
+        '00000000-0000-4000-8000-000000000010',
+        '00000000-0000-4000-8000-000000000011',
+        request as never,
+      ),
+    ).resolves.toBe(result);
+    expect(platformBusiness.getBranchDetails).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000010',
+      '00000000-0000-4000-8000-000000000011',
+      'platform-user-id',
+      expect.objectContaining({ method: 'GET', clientType: 'desktop' }),
+    );
+
+    await expect(
+      controller.getBranch(
+        '00000000-0000-4000-8000-000000000010',
+        '00000000-0000-4000-8000-000000000011',
+        { ...request, user: { isPlatform: false } } as never,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('makes the combined upload and request route public and rate limited', () => {

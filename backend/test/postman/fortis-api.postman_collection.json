@@ -96,6 +96,21 @@
       "type": "string"
     },
     {
+      "key": "businessId",
+      "value": "00000000-0000-4000-8000-000000000010",
+      "type": "string"
+    },
+    {
+      "key": "branchId",
+      "value": "00000000-0000-4000-8000-000000000011",
+      "type": "string"
+    },
+    {
+      "key": "provisionedBusinessId",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "provisioningIdempotencyKey",
       "value": "provision-business-req-1092",
       "type": "string"
@@ -921,6 +936,120 @@
           ]
         },
         {
+          "name": "GET /platform/business/{business_id}",
+          "request": {
+            "method": "GET",
+            "description": "Platform-manager-only business detail lookup. Returns the business, every branch (active and inactive), and business memberships with their user, role, and branch details.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{platformAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "{{platformClientType}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/platform/business/{{businessId}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.eql(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('business');",
+                  "  pm.expect(body).to.have.property('branches');",
+                  "  pm.expect(body).to.have.property('memberships');",
+                  "  pm.collectionVariables.set('businessId', body.business.id);",
+                  "  if (Array.isArray(body.branches) && body.branches.length > 0) {",
+                  "    pm.collectionVariables.set('branchId', body.branches[0].id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /platform/business/{business_id}/{branch_id}",
+          "request": {
+            "method": "GET",
+            "description": "Platform-manager-only branch detail lookup. Returns branch information, active employees assigned to or covering the branch, and all terminals with active/inactive/maintenance counts.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{platformAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "{{platformClientType}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/platform/business/{{businessId}}/{{branchId}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const provisionedBusinessId = pm.collectionVariables.get('provisionedBusinessId');",
+                  "if (provisionedBusinessId) pm.collectionVariables.set('businessId', provisionedBusinessId);",
+                  "pm.test('Platform test variables are configured', () => {",
+                  "  pm.expect(pm.collectionVariables.get('platformAccessToken'), 'Run the platform login request first').to.not.be.empty;",
+                  "  pm.expect(pm.collectionVariables.get('businessId'), 'Run business provisioning or set businessId').to.not.be.empty;",
+                  "  pm.expect(pm.collectionVariables.get('branchId'), 'Run GET business details or set branchId').to.not.be.empty;",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.eql(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('branch');",
+                  "  pm.expect(body).to.have.property('activeEmployeeCount');",
+                  "  pm.expect(body).to.have.property('activeEmployees');",
+                  "  pm.expect(body).to.have.property('terminals');",
+                  "  pm.expect(body).to.have.property('terminalCounts');",
+                  "  pm.test('Branch belongs to the requested business', () => {",
+                  "    pm.expect(body.branch.id).to.eql(pm.collectionVariables.get('branchId'));",
+                  "    pm.expect(body.branch.businessId).to.eql(pm.collectionVariables.get('businessId'));",
+                  "  });",
+                  "  pm.test('Employee count matches active employee records', () => {",
+                  "    pm.expect(body.activeEmployeeCount).to.eql(body.activeEmployees.length);",
+                  "    pm.expect(body.activeEmployees.every((employee) => employee.user.status === 'active')).to.be.true;",
+                  "  });",
+                  "  pm.test('Terminal counts match terminal records', () => {",
+                  "    pm.expect(body.terminalCount).to.eql(body.terminals.length);",
+                  "    pm.expect(body.terminalCounts.total).to.eql(body.terminals.length);",
+                  "    pm.expect(body.terminals.every((terminal) => terminal.businessId === pm.collectionVariables.get('businessId'))).to.be.true;",
+                  "    pm.expect(body.terminals.every((terminal) => terminal.branchId === pm.collectionVariables.get('branchId'))).to.be.true;",
+                  "    pm.expect(body.terminalCounts.active).to.eql(body.terminals.filter((terminal) => terminal.status === 'active').length);",
+                  "    pm.expect(body.terminalCounts.inactive).to.eql(body.terminals.filter((terminal) => terminal.status === 'inactive').length);",
+                  "    pm.expect(body.terminalCounts.maintenance).to.eql(body.terminals.filter((terminal) => terminal.status === 'maintenance').length);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "POST /platform/businesses/create",
           "request": {
             "method": "POST",
@@ -973,6 +1102,7 @@
                   "    pm.expect(body.ownerActivationInvitationStatus).to.eql(\"queued\");",
                   "  });",
                   "  pm.collectionVariables.set(\"provisionedBusinessId\", body.businessId);",
+                  "  pm.collectionVariables.set(\"businessId\", body.businessId);",
                   "}"
                 ]
               }
