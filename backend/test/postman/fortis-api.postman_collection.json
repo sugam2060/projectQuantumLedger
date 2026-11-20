@@ -101,6 +101,11 @@
       "type": "string"
     },
     {
+      "key": "branchCreationIdempotencyKey",
+      "value": "platform-branch-create-001",
+      "type": "string"
+    },
+    {
       "key": "platformUserInviteIdempotencyKey",
       "value": "platform-user-inv-123",
       "type": "string"
@@ -1014,6 +1019,58 @@
                   "  });",
                   "  pm.collectionVariables.set(\"provisionedBusinessId\", body.businessId);",
                   "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /platform/businesses/{businessId}/branches",
+          "request": {
+            "method": "POST",
+            "description": "Platform-only and idempotent. Creates a branch and one terminal per supplied name. If terminals is omitted, creates one active Initial Terminal. Codes are generated as POS-01, POS-02, and so on within the branch.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{platformAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{branchCreationIdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/platform/businesses/{{businessId}}/branches",
+              "host": ["{{baseUrl}}"],
+              "path": ["platform", "businesses", "{{businessId}}", "branches"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Downtown Branch\",\n  \"code\": \"DOWNTOWN\",\n  \"address\": \"Main Street, Kathmandu\",\n  \"contactNumber\": \"+977-1-5550100\",\n  \"terminals\": [\n    { \"name\": \"Front Counter\" },\n    { \"name\": \"Cafe Counter\" }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) { const body = pm.response.json(); pm.test('Response includes branch and generated terminal codes', () => { pm.expect(body.branch.id).to.be.a('string'); pm.expect(body.branch.name).to.eql('Downtown Branch'); pm.expect(body.terminals).to.have.length(2); pm.expect(body.terminals.map((terminal) => terminal.terminalCode)).to.eql(['POS-01', 'POS-02']); }); pm.collectionVariables.set('branchId', body.branch.id); }"
                 ]
               }
             }

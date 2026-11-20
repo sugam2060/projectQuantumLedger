@@ -1030,3 +1030,60 @@ for an unexpected database failure.
   }
 }
 ```
+
+### `POST /api/v1/platform/businesses/{businessId}/branches`
+
+**Description:** Creates a branch and its terminals for an existing business.
+The platform user may provide `terminals: [{ "name": "..." }]` to create one
+or more named terminals. When omitted, one active `Initial Terminal` is created.
+The service generates terminal codes in request order as `POS-01`, `POS-02`, and
+so on; codes are unique per branch. **Auth:** signed-in platform user only;
+`x-client-type` must be `web`. **Headers:** `Authorization`, `Content-Type:
+application/json`, `Idempotency-Key`, and `x-client-type`. **Idempotency:**
+required and actor-scoped; repeating the same key and request replays the saved
+response. Reusing the key with a different payload or an in-progress operation
+returns 409. **Audit:** required; branch, terminals, and audit event are created
+atomically. **Errors:** 400 for invalid fields/headers, 401 when signed out,
+403 for a non-platform user, 404 if the business does not exist, 409 for a
+branch code already used by that business or an idempotency conflict, 503 for
+unexpected database or Redis failures. **Success:** 201 with branch ID/name and
+created terminal IDs, names, and generated codes.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "POST /platform/businesses/{businessId}/branches",
+  "requestData": {
+    "pathParams": {
+      "businessId": "00000000-0000-4000-8000-000000000001"
+    },
+    "queryParams": null,
+    "headers": {
+      "Authorization": "Bearer <platform-access-token>",
+      "Content-Type": "application/json",
+      "Idempotency-Key": "platform-branch-create-001",
+      "x-client-type": "web"
+    },
+    "body": {
+      "name": "Downtown Branch",
+      "code": "DOWNTOWN",
+      "address": "Main Street, Kathmandu",
+      "contactNumber": "+977-1-5550100",
+      "terminals": [
+        { "name": "Front Counter" },
+        { "name": "Cafe Counter" }
+      ]
+    }
+  },
+  "responseData": {
+    "httpStatus": 201,
+    "body": {
+      "branch": { "id": "00000000-0000-4000-8000-000000000002", "name": "Downtown Branch" },
+      "terminals": [
+        { "id": "00000000-0000-4000-8000-000000000003", "name": "Front Counter", "terminalCode": "POS-01" },
+        { "id": "00000000-0000-4000-8000-000000000004", "name": "Cafe Counter", "terminalCode": "POS-02" }
+      ]
+    }
+  }
+}
+```
