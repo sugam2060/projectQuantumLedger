@@ -304,6 +304,70 @@ limited. **Idempotency:** read-only.
 
 ## Platform authentication
 
+### `GET /api/v1/platform/businesses`
+
+**Description:** Returns a paginated, newest-first directory of businesses
+registered on the platform, including both active and inactive businesses.
+The response contains basic business and primary contact details and does not
+include PAN values or document URLs. **Auth:** signed-in platform manager
+(platform-user JWT); `Authorization` and `x-client-type` headers are required,
+and `x-client-type` must be `web`, `desktop`, or `mobile`. **Errors:** 400 for
+invalid pagination or client-type headers; 401 when the access token is missing
+or invalid; 403 for a non-platform user. **Pagination:** `page` defaults to 1;
+`limit` defaults to 20 and is capped at 100. **Success:** 200.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "GET /api/v1/platform/businesses",
+  "requestData": {
+    "pathParams": {},
+    "queryParams": {
+      "page": 1,
+      "limit": 20
+    },
+    "headers": {
+      "Authorization": "Bearer <platform-access-token>",
+      "x-client-type": "web"
+    },
+    "body": null
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": {
+      "data": [
+        {
+          "id": "8b6dd8d2-53d4-4f52-87a1-5e8187423d56",
+          "legalName": "Example Retail Pvt. Ltd.",
+          "displayName": "Example Retail",
+          "isActive": true,
+          "primaryContactNumber": "+9779812345678",
+          "primaryContactEmail": "owner@example.com",
+          "createdAt": "2026-11-13T02:15:00.000Z",
+          "updatedAt": "2026-11-13T02:15:00.000Z"
+        },
+        {
+          "id": "a8c6dd8d-2f52-4f52-87a1-5e8187423d56",
+          "legalName": "Example Inactive Ltd.",
+          "displayName": "Example Inactive",
+          "isActive": false,
+          "primaryContactNumber": "+9779812345679",
+          "primaryContactEmail": "inactive@example.com",
+          "createdAt": "2026-11-12T02:15:00.000Z",
+          "updatedAt": "2026-11-12T02:15:00.000Z"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 2,
+        "totalPages": 1
+      }
+    }
+  }
+}
+```
+
 ### `POST /api/v1/platform/businesses/request`
 
 **Description:** Submits a public business workspace provisioning request for

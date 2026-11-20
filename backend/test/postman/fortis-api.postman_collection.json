@@ -988,6 +988,67 @@
               }
             }
           ]
+        },
+        {
+          "name": "GET /platform/businesses",
+          "request": {
+            "method": "GET",
+            "description": "Lists registered active and inactive businesses. Requires a platform access token and a supported x-client-type.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{platformAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{platformClientType}}",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/platform/businesses?page=1&limit=20"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Response contains business data and pagination metadata', () => {",
+                  "    pm.expect(body.data).to.be.an('array');",
+                  "    pm.expect(body.pagination).to.include({ page: 1, limit: 20 });",
+                  "    pm.expect(body.pagination.total).to.be.a('number');",
+                  "    pm.expect(body.pagination.totalPages).to.be.a('number');",
+                  "  });",
+                  "  pm.test('Every result exposes status without sensitive identifiers or documents', () => {",
+                  "    body.data.forEach((business) => {",
+                  "      pm.expect(business.isActive).to.be.a('boolean');",
+                  "      pm.expect(business).not.to.have.property('pan');",
+                  "      pm.expect(business).not.to.have.property('documents');",
+                  "    });",
+                  "  });",
+                  "  const provisionedBusinessId = pm.collectionVariables.get('provisionedBusinessId');",
+                  "  if (provisionedBusinessId) {",
+                  "    pm.test('Includes the business created earlier in this collection run as inactive', () => {",
+                  "      const provisionedBusiness = body.data.find((business) => business.id === provisionedBusinessId);",
+                  "      pm.expect(provisionedBusiness, 'The newly provisioned business should be in the first page').to.be.an('object');",
+                  "      pm.expect(provisionedBusiness.isActive).to.eql(false);",
+                  "    });",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

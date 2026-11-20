@@ -11,6 +11,7 @@ describe('PlatformBusinessController', () => {
   const platformBusiness = {
     submitBusinessRequest: jest.fn(),
     provisionBusiness: jest.fn(),
+    listBusinesses: jest.fn(),
   };
   let controller: PlatformBusinessController;
 
@@ -23,6 +24,36 @@ describe('PlatformBusinessController', () => {
       ],
     }).compile();
     controller = module.get(PlatformBusinessController);
+  });
+
+  it('lists businesses only for authenticated platform users', async () => {
+    const result = {
+      data: [{ id: 'business-id', isActive: false }],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    };
+    platformBusiness.listBusinesses.mockResolvedValue(result);
+    const handler = Reflect.get(
+      PlatformBusinessController.prototype,
+      'listBusinesses',
+    );
+
+    expect(Reflect.getMetadata(IS_PUBLIC, handler)).not.toBe(true);
+    await expect(
+      controller.listBusinesses({ page: 1, limit: 20 }, { clientType: 'web' }, {
+        user: { isPlatform: true, platformUserId: 'platform-user-id' },
+      } as never),
+    ).resolves.toBe(result);
+    expect(platformBusiness.listBusinesses).toHaveBeenCalledWith(
+      { page: 1, limit: 20 },
+      'platform-user-id',
+    );
+
+    await expect(
+      controller.listBusinesses({ page: 1, limit: 20 }, { clientType: 'web' }, {
+        user: { isPlatform: false },
+      } as never),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(platformBusiness.listBusinesses).toHaveBeenCalledTimes(1);
   });
 
   it('makes the combined upload and request route public and rate limited', () => {
