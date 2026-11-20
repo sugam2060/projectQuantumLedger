@@ -730,6 +730,9 @@ describe('UserAuthService', () => {
         name: 'Business Owner',
         password: 'secure-password',
         redeemCode: 'AABBCCDDEEFF001122334455',
+        businessId: 'business-id',
+        branchId: 'branch-id',
+        terminalCode: 'POS-A1B2C3D4E5F60718',
       });
 
       expect(result).toMatchObject({
@@ -749,8 +752,8 @@ describe('UserAuthService', () => {
         isOwner: true,
         isActive: true,
       });
-      expect(tx.update).toHaveBeenCalledTimes(2);
-      expect(tx.execute).toHaveBeenCalledTimes(3);
+      expect(tx.update).toHaveBeenCalledTimes(3);
+      expect(tx.execute).toHaveBeenCalledTimes(4);
     });
 
     it('rejects a redemption code that is not visible or no longer redeemable', async () => {
@@ -778,6 +781,9 @@ describe('UserAuthService', () => {
           name: 'Business Owner',
           password: 'secure-password',
           redeemCode: 'INVALID',
+          businessId: 'business-id',
+          branchId: 'branch-id',
+          terminalCode: 'POS-A1B2C3D4E5F60718',
         }),
       ).rejects.toThrow(UnauthorizedException);
       expect(tx.insert).not.toHaveBeenCalled();
@@ -847,6 +853,9 @@ describe('UserAuthService', () => {
         name: 'Owner Name',
         password: 'existing-password',
         redeemCode: 'AABBCCDDEEFF001122334455',
+        businessId: 'business-id',
+        branchId: 'branch-id',
+        terminalCode: 'POS-A1B2C3D4E5F60718',
       });
 
       expect(bcrypt.compare).toHaveBeenCalledWith(

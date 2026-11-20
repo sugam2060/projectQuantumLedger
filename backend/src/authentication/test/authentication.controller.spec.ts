@@ -57,6 +57,9 @@ describe('AuthenticationController', () => {
         name: 'Business Owner',
         password: 'correct-horse',
         redeemCode: 'AABBCCDDEEFF001122334455',
+        businessId: '00000000-0000-4000-8000-000000000001',
+        branchId: '00000000-0000-4000-8000-000000000002',
+        terminalCode: 'POS-A1B2C3D4E5F60718',
       };
       const result = { userId: 'user-id', businessId: 'business-id' };
       authServiceMock.registerOwner.mockResolvedValue(result);

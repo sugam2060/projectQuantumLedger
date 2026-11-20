@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   HttpException,
   Injectable,
@@ -8,7 +9,7 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { and, count, desc, eq, gte, lt, lte, or } from 'drizzle-orm';
+import { and, count, desc, eq, gte, lt, lte, or, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
   business,
@@ -43,6 +44,88 @@ export class BusinessService {
     private readonly objectStore: ObjectStoreService,
     private readonly auditLogs: AuditLogService,
   ) {}
+
+  async activateTerminal(
+    businessId: string,
+    branchId: string,
+    terminalCode: string,
+    session: RequestSession,
+    auditContext: AuditRequestContext = {},
+  ) {
+    if (
+      session.isOwner !== true ||
+      session.isPlatform === true ||
+      session.businessId !== businessId
+    ) {
+      throw new ForbiddenException('Business owner access required');
+    }
+    try {
+      return await this.database.transactionWithSession(session, async (tx) => {
+        await tx.execute(sql`
+          SELECT
+            set_config('app.terminal_activation_business_id', ${businessId}, true),
+            set_config('app.terminal_activation_branch_id', ${branchId}, true),
+            set_config('app.terminal_activation_code', ${terminalCode}, true)
+        `);
+        const [terminal] = await tx
+          .select({
+            id: terminals.id,
+            name: terminals.name,
+            terminalCode: terminals.terminalCode,
+            status: terminals.status,
+          })
+          .from(terminals)
+          .where(
+            and(
+              eq(terminals.businessId, businessId),
+              eq(terminals.branchId, branchId),
+              eq(terminals.terminalCode, terminalCode),
+            ),
+          )
+          .limit(1);
+        if (!terminal) throw new NotFoundException('Terminal was not found');
+        if (terminal.status === 'active') return terminal;
+        if (terminal.status !== 'inactive') {
+          throw new ConflictException('Terminal cannot be activated');
+        }
+        const [activated] = await tx
+          .update(terminals)
+          .set({ status: 'active', updatedAt: new Date() })
+          .where(
+            and(
+              eq(terminals.id, terminal.id),
+              eq(terminals.status, 'inactive'),
+            ),
+          )
+          .returning({
+            id: terminals.id,
+            name: terminals.name,
+            terminalCode: terminals.terminalCode,
+            status: terminals.status,
+          });
+        if (!activated)
+          throw new ConflictException('Terminal cannot be activated');
+        await this.auditLogs.insertUserEvent(tx, {
+          ...auditContext,
+          userId: session.userId,
+          businessId,
+          eventType: 'TERMINAL_ACTIVATED',
+          responseStatus: 200,
+          metadata: { terminalId: terminal.id, branchId },
+        });
+        return activated;
+      });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(
+        `Failed to activate terminal in branch ${branchId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new ServiceUnavailableException(
+        'Terminal activation is temporarily unavailable',
+      );
+    }
+  }
 
   async getBusinessProfile(businessId: string) {
     const [profile] = await this.database

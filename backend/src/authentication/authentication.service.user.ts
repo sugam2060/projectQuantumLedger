@@ -414,6 +414,11 @@ export class UserAuthService {
         if (!redemption || redemption.email !== email) {
           throw new UnauthorizedException('Invalid or expired redemption code');
         }
+        if (redemption.businessId !== dto.businessId) {
+          throw new UnauthorizedException(
+            'Invalid terminal activation details',
+          );
+        }
 
         await tx.execute(sql`
           SELECT
@@ -483,20 +488,13 @@ export class UserAuthService {
           .update(business)
           .set({ isActive: true, updatedAt: new Date() })
           .where(eq(business.id, redemption.businessId));
-        await tx
-          .update(ownerRedemptions)
-          .set({ consumedAt: new Date(), consumedByUserId: userId })
-          .where(eq(ownerRedemptions.id, redemption.id));
-
-        await this.auditLogs.insertUserEvent(tx, {
-          ...auditContext,
-          userId,
-          businessId: redemption.businessId,
-          eventType: 'OWNER_REGISTERED',
-          responseStatus: 201,
-          metadata: { isOwner: true },
-        });
-
+        await tx.execute(sql`
+          SELECT
+            set_config('app.terminal_activation_business_id', ${dto.businessId}, true),
+            set_config('app.terminal_activation_branch_id', ${dto.branchId}, true),
+            set_config('app.terminal_activation_code', ${dto.terminalCode.trim().toUpperCase()}, true),
+            set_config('app.owner_redemption_hash', ${tokenHash}, true)
+        `);
         const [initialTerminal] = await tx
           .select({
             terminalId: terminals.id,
@@ -506,15 +504,33 @@ export class UserAuthService {
           .where(
             and(
               eq(terminals.businessId, redemption.businessId),
-              eq(terminals.status, 'active'),
+              eq(terminals.branchId, dto.branchId),
+              eq(terminals.terminalCode, dto.terminalCode.trim().toUpperCase()),
+              eq(terminals.status, 'inactive'),
             ),
           )
           .limit(1);
         if (!initialTerminal) {
           throw new ConflictException(
-            'Business is missing its initial active terminal',
+            'Terminal activation details are invalid or the terminal is already active',
           );
         }
+        await tx
+          .update(terminals)
+          .set({ status: 'active', updatedAt: new Date() })
+          .where(eq(terminals.id, initialTerminal.terminalId));
+        await tx
+          .update(ownerRedemptions)
+          .set({ consumedAt: new Date(), consumedByUserId: userId })
+          .where(eq(ownerRedemptions.id, redemption.id));
+        await this.auditLogs.insertUserEvent(tx, {
+          ...auditContext,
+          userId,
+          businessId: redemption.businessId,
+          eventType: 'OWNER_REGISTERED',
+          responseStatus: 201,
+          metadata: { isOwner: true },
+        });
 
         return {
           message: 'Owner account registered and business activated.',

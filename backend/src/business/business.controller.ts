@@ -3,6 +3,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Post,
   HttpCode,
   HttpStatus,
   Param,
@@ -31,6 +32,7 @@ import { BusinessService } from './business.service';
 import type { BusinessUpdateFiles } from './business.utils.service';
 import { UpdateBusinessValidationPipe } from './pipes/update-business-validation.pipe';
 import { ListBranchesQueryDto } from './dto/list-branches-query.dto';
+import { ActivateTerminalDto } from './dto/activate-terminal.dto';
 
 interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
@@ -95,6 +97,37 @@ export class BusinessController {
       params.businessId,
       params.branchId,
       user,
+    );
+  }
+
+  @Post(':businessId/branches/:branchId/terminals/activate')
+  @HttpCode(HttpStatus.OK)
+  activateTerminal(
+    @Param() params: BusinessBranchParamDto,
+    @Body() dto: ActivateTerminalDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const user = request.user;
+    if (
+      user?.isOwner !== true ||
+      user.isPlatform === true ||
+      user.businessId !== params.businessId
+    ) {
+      throw new ForbiddenException('Business owner access required');
+    }
+    return this.businessService.activateTerminal(
+      params.businessId,
+      params.branchId,
+      dto.terminalCode.trim().toUpperCase(),
+      user,
+      {
+        method: request.method,
+        endpointPath: request.route?.path,
+        requestId: request.header('x-request-id'),
+        clientType: request.header('x-client-type'),
+        ipAddress: request.ip,
+        userAgent: request.header('user-agent'),
+      },
     );
   }
 
