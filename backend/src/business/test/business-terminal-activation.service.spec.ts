@@ -6,9 +6,11 @@ import { ObjectStoreService } from '../../utils/objectStore.service';
 import { BusinessService } from '../business.service';
 import { BusinessUtilsService } from '../business.utils.service';
 
+const mockFn = () => jest.fn<(...args: any[]) => any>();
+
 describe('BusinessService.activateTerminal', () => {
-  const database = { transactionWithSession: jest.fn() };
-  const auditLogs = { insertUserEvent: jest.fn() };
+  const database = { transactionWithSession: mockFn() };
+  const auditLogs = { insertUserEvent: mockFn() };
   const service = new BusinessService(
     database as unknown as DatabaseService,
     {} as BusinessUtilsService,
@@ -47,20 +49,20 @@ describe('BusinessService.activateTerminal', () => {
       status: 'active',
     };
     const tx = {
-      execute: jest.fn().mockResolvedValue(undefined),
-      select: jest.fn(() => ({
-        from: jest.fn(() => ({
-          where: jest.fn(() => ({
+      execute: mockFn().mockResolvedValue(undefined),
+      select: mockFn().mockImplementation(() => ({
+        from: mockFn().mockImplementation(() => ({
+          where: mockFn().mockImplementation(() => ({
             limit: jest
-              .fn()
+              .fn<(...args: any[]) => any>()
               .mockResolvedValue([{ ...updated, status: 'inactive' }]),
           })),
         })),
       })),
-      update: jest.fn(() => ({
-        set: jest.fn(() => ({
-          where: jest.fn(() => ({
-            returning: jest.fn().mockResolvedValue([updated]),
+      update: mockFn().mockImplementation(() => ({
+        set: mockFn().mockImplementation(() => ({
+          where: mockFn().mockImplementation(() => ({
+            returning: mockFn().mockResolvedValue([updated]),
           })),
         })),
       })),
