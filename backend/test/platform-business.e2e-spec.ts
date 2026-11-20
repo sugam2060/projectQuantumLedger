@@ -71,12 +71,12 @@ describe('PlatformBusinessController (e2e)', () => {
         {
           id: '00000000-0000-4000-8000-000000000011',
           name: 'Front Counter',
-          terminalCode: 'POS-01',
+          terminalCode: 'POS-ABCDEF0123456789',
         },
         {
           id: '00000000-0000-4000-8000-000000000012',
           name: 'Cafe Counter',
-          terminalCode: 'POS-02',
+          terminalCode: 'POS-1234567890ABCDEF',
         },
       ],
     });
@@ -268,7 +268,7 @@ describe('PlatformBusinessController (e2e)', () => {
           responseBody.terminals.map(
             (terminal: { terminalCode: string }) => terminal.terminalCode,
           ),
-        ).toEqual(['POS-01', 'POS-02']);
+        ).toEqual(['POS-ABCDEF0123456789', 'POS-1234567890ABCDEF']);
       });
 
     expect(platformBusiness.createBranch).toHaveBeenCalledWith(

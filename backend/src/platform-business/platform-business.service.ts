@@ -8,7 +8,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
   branches,
@@ -17,6 +17,8 @@ import {
   mailOutbox,
   ownerRedemptions,
   terminals,
+  businessMemberships,
+  users,
 } from '../database/schema';
 import type { BusinessDocuments } from '../database/schema/Identity_and_tenent/businesses';
 import { ObjectStoreService } from '../utils/objectStore.service';
@@ -153,7 +155,7 @@ export class PlatformBusinessService {
         { isPlatform: true, platformUserId },
         async (tx) => {
           const [existingBusiness] = await tx
-            .select({ id: business.id })
+            .select({ id: business.id, displayName: business.displayName })
             .from(business)
             .where(eq(business.id, businessId))
             .limit(1);
@@ -173,12 +175,12 @@ export class PlatformBusinessService {
             .returning({ id: branches.id, name: branches.name });
           if (!branch) throw new Error('Branch could not be created');
 
-          const terminalValues = terminalNames.map((terminalName, index) => ({
+          const terminalValues = terminalNames.map((terminalName) => ({
             businessId,
             branchId: branch.id,
             name: terminalName,
-            terminalCode: generateTerminalCode(index + 1),
-            status: 'active',
+            terminalCode: generateTerminalCode(),
+            status: 'inactive',
           }));
           const createdTerminals = await tx
             .insert(terminals)
@@ -190,6 +192,53 @@ export class PlatformBusinessService {
             });
           if (createdTerminals.length !== terminalValues.length) {
             throw new Error('One or more terminals could not be created');
+          }
+
+          const owners = await tx
+            .select({ email: users.emailNormalized })
+            .from(businessMemberships)
+            .innerJoin(users, eq(users.id, businessMemberships.userId))
+            .where(
+              and(
+                eq(businessMemberships.businessId, businessId),
+                eq(businessMemberships.isOwner, true),
+                eq(businessMemberships.isActive, true),
+                eq(users.status, 'active'),
+              ),
+            );
+          if (owners.length === 0) {
+            throw new ConflictException(
+              'Business has no active owner to notify about the branch',
+            );
+          }
+
+          const now = new Date();
+          for (const owner of owners) {
+            const mailJob: MailJob = {
+              id: randomUUID(),
+              to: owner.email,
+              subject: `New branch created for ${existingBusiness.displayName ?? 'your business'}`,
+              template: 'branch-created',
+              context: {
+                businessName: existingBusiness.displayName ?? 'Your business',
+                businessId,
+                branchName: branch.name,
+                branchId: branch.id,
+                branchCode: code,
+                address,
+                contactNumber,
+                terminals: createdTerminals.map(
+                  ({ id, name, terminalCode }) => ({ id, name, terminalCode }),
+                ),
+                homeUrl: '#',
+              },
+              correlationId: branch.id,
+              createdAt: now.toISOString(),
+            };
+            await tx.insert(mailOutbox).values({
+              businessId,
+              payload: mailJob,
+            });
           }
 
           const result = {
@@ -205,14 +254,13 @@ export class PlatformBusinessService {
             metadata: {
               branchId: branch.id,
               terminalIds: createdTerminals.map((terminal) => terminal.id),
-              terminalCodes: createdTerminals.map(
-                (terminal) => terminal.terminalCode,
-              ),
             },
           });
           return result;
         },
       );
+
+      this.outboxPublisher.notifyOutboxAvailable();
 
       try {
         await this.redis.set(
@@ -486,10 +534,13 @@ export class PlatformBusinessService {
               businessId: createdBusiness.id,
               branchId: branch.id,
               name: 'Initial Terminal',
-              terminalCode: generateTerminalCode(1),
-              status: 'active',
+              terminalCode: generateTerminalCode(),
+              status: 'inactive',
             })
-            .returning({ id: terminals.id });
+            .returning({
+              id: terminals.id,
+              terminalCode: terminals.terminalCode,
+            });
           if (!terminal)
             throw new Error('Initial terminal could not be created');
 
@@ -540,6 +591,10 @@ export class PlatformBusinessService {
             context: {
               redeemCode,
               expiresAt: expiresAt.toISOString(),
+              businessName: createdBusiness.displayName,
+              businessId: createdBusiness.id,
+              branchId: branch.id,
+              terminalCode: terminal.terminalCode,
               homeUrl: '#',
             },
             correlationId: requestId,
@@ -622,6 +677,6 @@ function postgresErrorCode(error: unknown): string | undefined {
   return undefined;
 }
 
-function generateTerminalCode(sequence: number): string {
-  return `POS-${String(sequence).padStart(2, '0')}`;
+function generateTerminalCode(): string {
+  return `POS-${randomBytes(8).toString('hex').toUpperCase()}`;
 }

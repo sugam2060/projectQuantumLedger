@@ -491,7 +491,7 @@
           "name": "POST /authentication/register-owner",
           "request": {
             "method": "POST",
-            "description": "Web-only owner activation. First provision a business, then paste the code received by email into ownerRedeemCode. The response includes the initial terminal ID for subsequent login.",
+            "description": "Web-only owner activation. Use the redemption code and initial terminal activation details received by email.",
             "header": [
               {
                 "key": "X-Client-Type",
@@ -507,7 +507,7 @@
             "url": "{{baseUrl}}/authentication/register-owner",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"name\": \"Example Owner\",\n  \"password\": \"{{ownerPassword}}\",\n  \"redeemCode\": \"{{ownerRedeemCode}}\"\n}",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"name\": \"Example Owner\",\n  \"password\": \"{{ownerPassword}}\",\n  \"redeemCode\": \"{{ownerRedeemCode}}\",\n  \"businessId\": \"{{businessId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"terminalCode\": \"{{terminalCode}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1028,7 +1028,7 @@
           "name": "POST /platform/businesses/{businessId}/branches",
           "request": {
             "method": "POST",
-            "description": "Platform-only and idempotent. Creates a branch and one terminal per supplied name. If terminals is omitted, creates one active Initial Terminal. Codes are generated as POS-01, POS-02, and so on within the branch.",
+            "description": "Platform manager only and idempotent. Creates a branch and one or more inactive terminals with cryptographically random activation codes. The active owner receives branch and terminal details by email.",
             "header": [
               {
                 "key": "Authorization",
@@ -1053,13 +1053,24 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/platform/businesses/{{businessId}}/branches",
-              "host": ["{{baseUrl}}"],
-              "path": ["platform", "businesses", "{{businessId}}", "branches"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "businesses",
+                "{{businessId}}",
+                "branches"
+              ]
             },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Downtown Branch\",\n  \"code\": \"DOWNTOWN\",\n  \"address\": \"Main Street, Kathmandu\",\n  \"contactNumber\": \"+977-1-5550100\",\n  \"terminals\": [\n    { \"name\": \"Front Counter\" },\n    { \"name\": \"Cafe Counter\" }\n  ]\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": [],
@@ -1070,7 +1081,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
-                  "if (pm.response.code === 201) { const body = pm.response.json(); pm.test('Response includes branch and generated terminal codes', () => { pm.expect(body.branch.id).to.be.a('string'); pm.expect(body.branch.name).to.eql('Downtown Branch'); pm.expect(body.terminals).to.have.length(2); pm.expect(body.terminals.map((terminal) => terminal.terminalCode)).to.eql(['POS-01', 'POS-02']); }); pm.collectionVariables.set('branchId', body.branch.id); }"
+                  "if (pm.response.code === 201) { const body = pm.response.json(); pm.test('Response contains branch and generated activation codes', () => { pm.expect(body.branch.id).to.be.a('string'); pm.expect(body.branch.name).to.eql('Downtown Branch'); pm.expect(body.terminals).to.have.length(2); body.terminals.forEach((terminal) => pm.expect(terminal.terminalCode).to.match(/^POS-[A-F0-9]{16}$/)); }); pm.collectionVariables.set('branchId', body.branch.id); pm.collectionVariables.set('terminalCode', body.terminals[0].terminalCode); }"
                 ]
               }
             }
@@ -1563,8 +1574,15 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["businesses", "{{businessId}}", "branches", "{{branchId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}"
+              ]
             }
           },
           "response": [],
@@ -1576,6 +1594,52 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "pm.test('Response contains branch and operational summary', () => { const body = pm.response.json(); pm.expect(body.branch.id).to.eql(pm.collectionVariables.get('branchId')); pm.expect(body.summary.terminals).to.include.all.keys('active', 'inactive', 'maintenance', 'total'); pm.expect(body.summary.members).to.include.all.keys('active', 'inactive', 'total'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /businesses/{businessId}/branches/{branchId}/terminals/activate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/terminals/activate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"terminalCode\": \"{{terminalCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Terminal is active', () => pm.expect(pm.response.json().status).to.eql('active'));"
                 ]
               }
             }

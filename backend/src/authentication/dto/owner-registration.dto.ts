@@ -4,6 +4,7 @@ import {
   IsString,
   MaxLength,
   MinLength,
+  IsUUID,
 } from 'class-validator';
 
 export class OwnerRegistrationDto {
@@ -25,4 +26,15 @@ export class OwnerRegistrationDto {
   @IsNotEmpty()
   @MaxLength(128)
   redeemCode!: string;
+
+  @IsUUID()
+  businessId!: string;
+
+  @IsUUID()
+  branchId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  terminalCode!: string;
 }

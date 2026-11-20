@@ -1,4 +1,4 @@
-# Mail worker
+﻿# Mail worker
 
 The worker is a separate NestJS application context. It shares the centralized
 `RabbitMQService`; it does not create its own AMQP connection or expose HTTP
@@ -48,7 +48,7 @@ producers, not in the worker infrastructure.
 
 ## Templates and payloads
 
-Only `otp-verification`, `user-invitation`, `redeem-code`, and `marketing-email`
+Only `otp-verification`, `user-invitation`, `redeem-code`, `branch-created`, and `marketing-email`
 are accepted. Handlebars HTML-escapes variables. Invitation and marketing
 links must use HTTP or HTTPS. Attachments must contain base64 content; local
 filesystem paths are never accepted. An optional `MAIL_MAX_ATTACHMENT_SIZE_BYTES`

@@ -13,7 +13,6 @@ import { PermissionGuard } from '../src/authentication/guards/permission.guard';
 import type { AuthenticatedUser } from '../src/authentication/strategies/jwt.strategy';
 import { BusinessController } from '../src/business/business.controller';
 import { BusinessService } from '../src/business/business.service';
-import { EndpointAccessService } from '../src/roles-permissions/endpoint-access.service';
 
 describe('BusinessController endpoints (e2e)', () => {
   let app: INestApplication;
@@ -24,6 +23,7 @@ describe('BusinessController endpoints (e2e)', () => {
     updateBusinessProfile: jest.fn(),
     listBranches: jest.fn(),
     getBranchDetails: jest.fn(),
+    activateTerminal: jest.fn(),
   };
   const endpointAccess = { hasAccess: jest.fn() };
 
@@ -97,6 +97,12 @@ describe('BusinessController endpoints (e2e)', () => {
         terminals: { active: 1, inactive: 0, maintenance: 0, total: 1 },
         members: { active: 1, inactive: 0, total: 1 },
       },
+    });
+    businessService.activateTerminal.mockResolvedValue({
+      id: 'terminal-id',
+      name: 'Front Counter',
+      terminalCode: 'POS-A1B2C3D4E5F60718',
+      status: 'active',
     });
     businessService.updateBusinessProfile.mockResolvedValue({
       businessId,
@@ -192,6 +198,28 @@ describe('BusinessController endpoints (e2e)', () => {
       .get(`/businesses/${businessId}/branches/not-a-uuid`)
       .set('x-test-owner', 'true')
       .expect(400);
+  });
+
+  it('allows only the business owner to activate a terminal with its code', async () => {
+    await request(app.getHttpServer())
+      .post(`/businesses/${businessId}/branches/${branchId}/terminals/activate`)
+      .send({ terminalCode: 'pos-a1b2c3d4e5f60718' })
+      .expect(403);
+    expect(businessService.activateTerminal).not.toHaveBeenCalled();
+
+    await request(app.getHttpServer())
+      .post(`/businesses/${businessId}/branches/${branchId}/terminals/activate`)
+      .set('x-test-owner', 'true')
+      .send({ terminalCode: 'pos-a1b2c3d4e5f60718' })
+      .expect(200)
+      .expect(({ body }) => expect(body.status).toBe('active'));
+    expect(businessService.activateTerminal).toHaveBeenCalledWith(
+      businessId,
+      branchId,
+      'POS-A1B2C3D4E5F60718',
+      expect.objectContaining({ isOwner: true }),
+      expect.objectContaining({ method: 'POST' }),
+    );
   });
 
   it('updates permitted profile fields for the owner and rejects sensitive fields', async () => {

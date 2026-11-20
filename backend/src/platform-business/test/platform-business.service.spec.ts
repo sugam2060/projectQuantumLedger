@@ -261,7 +261,7 @@ describe('PlatformBusinessService', () => {
     const returningRows = [
       [{ id: 'business-id', displayName: 'Example Retail' }],
       [{ id: 'branch-id' }],
-      [{ id: 'terminal-id' }],
+      [{ id: 'terminal-id', terminalCode: 'POS-A1B2C3D4E5F60718' }],
     ];
     const tx = {
       select: jest.fn(() => {
@@ -330,7 +330,8 @@ describe('PlatformBusinessService', () => {
     expect(insertedValues[2]).toMatchObject({
       businessId: 'business-id',
       branchId: 'branch-id',
-      terminalCode: 'POS-01',
+      terminalCode: expect.stringMatching(/^POS-[A-F0-9]{16}$/),
+      status: 'inactive',
     });
     expect(insertedValues[3]).toMatchObject({
       businessId: 'business-id',
@@ -342,6 +343,11 @@ describe('PlatformBusinessService', () => {
     };
     expect(outbox.payload.template).toBe('redeem-code');
     expect(outbox.payload.context.redeemCode).toBeTruthy();
+    expect(outbox.payload.context).toMatchObject({
+      businessId: 'business-id',
+      branchId: 'branch-id',
+      terminalCode: expect.stringMatching(/^POS-[A-F0-9]{16}$/),
+    });
     expect(JSON.stringify(result)).not.toContain(
       String(outbox.payload.context.redeemCode),
     );

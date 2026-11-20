@@ -25,9 +25,14 @@ describe('PlatformBusinessService.createBranch', () => {
   let branchValues: unknown;
   let terminalValues: unknown;
   let terminalRows: Array<{ id: string; name: string; terminalCode: string }>;
+  let outboxValues: Array<{
+    payload: { template: string; to: string; context: Record<string, unknown> };
+  }>;
+  let selectCount = 0;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    selectCount = 0;
     redis.get.mockResolvedValue(null);
     redis.set.mockResolvedValue(undefined);
     redis.setIfAbsent.mockResolvedValue(true);
@@ -36,22 +41,49 @@ describe('PlatformBusinessService.createBranch', () => {
     branchValues = undefined;
     terminalValues = undefined;
     terminalRows = [];
+    outboxValues = [];
 
     const tx = {
-      select: jest.fn(() => ({
-        from: jest.fn(() => ({
-          where: jest.fn(() => ({
-            limit: jest.fn().mockResolvedValue([{ id: businessId }]),
-          })),
-        })),
-      })),
+      select: jest.fn(() => {
+        selectCount += 1;
+        if (selectCount % 2 === 0) {
+          const ownerQuery = {
+            from: jest.fn(),
+            innerJoin: jest.fn(),
+            where: jest
+              .fn()
+              .mockResolvedValue([{ email: 'owner@example.com' }]),
+          };
+          ownerQuery.from.mockReturnValue(ownerQuery);
+          ownerQuery.innerJoin.mockReturnValue(ownerQuery);
+          return ownerQuery;
+        }
+        const businessQuery = {
+          from: jest.fn(),
+          where: jest.fn(),
+          limit: jest
+            .fn()
+            .mockResolvedValue([{ id: businessId, displayName: 'Example' }]),
+        };
+        businessQuery.from.mockReturnValue(businessQuery);
+        businessQuery.where.mockReturnValue(businessQuery);
+        return businessQuery;
+      }),
       insert: jest.fn((_table: unknown) => ({
         values: (values: unknown) => {
+          if (
+            !Array.isArray(values) &&
+            typeof values === 'object' &&
+            values !== null &&
+            'payload' in values
+          ) {
+            outboxValues.push(values as (typeof outboxValues)[number]);
+          }
           if (Array.isArray(values)) {
             terminalValues = values;
             return { returning: jest.fn().mockResolvedValue(terminalRows) };
           }
-          branchValues = values;
+          if (branchValues === undefined) branchValues = values;
           return {
             returning: jest
               .fn()
@@ -75,7 +107,11 @@ describe('PlatformBusinessService.createBranch', () => {
 
   it('creates one default terminal when names are omitted', async () => {
     terminalRows = [
-      { id: 'terminal-id', name: 'Initial Terminal', terminalCode: 'POS-01' },
+      {
+        id: 'terminal-id',
+        name: 'Initial Terminal',
+        terminalCode: 'POS-A1B2C3D4E5F60718',
+      },
     ];
     await expect(
       service.createBranch(
@@ -100,10 +136,29 @@ describe('PlatformBusinessService.createBranch', () => {
         businessId,
         branchId: 'branch-id',
         name: 'Initial Terminal',
-        terminalCode: 'POS-01',
-        status: 'active',
+        terminalCode: expect.stringMatching(/^POS-[A-F0-9]{16}$/),
+        status: 'inactive',
       },
     ]);
+    expect(outboxValues).toHaveLength(1);
+    expect(outboxValues[0]).toMatchObject({
+      payload: {
+        template: 'branch-created',
+        to: 'owner@example.com',
+        context: {
+          businessName: 'Example',
+          businessId,
+          branchName: 'Main Branch',
+          branchId: 'branch-id',
+          terminals: [
+            {
+              name: 'Initial Terminal',
+              terminalCode: expect.stringMatching(/^POS-[A-F0-9]{16}$/),
+            },
+          ],
+        },
+      },
+    });
     expect(auditLogs.insertPlatformEvent).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -115,7 +170,7 @@ describe('PlatformBusinessService.createBranch', () => {
     );
   });
 
-  it('creates all requested terminals with sequential branch-local codes', async () => {
+  it('creates all requested terminals with unique activation codes and inactive status', async () => {
     terminalRows = [
       { id: 't1', name: 'Counter One', terminalCode: 'POS-01' },
       { id: 't2', name: 'Counter Two', terminalCode: 'POS-02' },
@@ -131,9 +186,24 @@ describe('PlatformBusinessService.createBranch', () => {
       platformUserId,
     );
     expect(terminalValues).toEqual([
-      expect.objectContaining({ name: 'Counter One', terminalCode: 'POS-01' }),
-      expect.objectContaining({ name: 'Counter Two', terminalCode: 'POS-02' }),
+      expect.objectContaining({
+        name: 'Counter One',
+        status: 'inactive',
+        terminalCode: expect.stringMatching(/^POS-[A-F0-9]{16}$/),
+      }),
+      expect.objectContaining({
+        name: 'Counter Two',
+        status: 'inactive',
+        terminalCode: expect.stringMatching(/^POS-[A-F0-9]{16}$/),
+      }),
     ]);
+    expect(
+      new Set(
+        (terminalValues as Array<{ terminalCode: string }>).map(
+          (item) => item.terminalCode,
+        ),
+      ).size,
+    ).toBe(2);
   });
 
   it('replays the stored response for a repeated idempotency key', async () => {

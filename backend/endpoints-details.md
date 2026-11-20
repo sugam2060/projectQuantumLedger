@@ -419,9 +419,7 @@ each accepted call creates a separate pending request. **Success:** 201.
 ### `POST /api/v1/platform/businesses/create`
 
 **Description:** Provisions a business after platform review of an existing
-request. Creates the business inactive, creates its initial MAIN branch and
-POS-01 terminal, approves and links the request, records an audit event, and
-queues a single-use owner redemption email. The email is sent asynchronously;
+request. Creates the business inactive, creates its initial MAIN branch and an inactive terminal with a random activation code, approves and links the request, records an audit event, and queues a single-use owner redemption email containing redemption and initial terminal activation details. The email is sent asynchronously;
 the API does not wait for delivery. The owner’s email defaults to the request
 contact and may be overridden. PAN is required. **Auth:** signed-in platform
 user; only `x-client-type: web` is accepted. **Rate limit:** 20 requests per
@@ -508,8 +506,7 @@ replays the original response. **Success:** 200.
 **Description:** Registers the invited business owner using the emailed,
 single-use redemption code. Creates a new user or verifies the password for an
 existing account, adds an owner membership with no role and no branch
-assignment, then activates the business. It returns the pre-created branch and
-terminal IDs so the client can use the existing terminal-based login flow.
+assignment, then activates the business and the initial terminal using the business ID, branch ID, and terminal code included in the redemption email. It returns the initial terminal IDs for the existing terminal-based login flow.
 **Auth:** public; only `x-client-type: web` is accepted. **Rate limit:** 10
 requests per hour. **Errors:** 400 for invalid registration data or client
 type; 401 for an invalid, expired, consumed, email-mismatched code or invalid
@@ -532,7 +529,10 @@ one-time. **Success:** 201.
       "email": "owner@example.com",
       "name": "Example Owner",
       "password": "<redacted>",
-      "redeemCode": "<code-from-email>"
+      "redeemCode": "<code-from-email>",
+      "businessId": "<business-id-from-email>",
+      "branchId": "<branch-id-from-email>",
+      "terminalCode": "<terminal-code-from-email>"
     }
   },
   "responseData": {
@@ -1035,9 +1035,7 @@ for an unexpected database failure.
 
 **Description:** Creates a branch and its terminals for an existing business.
 The platform user may provide `terminals: [{ "name": "..." }]` to create one
-or more named terminals. When omitted, one active `Initial Terminal` is created.
-The service generates terminal codes in request order as `POS-01`, `POS-02`, and
-so on; codes are unique per branch. **Auth:** signed-in platform user only;
+or more named terminals. When omitted, one inactive `Initial Terminal` is created. Each terminal receives a cryptographically random `POS-` activation code, unique per branch. The active business owner receives a styled email with branch details and each terminal name, ID, and activation code. **Auth:** signed-in platform user only;
 `x-client-type` must be `web`. **Headers:** `Authorization`, `Content-Type:
 application/json`, `Idempotency-Key`, and `x-client-type`. **Idempotency:**
 required and actor-scoped; repeating the same key and request replays the saved
@@ -1047,7 +1045,7 @@ atomically. **Errors:** 400 for invalid fields/headers, 401 when signed out,
 403 for a non-platform user, 404 if the business does not exist, 409 for a
 branch code already used by that business or an idempotency conflict, 503 for
 unexpected database or Redis failures. **Success:** 201 with branch ID/name and
-created terminal IDs, names, and generated codes.
+created inactive terminal IDs, names, and generated activation codes.
 
 ```json
 {
@@ -1080,10 +1078,35 @@ created terminal IDs, names, and generated codes.
     "body": {
       "branch": { "id": "00000000-0000-4000-8000-000000000002", "name": "Downtown Branch" },
       "terminals": [
-        { "id": "00000000-0000-4000-8000-000000000003", "name": "Front Counter", "terminalCode": "POS-01" },
-        { "id": "00000000-0000-4000-8000-000000000004", "name": "Cafe Counter", "terminalCode": "POS-02" }
+        { "id": "00000000-0000-4000-8000-000000000003", "name": "Front Counter", "terminalCode": "POS-A1B2C3D4E5F60718" },
+        { "id": "00000000-0000-4000-8000-000000000004", "name": "Cafe Counter", "terminalCode": "POS-1234567890ABCDEF" }
       ]
     }
+  }
+}
+```
+
+### `POST /api/v1/businesses/{businessId}/branches/{branchId}/terminals/activate`
+
+**Description:** Activates an inactive terminal using its emailed activation code. The authenticated business owner must belong to the matching business. Business ID and branch ID scope the code to one terminal; repeating activation for an active terminal returns its current details. **Auth:** business owner. **Errors:** 403 for non-owner or out-of-business access; 404 if the business, branch, terminal, or code combination does not match; 409 if the terminal cannot be activated. Activation is audited and the activation code is excluded from audit metadata.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "POST /api/v1/businesses/{businessId}/branches/{branchId}/terminals/activate",
+  "requestData": {
+    "pathParams": { "businessId": "<business-id>", "branchId": "<branch-id>" },
+    "queryParams": null,
+    "headers": {
+      "Authorization": "Bearer <owner-access-token>",
+      "Content-Type": "application/json",
+      "x-client-type": "web"
+    },
+    "body": { "terminalCode": "POS-<activation-code-from-email>" }
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": { "id": "<terminal-id>", "name": "Counter One", "terminalCode": "POS-<activation-code>", "status": "active" }
   }
 }
 ```
