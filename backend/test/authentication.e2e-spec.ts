@@ -56,11 +56,26 @@ describe('AuthenticationController (e2e)', () => {
         .expect(400);
     });
 
-    it('requires a terminal ID header', async () => {
+    it('requires a terminal ID for mobile and desktop but not web', async () => {
       await request(app.getHttpServer())
         .post('/authentication/login')
+        .set('x-client-type', 'mobile')
         .send({ email: 'test@example.com', password: 'password123' })
         .expect(400);
+
+      await request(app.getHttpServer())
+        .post('/authentication/login')
+        .set('x-client-type', 'desktop')
+        .send({ email: 'test@example.com', password: 'password123' })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .post('/authentication/login')
+        .set('x-client-type', 'web')
+        .send({ email: 'test@example.com', password: 'password123' })
+        .expect((response) => {
+          expect(response.status).not.toBe(400);
+        });
     });
 
     it('validates custom login headers through the registered global pipe', async () => {
@@ -124,12 +139,20 @@ describe('AuthenticationController (e2e)', () => {
   });
 
   describe('POST /authentication/refresh', () => {
-    it('requires the terminal ID header', async () => {
+    it('requires a terminal for mobile but allows a web refresh without one', async () => {
       await request(app.getHttpServer())
         .post('/authentication/refresh')
         .set('x-client-type', 'mobile')
         .send({ refreshToken: 'refresh-token' })
         .expect(400);
+
+      await request(app.getHttpServer())
+        .post('/authentication/refresh')
+        .set('x-client-type', 'web')
+        .send({ refreshToken: 'refresh-token' })
+        .expect((response) => {
+          expect(response.status).not.toBe(400);
+        });
     });
 
     it('rejects a missing refresh token after validating headers', async () => {

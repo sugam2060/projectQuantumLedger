@@ -99,6 +99,13 @@
       "when": 1795180000000,
       "tag": "0012_terminal_activation_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795181000000,
+      "tag": "0013_one_active_business_membership_per_user",
+      "breakpoints": true
     }
   ]
 }

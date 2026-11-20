@@ -89,18 +89,17 @@ export class AuthenticationController {
     @ReqDecorator() req: Request,
     @ResDecorator({ passthrough: true }) res: Response,
   ) {
+    const clientType = headers.clientType ?? ClientType.WEB;
     const result = await this.authService.userLogin(dto, headers.terminalId, {
       method: req.method,
       endpointPath: req.route?.path,
       responseStatus: 200,
       requestId: req.header('x-request-id'),
-      clientType: headers.clientType,
+      clientType,
       terminalId: headers.terminalId,
       ipAddress: req.ip,
       userAgent: req.header('user-agent'),
     });
-    const clientType = headers.clientType ?? ClientType.WEB;
-
     // For web clients, set the JWT and refresh token as HTTP-only cookies
     if (clientType === ClientType.WEB) {
       const cookieOptions = {
@@ -143,7 +142,7 @@ export class AuthenticationController {
     @ResDecorator({ passthrough: true }) res: Response,
   ) {
     // For web clients, try to get refresh token from cookie if not in body
-    const clientType = headers.clientType;
+    const clientType = headers.clientType ?? ClientType.WEB;
     let token = refreshToken;
 
     if (clientType === 'web' && !token) {
