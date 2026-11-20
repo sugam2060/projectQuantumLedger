@@ -82,6 +82,52 @@ describe('PlatformBusinessService', () => {
     );
   });
 
+  it('returns a paginated business directory containing active and inactive records', async () => {
+    const activeBusiness = {
+      id: 'active-id',
+      isActive: true,
+    };
+    const inactiveBusiness = {
+      id: 'inactive-id',
+      isActive: false,
+    };
+    const rows = [activeBusiness, inactiveBusiness];
+    const query = {
+      from: jest.fn(),
+      orderBy: jest.fn(),
+      limit: jest.fn(),
+      offset: jest.fn().mockResolvedValue(rows),
+    };
+    query.from.mockReturnValue(query);
+    query.orderBy.mockReturnValue(query);
+    query.limit.mockReturnValue(query);
+    const tx = {
+      select: jest
+        .fn()
+        .mockReturnValueOnce({
+          from: jest.fn().mockResolvedValue([{ total: 2 }]),
+        })
+        .mockReturnValueOnce(query),
+    };
+    database.transactionWithSession.mockImplementation(
+      async (_session: unknown, callback: (transaction: unknown) => unknown) =>
+        callback(tx),
+    );
+
+    await expect(
+      service.listBusinesses({ page: 2, limit: 2 }, 'platform-user-id'),
+    ).resolves.toEqual({
+      data: rows,
+      pagination: { page: 2, limit: 2, total: 2, totalPages: 1 },
+    });
+    expect(database.transactionWithSession).toHaveBeenCalledWith(
+      { isPlatform: true, platformUserId: 'platform-user-id' },
+      expect.any(Function),
+    );
+    expect(query.limit).toHaveBeenCalledWith(2);
+    expect(query.offset).toHaveBeenCalledWith(2);
+  });
+
   it('uploads all documents and saves their Cloudinary IDs and URLs with the request', async () => {
     const values = jest.fn().mockResolvedValue(undefined);
     const tx = { insert: jest.fn().mockReturnValue({ values }) };

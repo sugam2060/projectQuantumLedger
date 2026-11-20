@@ -7,7 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { count, desc, eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
   branches,
@@ -47,6 +47,44 @@ export class PlatformBusinessService {
     private readonly auditLogs: AuditLogService,
     private readonly outboxPublisher: MailOutboxPublisher,
   ) {}
+
+  async listBusinesses(
+    pagination: { page: number; limit: number },
+    platformUserId: string,
+  ) {
+    return this.database.transactionWithSession(
+      { isPlatform: true, platformUserId },
+      async (tx) => {
+        const [totalRow] = await tx.select({ total: count() }).from(business);
+        const rows = await tx
+          .select({
+            id: business.id,
+            legalName: business.legalName,
+            displayName: business.displayName,
+            isActive: business.isActive,
+            primaryContactNumber: business.primaryContactNumber,
+            primaryContactEmail: business.primaryContactEmail,
+            createdAt: business.createdAt,
+            updatedAt: business.updatedAt,
+          })
+          .from(business)
+          .orderBy(desc(business.createdAt), desc(business.id))
+          .limit(pagination.limit)
+          .offset((pagination.page - 1) * pagination.limit);
+
+        const total = totalRow?.total ?? 0;
+        return {
+          data: rows,
+          pagination: {
+            page: pagination.page,
+            limit: pagination.limit,
+            total,
+            totalPages: Math.ceil(total / pagination.limit),
+          },
+        };
+      },
+    );
+  }
 
   async submitBusinessRequest(
     request: BusinessRequestDto,
