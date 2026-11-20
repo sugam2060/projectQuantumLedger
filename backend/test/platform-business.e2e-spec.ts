@@ -13,6 +13,7 @@ describe('PlatformBusinessController (e2e)', () => {
   const platformBusiness = {
     submitBusinessRequest: jest.fn(),
     provisionBusiness: jest.fn(),
+    createBranch: jest.fn(),
   };
 
   beforeAll(async () => {
@@ -39,7 +40,7 @@ describe('PlatformBusinessController (e2e)', () => {
         next: NextFunction,
       ) => {
         request.user = {
-          isPlatform: true,
+          isPlatform: request.header('x-test-platform') !== 'false',
           platformUserId: '00000000-0000-4000-8000-000000000009',
         };
         next();
@@ -60,6 +61,24 @@ describe('PlatformBusinessController (e2e)', () => {
         'Business Example Retail has been verified. Redeem code has been sent to owner.',
       businessId: '00000000-0000-4000-8000-000000000010',
       ownerActivationInvitationStatus: 'queued',
+    });
+    platformBusiness.createBranch.mockResolvedValue({
+      branch: {
+        id: '00000000-0000-4000-8000-000000000010',
+        name: 'Downtown Branch',
+      },
+      terminals: [
+        {
+          id: '00000000-0000-4000-8000-000000000011',
+          name: 'Front Counter',
+          terminalCode: 'POS-01',
+        },
+        {
+          id: '00000000-0000-4000-8000-000000000012',
+          name: 'Cafe Counter',
+          terminalCode: 'POS-02',
+        },
+      ],
     });
   });
 
@@ -225,5 +244,77 @@ describe('PlatformBusinessController (e2e)', () => {
       .set('idempotency-key', 'key-e2e-003')
       .send({ pan: 'ABCDE1234F' })
       .expect(400);
+  });
+
+  it('creates a branch with multiple named terminals for a platform user', async () => {
+    const businessId = '00000000-0000-4000-8000-000000000001';
+    const body = {
+      name: 'Downtown Branch',
+      code: 'DOWNTOWN',
+      terminals: [{ name: 'Front Counter' }, { name: 'Cafe Counter' }],
+    };
+    await request(app.getHttpServer())
+      .post(`/platform/businesses/${businessId}/branches`)
+      .set('x-client-type', 'web')
+      .set('idempotency-key', 'branch-create-e2e-001')
+      .send(body)
+      .expect(201)
+      .expect(({ body: responseBody }) => {
+        expect(responseBody.branch).toEqual({
+          id: '00000000-0000-4000-8000-000000000010',
+          name: 'Downtown Branch',
+        });
+        expect(
+          responseBody.terminals.map(
+            (terminal: { terminalCode: string }) => terminal.terminalCode,
+          ),
+        ).toEqual(['POS-01', 'POS-02']);
+      });
+
+    expect(platformBusiness.createBranch).toHaveBeenCalledWith(
+      businessId,
+      body,
+      'branch-create-e2e-001',
+      '00000000-0000-4000-8000-000000000009',
+      expect.objectContaining({
+        endpointPath: '/platform/businesses/:businessId/branches',
+        method: 'POST',
+      }),
+    );
+  });
+
+  it('rejects non-platform users and invalid branch creation input', async () => {
+    const path =
+      '/platform/businesses/00000000-0000-4000-8000-000000000001/branches';
+    const validBody = { name: 'Downtown Branch', code: 'DOWNTOWN' };
+    await request(app.getHttpServer())
+      .post(path)
+      .set('x-test-platform', 'false')
+      .set('x-client-type', 'web')
+      .set('idempotency-key', 'branch-create-e2e-002')
+      .send(validBody)
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/platform/businesses/not-a-uuid/branches')
+      .set('x-client-type', 'web')
+      .set('idempotency-key', 'branch-create-e2e-003')
+      .send(validBody)
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post(path)
+      .set('x-client-type', 'web')
+      .send(validBody)
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post(path)
+      .set('x-client-type', 'web')
+      .set('idempotency-key', 'branch-create-e2e-004')
+      .send({ ...validBody, terminals: [] })
+      .expect(400);
+
+    expect(platformBusiness.createBranch).not.toHaveBeenCalled();
   });
 });

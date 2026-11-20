@@ -7,6 +7,7 @@ import {
   ForbiddenException,
   Get,
   Post,
+  Param,
   Query,
   Req,
   UploadedFiles,
@@ -27,6 +28,8 @@ import { ProvisionBusinessHeaders } from './decorators/provision-business-header
 import { BusinessListHeaders } from './decorators/business-list-headers.decorator';
 import { BusinessListHeadersDto } from './dto/business-list-headers.dto';
 import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
+import { BusinessBranchParamsDto } from './dto/business-branch-params.dto';
+import { CreateBusinessBranchDto } from './dto/create-business-branch.dto';
 import type { AuthenticatedUser } from '../authentication/strategies/jwt.strategy';
 import type { Request } from 'express';
 
@@ -89,6 +92,41 @@ export class PlatformBusinessController {
     }
     return this.platformBusiness.provisionBusiness(
       query.requested_business_id,
+      body,
+      headers.idempotencyKey,
+      platformUserId,
+      {
+        method: request.method,
+        endpointPath: request.route?.path,
+        requestId: request.header('x-request-id'),
+        clientType: request.header('x-client-type'),
+        ipAddress: request.ip,
+        userAgent: request.header('user-agent'),
+      },
+    );
+  }
+
+  @Post(':businessId/branches')
+  @HttpCode(HttpStatus.CREATED)
+  async createBranch(
+    @Param() params: BusinessBranchParamsDto,
+    @Body() body: CreateBusinessBranchDto,
+    @ProvisionBusinessHeaders() headers: ProvisionBusinessHeadersDto,
+    @Req() request: PlatformAuthenticatedRequest,
+  ) {
+    const isPlatformUser = request.user?.isPlatform === true;
+    const platformUserId = isPlatformUser
+      ? (request.user.platformUserId ??
+        request.user.subjectId ??
+        request.user.userId ??
+        request.user.sub)
+      : undefined;
+    if (!platformUserId) {
+      throw new ForbiddenException('Platform user authentication required');
+    }
+
+    return this.platformBusiness.createBranch(
+      params.businessId,
       body,
       headers.idempotencyKey,
       platformUserId,
