@@ -3,11 +3,18 @@ import { jest } from '@jest/globals';
 import { BusinessService } from '../business.service';
 
 describe('BusinessService', () => {
-  const limit = jest.fn();
-  const where = jest.fn(() => ({ limit }));
-  const from = jest.fn(() => ({ where }));
-  const database = { select: jest.fn(() => ({ from })) };
-  const service = new BusinessService(database as never);
+  const limit = jest.fn<(...args: any[]) => any>();
+  const where = jest.fn<(...args: any[]) => any>(() => ({ limit }));
+  const from = jest.fn<(...args: any[]) => any>(() => ({ where }));
+  const database = {
+    select: jest.fn<(...args: any[]) => any>(() => ({ from })),
+  };
+  const service = new BusinessService(
+    database as never,
+    {} as never,
+    {} as never,
+    {} as never,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();

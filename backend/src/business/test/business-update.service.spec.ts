@@ -11,16 +11,18 @@ import { ObjectStoreService } from '../../utils/objectStore.service';
 import { BusinessService } from '../business.service';
 import { BusinessUtilsService } from '../business.utils.service';
 
+const mockFn = () => jest.fn<(...args: any[]) => any>();
+
 describe('BusinessService.updateBusinessProfile', () => {
   const redis = {
-    get: jest.fn(),
-    set: jest.fn(),
-    setIfAbsent: jest.fn(),
-    compareAndDelete: jest.fn(),
+    get: mockFn(),
+    set: mockFn(),
+    setIfAbsent: mockFn(),
+    compareAndDelete: mockFn(),
   };
-  const objectStore = { upload: jest.fn(), delete: jest.fn() };
-  const auditLogs = { insertUserEvent: jest.fn() };
-  const database = { transactionWithSession: jest.fn() };
+  const objectStore = { upload: mockFn(), delete: mockFn() };
+  const auditLogs = { insertUserEvent: mockFn() };
+  const database = { transactionWithSession: mockFn() };
   let service: BusinessService;
   let current: Record<string, unknown>;
   let tx: Record<string, jest.Mock>;
@@ -65,33 +67,30 @@ describe('BusinessService.updateBusinessProfile', () => {
       isActive: false,
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     };
-    const membershipLimit = jest
-      .fn()
+    const membershipLimit = mockFn()
       .mockImplementation(async () =>
         activeMembership ? [{ id: 'membership' }] : [],
       );
-    const businessLimit = jest.fn(() => ({
-      for: jest.fn().mockResolvedValue([current]),
+    const businessLimit = mockFn().mockImplementation(() => ({
+      for: mockFn().mockResolvedValue([current]),
     }));
-    const whereSelect = jest.fn(() => {
+    const whereSelect = mockFn().mockImplementation(() => {
       const isMembershipQuery = selectCount++ % 2 === 0;
       return { limit: isMembershipQuery ? membershipLimit : businessLimit };
     });
-    const valuesInsert = jest.fn().mockResolvedValue(undefined);
-    const whereUpdate = jest.fn(() => ({
-      returning: jest
-        .fn()
-        .mockResolvedValue([
+    const valuesInsert = mockFn().mockResolvedValue(undefined);
+    const whereUpdate = mockFn().mockImplementation(() => ({
+      returning: mockFn().mockResolvedValue([
           { updatedAt: new Date('2026-02-01T00:00:00.000Z') },
         ]),
     }));
-    const setUpdate = jest.fn(() => ({ where: whereUpdate }));
+    const setUpdate = mockFn().mockImplementation(() => ({ where: whereUpdate }));
     tx = {
-      select: jest.fn(() => ({
-        from: jest.fn(() => ({ where: whereSelect })),
+      select: mockFn().mockImplementation(() => ({
+        from: mockFn().mockImplementation(() => ({ where: whereSelect })),
       })),
-      update: jest.fn(() => ({ set: setUpdate })),
-      insert: jest.fn(() => ({ values: valuesInsert })),
+      update: mockFn().mockImplementation(() => ({ set: setUpdate })),
+      insert: mockFn().mockImplementation(() => ({ values: valuesInsert })),
     };
     database.transactionWithSession.mockImplementation(
       async (_session: unknown, callback: (transaction: unknown) => unknown) =>
