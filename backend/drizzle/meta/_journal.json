@@ -78,6 +78,13 @@
       "when": 1794864600000,
       "tag": "0009_owner_redemption_membership_insert",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795170000000,
+      "tag": "0010_branches_business_created_cursor_idx",
+      "breakpoints": true
     }
   ]
 }

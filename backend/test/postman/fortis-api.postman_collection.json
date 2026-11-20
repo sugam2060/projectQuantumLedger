@@ -144,6 +144,26 @@
       "key": "businessUpdateIdempotencyKey",
       "value": "business-profile-update-001",
       "type": "string"
+    },
+    {
+      "key": "branchFrom",
+      "value": "2026-10-01T00:00:00+05:45",
+      "type": "string"
+    },
+    {
+      "key": "branchTo",
+      "value": "2026-10-29T23:59:59+05:45",
+      "type": "string"
+    },
+    {
+      "key": "branchLimit",
+      "value": "50",
+      "type": "string"
+    },
+    {
+      "key": "branchCursor",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -1394,6 +1414,69 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "pm.test('Response contains changed fields without document URLs', () => { const body = pm.response.json(); pm.expect(body.businessId).to.eql(pm.collectionVariables.get('businessId')); pm.expect(body.changedFields).to.be.an('object'); pm.expect(body).not.to.have.property('documents'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /businesses/{businessId}/branches (owner or authorized role)",
+          "request": {
+            "method": "GET",
+            "description": "Requires an owner token or a role explicitly assigned the branches.read endpoint key. An assigned branch membership sees only that branch; a membership with no branch assignment has business-wide scope. Enable the cursor query parameter after a page returns nextCursor.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "desktop",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches?from={{branchFrom}}&to={{branchTo}}&limit={{branchLimit}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{branchFrom}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{branchTo}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{branchLimit}}"
+                },
+                {
+                  "key": "cursor",
+                  "value": "{{branchCursor}}",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains branch items and cursor', () => { const body = pm.response.json(); pm.expect(body.items).to.be.an('array'); pm.expect(body.nextCursor === null || typeof body.nextCursor === 'string').to.eql(true); body.items.forEach((branch) => { pm.expect(branch.id).to.be.a('string'); pm.expect(branch.status).to.be.oneOf(['active', 'inactive']); }); });",
+                  "if (pm.response.code === 200 && pm.response.json().nextCursor) pm.collectionVariables.set('branchCursor', pm.response.json().nextCursor);"
                 ]
               }
             }

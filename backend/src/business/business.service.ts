@@ -1,15 +1,19 @@
 import {
+  BadRequestException,
   ForbiddenException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, lte, or } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
   business,
   businessMemberships,
+  branches,
   type BusinessDocuments,
 } from '../database/schema';
 import type { RequestSession } from '../database/request_context.service';
@@ -19,9 +23,11 @@ import {
 } from '../database/audit-log.service';
 import { ObjectStoreService } from '../utils/objectStore.service';
 import type { UpdateBusinessDto } from './dto/update-business.dto';
+import type { ListBranchesQueryDto } from './dto/list-branches-query.dto';
 import {
   BusinessUtilsService,
   type BusinessAddress,
+  type BranchCursorContext,
   type BusinessUpdateFiles,
   type StagedBusinessDocument,
 } from './business.utils.service';
@@ -57,6 +63,123 @@ export class BusinessService {
 
     if (!profile) throw new NotFoundException('Business was not found');
     return profile;
+  }
+
+  async listBranches(
+    businessId: string,
+    session: RequestSession,
+    query: ListBranchesQueryDto,
+  ) {
+    if (
+      !session.userId ||
+      session.isPlatform === true ||
+      session.businessId !== businessId
+    ) {
+      throw new ForbiddenException('Business branch access required');
+    }
+
+    const from = query.from ? new Date(query.from) : null;
+    const to = query.to ? new Date(query.to) : null;
+    if (
+      (from && Number.isNaN(from.getTime())) ||
+      (to && Number.isNaN(to.getTime())) ||
+      (from && to && from.getTime() > to.getTime())
+    ) {
+      throw new BadRequestException('Invalid branch creation time range');
+    }
+
+    try {
+      return await this.database.transactionWithSession(session, async (tx) => {
+        const [membership] = await tx
+          .select({
+            branchId: businessMemberships.branchId,
+            isOwner: businessMemberships.isOwner,
+          })
+          .from(businessMemberships)
+          .where(
+            and(
+              eq(businessMemberships.businessId, businessId),
+              eq(businessMemberships.userId, session.userId!),
+              eq(businessMemberships.isActive, true),
+            ),
+          )
+          .limit(1);
+        if (!membership || (session.isOwner === true && !membership.isOwner)) {
+          throw new ForbiddenException('Active business membership required');
+        }
+
+        const scopeBranchId = membership.isOwner ? null : membership.branchId;
+        const cursorContext: BranchCursorContext = {
+          businessId,
+          from,
+          to,
+          branchId: scopeBranchId,
+        };
+        const cursor = query.cursor
+          ? this.businessUtils.parseBranchCursor(query.cursor, cursorContext)
+          : null;
+
+        const conditions = [eq(branches.businessId, businessId)];
+        if (scopeBranchId) {
+          conditions.push(eq(branches.id, scopeBranchId));
+        }
+        if (from) conditions.push(gte(branches.createdAt, from));
+        if (to) conditions.push(lte(branches.createdAt, to));
+        if (cursor) {
+          conditions.push(
+            or(
+              lt(branches.createdAt, cursor.createdAt),
+              and(
+                eq(branches.createdAt, cursor.createdAt),
+                lt(branches.id, cursor.id),
+              ),
+            )!,
+          );
+        }
+
+        const rows = await tx
+          .select({
+            id: branches.id,
+            name: branches.name,
+            code: branches.code,
+            address: branches.address,
+            contactNumber: branches.contactNumber,
+            isActive: branches.isActive,
+            createdAt: branches.createdAt,
+            updatedAt: branches.updatedAt,
+          })
+          .from(branches)
+          .where(and(...conditions))
+          .orderBy(desc(branches.createdAt), desc(branches.id))
+          .limit(query.limit + 1);
+
+        const hasNextPage = rows.length > query.limit;
+        const pageRows = rows.slice(0, query.limit);
+        const lastRow = pageRows[pageRows.length - 1];
+        return {
+          items: pageRows.map(({ isActive, ...branch }) => ({
+            ...branch,
+            status: isActive ? 'active' : 'inactive',
+          })),
+          nextCursor:
+            hasNextPage && lastRow
+              ? this.businessUtils.createBranchCursor(
+                  { createdAt: lastRow.createdAt, id: lastRow.id },
+                  cursorContext,
+                )
+              : null,
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(
+        `Failed to list branches for business ${businessId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new ServiceUnavailableException(
+        'Branch list is temporarily unavailable',
+      );
+    }
   }
 
   async updateBusinessProfile(

@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Patch,
+  Query,
   Req,
   UploadedFiles,
   UseInterceptors,
@@ -14,7 +15,10 @@ import {
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Request } from 'express';
-import { RequiredRoles } from '../authentication/decorators/required_permission.decorator';
+import {
+  RequireConfiguredRoles,
+  RequiredRoles,
+} from '../authentication/decorators/required_permission.decorator';
 import type { AuthenticatedUser } from '../authentication/strategies/jwt.strategy';
 import { BusinessIdParamDto } from './dto/business-id-param.dto';
 import { UpdateBusinessHeaders } from './decorators/update-business-headers.decorator';
@@ -23,6 +27,7 @@ import type { UpdateBusinessDto } from './dto/update-business.dto';
 import { BusinessService } from './business.service';
 import type { BusinessUpdateFiles } from './business.utils.service';
 import { UpdateBusinessValidationPipe } from './pipes/update-business-validation.pipe';
+import { ListBranchesQueryDto } from './dto/list-branches-query.dto';
 
 interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
@@ -47,6 +52,25 @@ export class BusinessController {
       throw new ForbiddenException('Business owner access required');
     }
     return this.businessService.getBusinessProfile(params.businessId);
+  }
+
+  @Get(':businessId/branches')
+  @RequiredRoles('branches.read')
+  @RequireConfiguredRoles()
+  listBranches(
+    @Param() params: BusinessIdParamDto,
+    @Query() query: ListBranchesQueryDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const user = request.user;
+    if (
+      user?.isPlatform === true ||
+      !user?.businessId ||
+      user.businessId !== params.businessId
+    ) {
+      throw new ForbiddenException('Business branch access required');
+    }
+    return this.businessService.listBranches(params.businessId, user, query);
   }
 
   @Patch(':businessId')

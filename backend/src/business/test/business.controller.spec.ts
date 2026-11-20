@@ -1,11 +1,15 @@
 import { ForbiddenException } from '@nestjs/common';
 import { jest } from '@jest/globals';
-import { REQUIRED_ROLES } from '../../authentication/decorators/required_permission.decorator';
+import {
+  REQUIRE_CONFIGURED_ROLES,
+  REQUIRED_ROLES,
+} from '../../authentication/decorators/required_permission.decorator';
 import { BusinessController } from '../business.controller';
 
 describe('BusinessController', () => {
   const service = {
     getBusinessProfile: jest.fn(),
+    listBranches: jest.fn(),
     updateBusinessProfile: jest.fn(),
   };
   const controller = new BusinessController(service as never);
@@ -95,5 +99,26 @@ describe('BusinessController', () => {
         )?.value,
       ),
     ).toBe('business.update');
+  });
+
+  it('registers branch read as fail-closed role access', () => {
+    const handler = Object.getOwnPropertyDescriptor(
+      BusinessController.prototype,
+      'listBranches',
+    )?.value;
+    expect(Reflect.getMetadata(REQUIRED_ROLES, handler)).toBe('branches.read');
+    expect(Reflect.getMetadata(REQUIRE_CONFIGURED_ROLES, handler)).toBe(true);
+  });
+
+  it('routes branch listing for the authenticated business user', async () => {
+    const response = { items: [], nextCursor: null };
+    service.listBranches.mockResolvedValue(response);
+    const user = { isOwner: false, businessId, userId: 'user-id' };
+    await expect(
+      controller.listBranches({ businessId }, { limit: 50 }, { user } as never),
+    ).resolves.toBe(response);
+    expect(service.listBranches).toHaveBeenCalledWith(businessId, user, {
+      limit: 50,
+    });
   });
 });

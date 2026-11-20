@@ -905,3 +905,64 @@ or documents, or an empty update; 503 if the idempotency service is unavailable.
 }
 ```
 
+
+## GET /api/v1/businesses/{businessId}/branches
+
+**Description:** Lists business branches with their current operational status.
+**Auth:** the active owner or a business member with an explicit `branches.read`
+role assignment. This endpoint fails closed until roles are configured. A
+branch-scoped membership sees only its assigned branch; a membership with a null
+branch assignment and the owner see all branches in the business. Platform users
+are denied. **Headers:** `Authorization: Bearer <access-token>` and optional
+`x-client-type: web|desktop|mobile` (required when using the web access-token
+cookie). **Query:** optional timezone-aware ISO `from` and `to` filter `createdAt`
+inclusively; `from` must not be after `to`. `limit` defaults to 50 and must be
+1–100. `cursor` is an opaque cursor returned by the previous page and is bound to
+the same business, date range, and membership scope. **Ordering:** newest branch
+first by `createdAt`, then `id`; pagination uses a stable keyset cursor.
+**Response:** `items` contains `id`, `name`, `code`, `address`, `contactNumber`,
+`status` (`active` or `inactive`), `createdAt`, and `updatedAt`. `nextCursor` is
+null on the last page. Status is current; the database does not retain status
+history. **Audit:** none for this read. **Errors:** 400 for an invalid business
+UUID, date range, limit, or cursor; 401 for authentication failure; 403 for
+wrong-business, platform, inactive membership, missing role assignment, or
+unconfigured `branches.read`; 503 for an unexpected database failure.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "GET /businesses/{businessId}/branches",
+  "requestData": {
+    "pathParams": { "businessId": "00000000-0000-4000-8000-000000000001" },
+    "queryParams": {
+      "from": "2026-10-01T00:00:00+05:45",
+      "to": "2026-10-29T23:59:59+05:45",
+      "limit": 50,
+      "cursor": null
+    },
+    "headers": {
+      "Authorization": "Bearer <access-token>",
+      "x-client-type": "desktop"
+    },
+    "body": null
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": {
+      "items": [
+        {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "name": "Main Branch",
+          "code": "MAIN",
+          "address": "Main Street, Kathmandu",
+          "contactNumber": "+977-1-5550100",
+          "status": "active",
+          "createdAt": "2026-10-15T12:00:00.000Z",
+          "updatedAt": "2026-10-16T12:00:00.000Z"
+        }
+      ],
+      "nextCursor": null
+    }
+  }
+}
+```

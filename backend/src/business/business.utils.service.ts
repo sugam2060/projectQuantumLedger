@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -17,6 +18,18 @@ export interface BusinessUpdateResponse {
   businessId: string;
   updatedAt: string;
   changedFields: Record<string, unknown>;
+}
+
+export interface BranchCursorContext {
+  businessId: string;
+  from: Date | null;
+  to: Date | null;
+  branchId: string | null;
+}
+
+export interface BranchCursor {
+  createdAt: Date;
+  id: string;
 }
 
 export interface BusinessUpdateFiles {
@@ -85,6 +98,55 @@ export class BusinessUtilsService {
   private readonly logger = new Logger(BusinessUtilsService.name);
 
   constructor(private readonly redis: RedisService) {}
+
+  createBranchCursor(
+    cursor: BranchCursor,
+    context: BranchCursorContext,
+  ): string {
+    const payload = {
+      version: 1,
+      createdAt: cursor.createdAt.toISOString(),
+      id: cursor.id,
+      scope: this.branchCursorScope(context),
+    };
+    return Buffer.from(JSON.stringify(payload)).toString('base64url');
+  }
+
+  parseBranchCursor(value: string, context: BranchCursorContext): BranchCursor {
+    try {
+      const payload = JSON.parse(
+        Buffer.from(value, 'base64url').toString('utf8'),
+      ) as {
+        version?: unknown;
+        createdAt?: unknown;
+        id?: unknown;
+        scope?: unknown;
+      };
+      if (
+        payload.version !== 1 ||
+        typeof payload.createdAt !== 'string' ||
+        typeof payload.id !== 'string' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          payload.id,
+        ) ||
+        payload.scope !== this.branchCursorScope(context)
+      ) {
+        throw new Error('Invalid cursor payload');
+      }
+      const createdAt = new Date(payload.createdAt);
+      if (
+        Number.isNaN(createdAt.getTime()) ||
+        createdAt.toISOString() !== payload.createdAt
+      ) {
+        throw new Error('Invalid cursor timestamp');
+      }
+      return { createdAt, id: payload.id };
+    } catch {
+      throw new BadRequestException(
+        'Invalid or out-of-scope branch pagination cursor',
+      );
+    }
+  }
 
   normalizeInput(dto: UpdateBusinessDto): { fields: BusinessUpdateFields } {
     const fields: BusinessUpdateFields = {};
@@ -253,5 +315,18 @@ export class BusinessUtilsService {
       );
     }
     return entry.response;
+  }
+
+  private branchCursorScope(context: BranchCursorContext): string {
+    return createHash('sha256')
+      .update(
+        JSON.stringify({
+          businessId: context.businessId,
+          from: context.from?.toISOString() ?? null,
+          to: context.to?.toISOString() ?? null,
+          branchId: context.branchId,
+        }),
+      )
+      .digest('hex');
   }
 }

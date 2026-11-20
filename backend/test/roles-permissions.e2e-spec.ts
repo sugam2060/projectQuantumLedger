@@ -161,6 +161,7 @@ describe('Roles and permissions endpoint access (e2e)', () => {
     expect(endpointAccess.hasAccess).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1' }),
       'inventory.create',
+      { requireConfiguration: false },
     );
 
     endpointAccess.hasAccess.mockResolvedValueOnce(false);
