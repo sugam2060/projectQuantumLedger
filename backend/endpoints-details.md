@@ -728,3 +728,55 @@ already-cleared configuration leaves it cleared.
   no `@RateLimit` decorator have no route-specific limit.
 - The endpoint catalog contains only routes currently decorated with
   `@RequiredRoles`; it is not a list of every API route.
+## GET /api/v1/businesses/{businessId}
+
+**Description:** Returns the authenticated owner's business profile and current
+activation state. **Auth:** business owner only; the JWT must identify the same
+business as the path parameter. Platform users and non-owner users are denied.
+The route is registered with the `business.read` permission key; the owner-only
+check also applies after the global permission guard.
+**Headers:** `Authorization: Bearer <owner-access-token>` and optional
+`x-client-type: web|desktop|mobile` (used by client-specific authentication
+behavior; not a business selector). **Errors:** 400 for an invalid UUID, 401 for
+missing/invalid authentication, 403 unless the caller is the owner of that
+business, and 404 when the business does not exist. PAN and registration
+document references are not returned.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "GET /businesses/{businessId}",
+  "requestData": {
+    "pathParams": { "businessId": "00000000-0000-4000-8000-000000000001" },
+    "queryParams": null,
+    "headers": {
+      "Authorization": "Bearer <owner-access-token>",
+      "x-client-type": "desktop"
+    },
+    "body": null
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "legalName": "Example Trading Pvt Ltd",
+      "displayName": "Example Trading",
+      "address": "Main Street, Kathmandu",
+      "addressDetails": {
+        "country": "NP",
+        "city": "Kathmandu",
+        "postalCode": "44600",
+        "addressLine1": "Main Street",
+        "addressLine2": null
+      },
+      "primaryContactNumber": "+977-1-5550100",
+      "primaryContactEmail": "owner@example.com",
+      "isActive": true,
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
+

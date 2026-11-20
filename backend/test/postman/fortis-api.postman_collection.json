@@ -129,6 +129,16 @@
       "key": "logoutTestRefreshToken",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "businessId",
+      "value": "00000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "ownerAccessToken",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -1161,6 +1171,50 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Business owner profile",
+      "item": [
+        {
+          "name": "GET /businesses/{businessId} (owner only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}"
+              },
+              {
+                "key": "x-client-type",
+                "value": "desktop"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/businesses/{{businessId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Sensitive registration data is omitted', () => { const body = pm.response.json(); pm.expect(body).not.to.have.property('pan'); pm.expect(body).not.to.have.property('documents'); });"
                 ]
               }
             }
