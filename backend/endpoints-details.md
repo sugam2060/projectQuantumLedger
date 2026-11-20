@@ -843,4 +843,65 @@ document references are not returned.
 }
 ```
 
+## PATCH /api/v1/businesses/{businessId}
+
+**Description:** Updates approved business profile fields and optionally replaces
+business documents. **Auth:** only the active business owner for the path business;
+the route is registered with `business.update`. **Headers:**
+`Authorization: Bearer <owner-access-token>`, `Idempotency-Key`, and
+`x-client-type: web|desktop|mobile`. Use multipart form data; the client must set
+the multipart boundary. **Permitted fields:** `reason` (required), `displayName`,
+`country`, `city`, `postalCode`, `addressLine1`, `addressLine2`,
+`primaryContactNumber`, and `primaryContactEmail`. Optional files:
+`panCardFront`, `panCardBack`, `businessRegistrationCertificate` (one per field,
+up to 10 MB each). Profile address fields update `addressDetails` and keep the
+legacy `address` column synchronized. PAN, legal name, active status, identifiers,
+and system timestamps are prohibited. **Idempotency:** the same owner, business,
+key, and request payload replays the original response for seven days; reusing a
+key with a different payload or an in-progress request returns 409. The key hash
+includes uploaded file contents. **Audit:** profile changes and their audit event
+are committed in the same database transaction; the required reason and before /
+after profile values are recorded. Document audit metadata records changed file
+field names, not document URLs. **Errors:** 403 for non-owners or business mismatch;
+400 for an invalid business UUID or missing/invalid required headers; 404 for a
+missing business; 409 for idempotency conflicts; 413 for a file larger than
+10 MB; 422 for invalid or prohibited fields, missing reason, incomplete address
+or documents, or an empty update; 503 if the idempotency service is unavailable.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "PATCH /businesses/{businessId}",
+  "requestData": {
+    "pathParams": { "businessId": "00000000-0000-4000-8000-000000000001" },
+    "queryParams": null,
+    "headers": {
+      "Authorization": "Bearer <owner-access-token>",
+      "Content-Type": "multipart/form-data; boundary=<generated-by-client>",
+      "Idempotency-Key": "idem_sample_001",
+      "x-client-type": "desktop"
+    },
+    "body": {
+      "reason": "Approved operation",
+      "displayName": "Example Trading",
+      "primaryContactEmail": "owner@example.com",
+      "panCardFront": "<file part; optional>",
+      "panCardBack": "<file part; optional>",
+      "businessRegistrationCertificate": "<file part; optional>"
+    }
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": {
+      "businessId": "00000000-0000-4000-8000-000000000001",
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "changedFields": {
+        "displayName": "Example Trading",
+        "primaryContactEmail": "owner@example.com",
+        "documents": ["panCard.frontImage"]
+      }
+    }
+  }
+}
+```
 
