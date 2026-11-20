@@ -3,10 +3,12 @@ import { jest } from '@jest/globals';
 import { REQUIRED_ROLES } from '../../authentication/decorators/required_permission.decorator';
 import { BusinessController } from '../business.controller';
 
+const mockFn = () => jest.fn<(...args: any[]) => any>();
+
 describe('BusinessController', () => {
   const service = {
-    getBusinessProfile: jest.fn(),
-    updateBusinessProfile: jest.fn(),
+    getBusinessProfile: mockFn(),
+    updateBusinessProfile: mockFn(),
   };
   const controller = new BusinessController(service as never);
   const businessId = '00000000-0000-4000-8000-000000000001';
