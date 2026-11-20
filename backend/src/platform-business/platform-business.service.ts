@@ -7,7 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
   branches,
@@ -123,6 +123,107 @@ export class PlatformBusinessService {
           business: businessRow,
           branches: businessBranches,
           memberships: membershipRows,
+        };
+      },
+    );
+  }
+
+  async getBranchDetails(
+    businessId: string,
+    branchId: string,
+    platformUserId: string,
+    auditContext: AuditRequestContext = {},
+  ) {
+    return this.database.transactionWithSession(
+      { isPlatform: true, platformUserId },
+      async (tx) => {
+        const [branchRow] = await tx
+          .select()
+          .from(branches)
+          .where(
+            and(eq(branches.id, branchId), eq(branches.businessId, businessId)),
+          )
+          .limit(1);
+        if (!branchRow) {
+          throw new NotFoundException('Branch was not found for this business');
+        }
+
+        const branchTerminals = await tx
+          .select()
+          .from(terminals)
+          .where(
+            and(
+              eq(terminals.businessId, businessId),
+              eq(terminals.branchId, branchId),
+            ),
+          );
+
+        const activeEmployees = await tx
+          .select({
+            membershipId: businessMemberships.id,
+            isOwner: businessMemberships.isOwner,
+            branchId: businessMemberships.branchId,
+            createdAt: businessMemberships.createdAt,
+            user: {
+              id: users.id,
+              email: users.emailNormalized,
+              name: users.name,
+              status: users.status,
+            },
+            role: {
+              id: roles.id,
+              name: roles.name,
+              description: roles.description,
+              isSystem: roles.isSystem,
+            },
+          })
+          .from(businessMemberships)
+          .leftJoin(users, eq(businessMemberships.userId, users.id))
+          .leftJoin(roles, eq(businessMemberships.roleId, roles.id))
+          .where(
+            and(
+              eq(businessMemberships.businessId, businessId),
+              eq(businessMemberships.isActive, true),
+              or(
+                eq(businessMemberships.branchId, branchId),
+                isNull(businessMemberships.branchId),
+              ),
+            ),
+          );
+
+        const terminalCounts = {
+          total: branchTerminals.length,
+          active: branchTerminals.filter(
+            (terminal) => terminal.status === 'active',
+          ).length,
+          inactive: branchTerminals.filter(
+            (terminal) => terminal.status === 'inactive',
+          ).length,
+          maintenance: branchTerminals.filter(
+            (terminal) => terminal.status === 'maintenance',
+          ).length,
+        };
+
+        await this.auditLogs.insertPlatformEvent(tx, {
+          ...auditContext,
+          platformUserId,
+          businessId,
+          action: 'business.branch.details.viewed',
+          responseStatus: 200,
+          metadata: {
+            branchId,
+            activeEmployeeCount: activeEmployees.length,
+            terminalCount: terminalCounts.total,
+          },
+        });
+
+        return {
+          branch: branchRow,
+          activeEmployeeCount: activeEmployees.length,
+          activeEmployees,
+          terminalCount: terminalCounts.total,
+          terminalCounts,
+          terminals: branchTerminals,
         };
       },
     );

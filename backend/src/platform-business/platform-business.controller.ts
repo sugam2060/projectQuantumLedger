@@ -82,6 +82,47 @@ export class PlatformBusinessController {
     );
   }
 
+  @Get('business/:business_id/:branch_id')
+  @HttpCode(HttpStatus.OK)
+  async getBranch(
+    @Param('business_id', new ParseUUIDPipe()) businessId: string,
+    @Param('branch_id', new ParseUUIDPipe()) branchId: string,
+    @Req() request: PlatformAuthenticatedRequest,
+  ) {
+    const clientType = request.header('x-client-type');
+    if (
+      typeof clientType !== 'string' ||
+      !['web', 'mobile', 'desktop'].includes(clientType)
+    ) {
+      throw new BadRequestException('A valid x-client-type header is required');
+    }
+
+    const isPlatformUser = request.user?.isPlatform === true;
+    const platformUserId = isPlatformUser
+      ? (request.user.platformUserId ??
+        request.user.subjectId ??
+        request.user.userId ??
+        request.user.sub)
+      : undefined;
+    if (!platformUserId) {
+      throw new ForbiddenException('Platform user authentication required');
+    }
+
+    return this.platformBusiness.getBranchDetails(
+      businessId,
+      branchId,
+      platformUserId,
+      {
+        method: request.method,
+        endpointPath: request.route?.path,
+        requestId: request.header('x-request-id'),
+        clientType,
+        ipAddress: request.ip,
+        userAgent: request.header('user-agent'),
+      },
+    );
+  }
+
   @Post('businesses/create')
   @HttpCode(HttpStatus.CREATED)
   @RateLimit({
