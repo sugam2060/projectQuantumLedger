@@ -41,6 +41,9 @@ export const businessMemberships = pgTable(
       table.userId,
       table.businessId,
     ),
+    uniqueIndex('business_memberships_one_active_user_uq')
+      .on(table.userId)
+      .where(sql`is_active = true`),
     index('business_memberships_business_branch_active_idx').on(
       table.businessId,
       table.branchId,

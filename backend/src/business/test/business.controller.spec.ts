@@ -34,13 +34,12 @@ describe('BusinessController', () => {
 
   it('returns the profile for the owner of the requested business', async () => {
     const profile = { id: businessId, isActive: false };
+    const user = { isOwner: true, businessId };
     service.getBusinessProfile.mockResolvedValue(profile);
     await expect(
-      controller.getBusiness({ businessId }, {
-        user: { isOwner: true, businessId },
-      } as never),
+      controller.getBusiness({ businessId }, { user } as never),
     ).resolves.toBe(profile);
-    expect(service.getBusinessProfile).toHaveBeenCalledWith(businessId);
+    expect(service.getBusinessProfile).toHaveBeenCalledWith(businessId, user);
   });
 
   it.each([

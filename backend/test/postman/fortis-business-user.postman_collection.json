@@ -1,0 +1,1181 @@
+{
+  "info": {
+    "name": "Fortis POS API v1 ? Business User",
+    "description": "Business user collection for owner, manager, and staff workflows. Run the relevant login request first. Desktop/mobile login stores bearer tokens in accessToken and refreshToken; owner web login stores an HttpOnly cookie used automatically by owner-only endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01. Public & onboarding",
+      "item": [
+        {
+          "name": "GET /",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /onboarding",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/onboarding",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"business.created\",\n  \"businessName\": \"Example Store\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 202', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02. User authentication (business users)",
+      "item": [
+        {
+          "name": "POST /authentication/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{userClientType}}",
+                "type": "text"
+              },
+              {
+                "key": "x-terminal-id",
+                "value": "{{terminalId}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/authentication/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\",\n  \"remember\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Web clients may omit x-terminal-id and use their sole active membership for business/branch context. Mobile and desktop clients must provide the active assigned x-terminal-id. Set userClientType to web and remove the terminal header for the web flow."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('userClientType') === 'web') pm.request.headers.remove('x-terminal-id');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token ?? body.tokens?.accessToken ?? body.tokens?.access_token;",
+                  "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token ?? body.tokens?.refreshToken ?? body.tokens?.refresh_token;",
+                  "if (token) {",
+                  "  pm.collectionVariables.set('accessToken', token);",
+                  "  try { pm.environment.set('accessToken', token); } catch (_) {}",
+                  "}",
+                  "if (refresh) {",
+                  "  pm.collectionVariables.set('refreshToken', refresh);",
+                  "  try { pm.environment.set('refreshToken', refresh); } catch (_) {}",
+                  "}",
+                  "if (token && body.memberships?.some((membership) => membership.isOwner === true)) {",
+                  "  pm.collectionVariables.set('ownerAccessToken', token);",
+                  "  try { pm.environment.set('ownerAccessToken', token); } catch (_) {}",
+                  "}",
+                  "const roleId = body.memberships?.find((membership) => membership.roleId)?.roleId;",
+                  "if (roleId) { pm.collectionVariables.set('roleId', roleId); try { pm.environment.set('roleId', roleId); } catch (_) {} }",
+                  "if (pm.collectionVariables.get('userClientType') !== 'web') pm.test('Bearer access token is available to later requests', () => { pm.expect(token).to.be.a('string').and.not.empty; pm.expect(pm.variables.replaceIn('{{accessToken}}')).to.eql(token); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /authentication/refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{userClientType}}",
+                "type": "text"
+              },
+              {
+                "key": "x-terminal-id",
+                "value": "{{terminalId}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/authentication/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Web clients may omit x-terminal-id and refresh using their sole active membership. Mobile and desktop clients must provide the active assigned x-terminal-id. Set userClientType to web and remove the terminal header for the web flow."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('userClientType') === 'web') pm.request.headers.remove('x-terminal-id');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token ?? body.tokens?.accessToken ?? body.tokens?.access_token;",
+                  "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token ?? body.tokens?.refreshToken ?? body.tokens?.refresh_token;",
+                  "if (token) {",
+                  "  pm.collectionVariables.set('accessToken', token);",
+                  "  try { pm.environment.set('accessToken', token); } catch (_) {}",
+                  "}",
+                  "if (refresh) {",
+                  "  pm.collectionVariables.set('refreshToken', refresh);",
+                  "  try { pm.environment.set('refreshToken', refresh); } catch (_) {}",
+                  "}",
+                  "if (token && body.memberships?.some((membership) => membership.isOwner === true)) {",
+                  "  pm.collectionVariables.set('ownerAccessToken', token);",
+                  "  try { pm.environment.set('ownerAccessToken', token); } catch (_) {}",
+                  "}",
+                  "const roleId = body.memberships?.find((membership) => membership.roleId)?.roleId;",
+                  "if (roleId) { pm.collectionVariables.set('roleId', roleId); try { pm.environment.set('roleId', roleId); } catch (_) {} }",
+                  "if (pm.collectionVariables.get('userClientType') !== 'web') pm.test('Bearer access token is available to later requests', () => { pm.expect(token).to.be.a('string').and.not.empty; pm.expect(pm.variables.replaceIn('{{accessToken}}')).to.eql(token); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /authentication/logout (web cookies)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/authentication/logout"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /authentication/logout (desktop/mobile)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{userClientType}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/authentication/logout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /authentication/me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "{{userClientType}}",
+                "type": "text"
+              },
+              {
+                "key": "x-terminal-id",
+                "value": "{{terminalId}}",
+                "type": "text"
+              },
+              {
+                "key": "x-initial-load",
+                "value": "true",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/authentication/me",
+            "description": "Requires an access token. x-terminal-id is optional for web and required for mobile/desktop; when omitted, session.terminalId is null. The request example uses the default desktop client."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('userClientType') === 'web') pm.request.headers.remove('x-terminal-id');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Normal user logout test",
+          "description": "Run these three requests in order. Requires a normal active user assigned to terminalId, and userEmail/userPassword set. The flow logs in, revokes the refresh token, then verifies that refresh is rejected.",
+          "item": [
+            {
+              "name": "1. Login normal user for logout test",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-client-type",
+                    "value": "{{userClientType}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-terminal-id",
+                    "value": "{{terminalId}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/authentication/login",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\",\n  \"remember\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Login succeeds for the normal user', () => pm.response.to.have.status(200));",
+                      "const body = pm.response.json();",
+                      "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token;",
+                      "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token;",
+                      "pm.expect(token).to.be.a('string').and.not.empty;",
+                      "pm.expect(refresh).to.be.a('string').and.not.empty;",
+                      "pm.collectionVariables.set('logoutTestAccessToken', token);",
+                      "pm.collectionVariables.set('logoutTestRefreshToken', refresh);",
+                      "try { pm.environment.set('logoutTestAccessToken', token); pm.environment.set('logoutTestRefreshToken', refresh); } catch (_) {}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2. Logout normal user",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-client-type",
+                    "value": "{{userClientType}}",
+                    "type": "text"
+                  }
+                ],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{logoutTestAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "url": "{{baseUrl}}/authentication/logout",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"{{logoutTestRefreshToken}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Logout succeeds', () => pm.response.to.have.status(200));",
+                      "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3. Verify revoked refresh token is rejected",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-client-type",
+                    "value": "{{userClientType}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "x-terminal-id",
+                    "value": "{{terminalId}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/authentication/refresh",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"{{logoutTestRefreshToken}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Revoked refresh token is rejected', () => pm.response.to.have.status(401));",
+                      "pm.collectionVariables.unset('logoutTestAccessToken');",
+                      "pm.collectionVariables.unset('logoutTestRefreshToken');"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "description": "Business user desktop/mobile authentication. Run login first; the response script saves accessToken and refreshToken for subsequent requests. Web login uses cookies and does not return bearer tokens in the response body."
+    },
+    {
+      "name": "03. Business owner ? activation",
+      "item": [
+        {
+          "name": "POST /authentication/register-owner",
+          "request": {
+            "method": "POST",
+            "description": "Web-only owner activation. Use the redemption code and initial terminal activation details received by email. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
+            "header": [
+              {
+                "key": "X-Client-Type",
+                "value": "web",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/authentication/register-owner",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"name\": \"Example Owner\",\n  \"password\": \"{{ownerPassword}}\",\n  \"redeemCode\": \"{{ownerRedeemCode}}\",\n  \"businessId\": \"{{businessId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"terminalCode\": \"{{terminalCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.expect(body.isOwner).to.eql(true);",
+                  "pm.expect(body.roleId).to.eql(null);",
+                  "pm.expect(body.branchId).to.eql(null);",
+                  "pm.collectionVariables.set(\"userId\", body.userId);",
+                  "if (body.initialTerminalId) pm.collectionVariables.set(\"terminalId\", body.initialTerminalId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /authentication/login (business owner web session)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/authentication/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"password\": \"{{ownerPassword}}\",\n  \"remember\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Sign in as the business owner before running owner operations. The web login sets an HttpOnly access_token cookie; Postman stores and sends it automatically to the same baseUrl. Set ownerEmail and ownerPassword first. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Owner login returned a user profile', () => pm.expect(pm.response.json().user).to.be.an('object'));",
+                  "pm.test('Web access cookie was set', () => pm.expect(pm.response.headers.get('Set-Cookie') || '').to.include('access_token='));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Register the owner if needed, then log in as the owner with the web client. Postman stores the HttpOnly cookie for the owner-only terminal activation flow."
+    },
+    {
+      "name": "04. Business owner ? profile & branches",
+      "item": [
+        {
+          "name": "GET /businesses/{businessId} (owner only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/businesses/{{businessId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Sensitive registration data is omitted', () => { const body = pm.response.json(); pm.expect(body).not.to.have.property('pan'); pm.expect(body).not.to.have.property('documents'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /businesses/{businessId} (owner only)",
+          "request": {
+            "method": "PATCH",
+            "description": "Requires an owner access token for businessId. Multipart file fields are optional; configure local file paths. Only approved profile fields and document replacement are allowed. Do not set Content-Type manually; Postman must add its multipart boundary. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{businessUpdateIdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/businesses/{{businessId}}",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "reason",
+                  "value": "Approved profile update",
+                  "type": "text"
+                },
+                {
+                  "key": "displayName",
+                  "value": "Updated Trading Name",
+                  "type": "text"
+                },
+                {
+                  "key": "country",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "city",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "postalCode",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "addressLine1",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "addressLine2",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "primaryContactNumber",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "primaryContactEmail",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "panCardFront",
+                  "type": "file",
+                  "src": "{{panCardFrontPath}}",
+                  "disabled": true
+                },
+                {
+                  "key": "panCardBack",
+                  "type": "file",
+                  "src": "{{panCardBackPath}}",
+                  "disabled": true
+                },
+                {
+                  "key": "businessRegistrationCertificate",
+                  "type": "file",
+                  "src": "{{businessRegistrationPath}}",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains changed fields without document URLs', () => { const body = pm.response.json(); pm.expect(body.businessId).to.eql(pm.collectionVariables.get('businessId')); pm.expect(body.changedFields).to.be.an('object'); pm.expect(body).not.to.have.property('documents'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /businesses/{businessId}/branches (owner or authorized role)",
+          "request": {
+            "method": "GET",
+            "description": "Requires an owner token or a role explicitly assigned the branches.read endpoint key. An assigned branch membership sees only that branch; a membership with no branch assignment has business-wide scope. Enable the cursor query parameter after a page returns nextCursor. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches?from={{branchFrom}}&to={{branchTo}}&limit={{branchLimit}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{branchFrom}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{branchTo}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{branchLimit}}"
+                },
+                {
+                  "key": "cursor",
+                  "value": "{{branchCursor}}",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains branch items and cursor', () => { const body = pm.response.json(); pm.expect(body.items).to.be.an('array'); pm.expect(body.nextCursor === null || typeof body.nextCursor === 'string').to.eql(true); body.items.forEach((branch) => { pm.expect(branch.id).to.be.a('string'); pm.expect(branch.status).to.be.oneOf(['active', 'inactive']); }); });",
+                  "if (pm.response.code === 200 && pm.response.json().nextCursor) pm.collectionVariables.set('branchCursor', pm.response.json().nextCursor);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /businesses/{businessId}/branches/{branchId} (owner or authorized role)",
+          "request": {
+            "method": "GET",
+            "description": "Returns branch profile and current terminal status/member counts. Members assigned to another branch receive 404; business-wide members can read any branch. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains branch and operational summary', () => { const body = pm.response.json(); pm.expect(body.branch.id).to.eql(pm.collectionVariables.get('branchId')); pm.expect(body.summary.terminals).to.include.all.keys('active', 'inactive', 'maintenance', 'total'); pm.expect(body.summary.members).to.include.all.keys('active', 'inactive', 'total'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /businesses/{businessId}/branches/{branchId}/terminals/activate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/terminals/activate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"terminalCode\": \"{{terminalCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Terminal is active', () => pm.expect(pm.response.json().status).to.eql('active'));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Run the business owner web login in the activation folder first. Web authentication uses the HttpOnly access_token cookie stored by Postman. Set businessId and branchId to the target records."
+    },
+    {
+      "name": "05. Business owner ? roles & endpoint access",
+      "item": [
+        {
+          "name": "GET /business/endpoint-access/endpoints",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/business/endpoint-access/endpoints"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /business/endpoint-access",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/business/endpoint-access"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /business/endpoint-access/:endpointKey",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/business/endpoint-access/{{endpointKey}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleIds\": [\n    \"{{roleId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /business/endpoint-access/:endpointKey",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/business/endpoint-access/{{endpointKey}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Owner only. Log in through the Business owner ? activation folder first; these authenticated requests use Postman?s saved web access cookie."
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "userClientType",
+      "value": "desktop",
+      "type": "string"
+    },
+    {
+      "key": "userEmail",
+      "value": "cashier@example.com",
+      "type": "string"
+    },
+    {
+      "key": "userPassword",
+      "value": "CHANGE_ME",
+      "type": "string"
+    },
+    {
+      "key": "terminalId",
+      "value": "01234567-89ab-4cde-8f01-23456789abcd",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "endpointKey",
+      "value": "users.login",
+      "type": "string"
+    },
+    {
+      "key": "roleId",
+      "value": "9abcde01-2345-4f67-89ab-cdef01234567",
+      "type": "string"
+    },
+    {
+      "key": "panCardFrontPath",
+      "value": "/absolute/path/to/pan-front.pdf",
+      "type": "string"
+    },
+    {
+      "key": "panCardBackPath",
+      "value": "/absolute/path/to/pan-back.pdf",
+      "type": "string"
+    },
+    {
+      "key": "businessRegistrationPath",
+      "value": "/absolute/path/to/registration.pdf",
+      "type": "string"
+    },
+    {
+      "key": "ownerEmail",
+      "value": "owner@example.com",
+      "type": "string"
+    },
+    {
+      "key": "ownerPassword",
+      "value": "CHANGE_ME",
+      "type": "string"
+    },
+    {
+      "key": "ownerRedeemCode",
+      "value": "PASTE_CODE_FROM_EMAIL",
+      "type": "string"
+    },
+    {
+      "key": "logoutTestAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "logoutTestRefreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "businessId",
+      "value": "00000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "ownerAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "businessUpdateIdempotencyKey",
+      "value": "business-profile-update-001",
+      "type": "string"
+    },
+    {
+      "key": "branchFrom",
+      "value": "2026-10-01T00:00:00+05:45",
+      "type": "string"
+    },
+    {
+      "key": "branchTo",
+      "value": "2026-10-29T23:59:59+05:45",
+      "type": "string"
+    },
+    {
+      "key": "branchLimit",
+      "value": "50",
+      "type": "string"
+    },
+    {
+      "key": "branchCursor",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "branchId",
+      "value": "00000000-0000-4000-8000-000000000002",
+      "type": "string"
+    },
+    {
+      "key": "terminalCode",
+      "value": "PASTE_TERMINAL_CODE_FROM_EMAIL_OR_PLATFORM_RESPONSE",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

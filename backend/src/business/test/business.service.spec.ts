@@ -7,7 +7,7 @@ describe('BusinessService', () => {
   const where = jest.fn<(...args: any[]) => any>(() => ({ limit }));
   const from = jest.fn<(...args: any[]) => any>(() => ({ where }));
   const database = {
-    select: jest.fn<(...args: any[]) => any>(() => ({ from })),
+    transactionWithSession: jest.fn<(...args: any[]) => any>(),
   };
   const service = new BusinessService(
     database as never,
@@ -20,27 +20,39 @@ describe('BusinessService', () => {
     jest.clearAllMocks();
     where.mockReturnValue({ limit });
     from.mockReturnValue({ where });
-    database.select.mockReturnValue({ from } as never);
+    database.transactionWithSession.mockImplementation(
+      async (_session: unknown, callback: (tx: unknown) => Promise<unknown>) =>
+        callback({
+          select: jest.fn(() => ({ from })),
+        }),
+    );
   });
 
   it('returns selected profile fields', async () => {
     const profile = { id: 'business-id', displayName: 'Shop', isActive: true };
     limit.mockResolvedValue([profile]);
-    await expect(service.getBusinessProfile('business-id')).resolves.toBe(
-      profile,
-    );
-    expect(database.select).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: expect.anything(),
-        isActive: expect.anything(),
-      }),
+    const session = {
+      userId: 'owner-id',
+      businessId: 'business-id',
+      isOwner: true,
+    };
+    await expect(
+      service.getBusinessProfile('business-id', session),
+    ).resolves.toBe(profile);
+    expect(database.transactionWithSession).toHaveBeenCalledWith(
+      session,
+      expect.any(Function),
     );
   });
 
   it('throws when the business does not exist', async () => {
     limit.mockResolvedValue([]);
-    await expect(service.getBusinessProfile('missing')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.getBusinessProfile('missing', {
+        userId: 'owner-id',
+        businessId: 'missing',
+        isOwner: true,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

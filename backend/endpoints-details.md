@@ -115,17 +115,14 @@ request body if it should also be revoked server-side:
 
 **Description:** Authenticates a business user with email and password, then
 returns their profile and active business memberships. An access token includes
-business/role claims for the active membership selected by the terminal header.
+business/role claims for the active business membership.
 **Auth:** public. **Rate limit:** 100 requests per hour, with dynamic
 adjustment enabled. **Errors:** 400 for invalid input, 401 for invalid
-credentials or an inactive/unassigned terminal, 429 when rate limited.
+credentials or an inactive/unassigned terminal or missing active business membership, 429 when rate limited. Mobile/desktop requests missing `x-terminal-id` receive 400.
 **Idempotency:** no; a login creates a new access token and may create a refresh
 token.
 
-`remember` is optional. `x-terminal-id` is required and must identify an active
-terminal whose business and branch match an active membership. A membership
-with no branch covers all branches within its business; the token is bound to
-the terminal's branch. The JWT includes the user's name and business/branch
+`remember` is optional. For `mobile` and `desktop`, `x-terminal-id` is required and must identify an active terminal matching the user's business membership. Web clients may omit it; without the header, the token uses the membership's branch assignment (or no branch for a business-wide manager). If a web client supplies a terminal ID, it is validated and the token is bound to that terminal's branch. The JWT includes the user's name and business/branch
 context; role claims are included when the membership has a role. A business
 owner may have `roleId: null`; the response then has an empty effective
 permission list because owners bypass endpoint role mappings. Non-owner
@@ -191,17 +188,14 @@ fields. Mobile and desktop clients receive tokens in the JSON body.
 Web clients may send the refresh token in the `refresh_token` cookie; other
 clients send it in the JSON body. **Auth:** public; possession of a valid
 refresh token is required. **Rate limit:** none currently. **Errors:** 400 for
-invalid headers, 401 for a missing/invalid refresh token or a terminal that is
-inactive or outside the user's active memberships. **Idempotency:** no; tokens
+invalid headers (including a missing `x-terminal-id` for mobile/desktop), 401 for a missing/invalid refresh token, no active membership, or an inactive/unassigned terminal. **Idempotency:** no; tokens
 rotate, so a refresh token should only be used once.
 
 The `x-client-type` header controls web behavior. For web, the controller sets
 new HTTP-only cookies and omits the tokens from the response body. For desktop
 and mobile, tokens are returned in JSON. `@RequiredRoles('users.refresh')` is
 present in code, but this route is public, so the permission guard skips that
-check. `x-terminal-id` is required; the server validates that it is active and
-matches one of the user's active memberships before issuing a new token with
-the current role ID and version. Owners with a role-free membership can also
+check. For mobile and desktop, `x-terminal-id` is required and must be active and match the user's membership. Web clients may omit it; refresh then uses the sole active membership and its assigned branch (or business-wide scope). A supplied terminal is still validated. The server issues a token with the current role ID and version. Owners with a role-free membership can also
 refresh; their response has an empty effective-permission list and the token
 omits role claims. Non-owners need an assigned role. The effective permission
 snapshot is returned separately from the JWT so the client can refresh its
@@ -249,8 +243,7 @@ summary from the validated access token. `x-initial-load` defaults to `true`;
 when true, the endpoint also returns effective permissions, using Redis first
 and querying the role and endpoint configuration from the database on a cache
 miss. When false, the permission field is omitted and no permission lookup is
-performed. The profile fields continue to come from the JWT. `x-terminal-id`
-is returned as session metadata and is not revalidated by this endpoint. A
+performed. The profile fields continue to come from the JWT. For mobile and desktop, `x-terminal-id` is required; web clients may omit it. It is session metadata and is not revalidated by this endpoint. When omitted, `session.terminalId` is null. A
 token without a business context can return a null active context and role. For
 a role-free owner, `role_template` and `role_template_version` are null, and
 initial-load permissions are an empty array.
@@ -270,7 +263,6 @@ limited. **Idempotency:** read-only.
     "headers": {
       "Authorization": "Bearer <access-token>",
       "x-client-type": "web",
-      "x-terminal-id": "6f806a43-405a-44e8-81be-27a68379c646",
       "x-initial-load": "true"
     },
     "body": null
@@ -292,7 +284,7 @@ limited. **Idempotency:** read-only.
       "effectivePermissions": ["inventory.create", "products.read"],
       "session": {
         "clientType": "web",
-        "terminalId": "6f806a43-405a-44e8-81be-27a68379c646",
+        "terminalId": null,
         "issuedAt": "2026-11-13T02:15:00.000Z",
         "expiresAt": "2026-11-13T02:30:00.000Z",
         "expiresInSeconds": 900

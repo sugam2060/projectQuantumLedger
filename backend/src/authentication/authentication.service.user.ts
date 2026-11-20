@@ -56,7 +56,7 @@ export class UserAuthService {
 
   async userLogin(
     dto: ClientLoginDTO,
-    requestedTerminalId: string,
+    requestedTerminalId?: string,
     auditContext: AuditRequestContext = {},
   ) {
     // Ensure email exists and is a string before processing
@@ -77,8 +77,7 @@ export class UserAuthService {
     try {
       return await this.db.transaction(async (tx) => {
         // Login has no authenticated user context yet, so enable the platform
-        // read policy for the user lookup and terminal validation in this
-        // transaction only.
+        // read policy for the user lookup and optional terminal validation.
         await tx.execute(sql`
         SELECT set_config('app.is_platform_user', 'true', true)
       `);
@@ -128,37 +127,44 @@ export class UserAuthService {
           throw new UnauthorizedException('Invalid email or password');
         }
 
-        const [terminal] = await tx
-          .select({
-            terminalId: terminals.id,
-            businessId: terminals.businessId,
-            branchId: terminals.branchId,
-          })
-          .from(terminals)
-          .innerJoin(
-            branches,
-            and(
-              eq(branches.id, terminals.branchId),
-              eq(branches.businessId, terminals.businessId),
-            ),
-          )
-          .where(
-            and(
-              eq(terminals.id, requestedTerminalId),
-              eq(terminals.status, 'active'),
-            ),
-          );
+        let terminal:
+          | { terminalId: string; businessId: string; branchId: string }
+          | undefined;
+        if (requestedTerminalId) {
+          [terminal] = await tx
+            .select({
+              terminalId: terminals.id,
+              businessId: terminals.businessId,
+              branchId: terminals.branchId,
+            })
+            .from(terminals)
+            .innerJoin(
+              branches,
+              and(
+                eq(branches.id, terminals.branchId),
+                eq(branches.businessId, terminals.businessId),
+              ),
+            )
+            .where(
+              and(
+                eq(terminals.id, requestedTerminalId),
+                eq(terminals.status, 'active'),
+              ),
+            );
+        }
 
-        const selectedMembership = userData.find(
-          (record) =>
-            terminal &&
-            record.businessId === terminal.businessId &&
-            (record.branchId === null || record.branchId === terminal.branchId),
+        const selectedMembership = userData.find((record) =>
+          terminal
+            ? record.businessId === terminal.businessId &&
+              (record.branchId === null ||
+                record.branchId === terminal.branchId)
+            : record.businessId !== null,
         );
-        if (!terminal || !selectedMembership) {
-          throw new UnauthorizedException(
-            'Terminal is not active for an assigned business branch',
-          );
+        if (!selectedMembership?.businessId) {
+          throw new UnauthorizedException('No active business membership');
+        }
+        if (requestedTerminalId && !terminal) {
+          throw new UnauthorizedException('Terminal is not active');
         }
 
         // Process the joined results to separate user data from memberships
@@ -193,10 +199,11 @@ export class UserAuthService {
           ...membershipsWithRoles.find(
             (membership) =>
               membership.businessId === selectedMembership.businessId &&
-              (membership.branchId === null ||
+              (terminal === undefined ||
+                membership.branchId === null ||
                 membership.branchId === terminal.branchId),
           ),
-          branchId: terminal.branchId,
+          branchId: terminal?.branchId ?? selectedMembership.branchId,
         };
         const effectivePermissions = activeMembership.roleId
           ? await this.getEffectivePermissions(
@@ -294,7 +301,7 @@ export class UserAuthService {
   async getCurrentUser(
     authenticatedUser: AuthenticatedUser,
     clientType: ClientType,
-    requestedTerminalId: string,
+    requestedTerminalId?: string,
     initialLoad = true,
   ) {
     const { userId, businessId, branchId, name, roleId, roleVersion } =
@@ -364,7 +371,7 @@ export class UserAuthService {
       ...(effectivePermissions && { effectivePermissions }),
       session: {
         clientType,
-        terminalId: requestedTerminalId,
+        terminalId: requestedTerminalId ?? null,
         issuedAt: issuedAt ? new Date(issuedAt * 1000).toISOString() : null,
         expiresAt: tokenExpiresAt
           ? new Date(tokenExpiresAt * 1000).toISOString()
@@ -642,7 +649,7 @@ export class UserAuthService {
    */
   async refreshAccessToken(
     refreshToken: string,
-    requestedTerminalId: string,
+    requestedTerminalId?: string,
     auditContext: AuditRequestContext = {},
   ): Promise<{
     accessToken: string;
@@ -694,38 +701,45 @@ export class UserAuthService {
           throw new UnauthorizedException('User not found');
         }
 
-        const [terminal] = await tx
-          .select({
-            terminalId: terminals.id,
-            businessId: terminals.businessId,
-            branchId: terminals.branchId,
-          })
-          .from(terminals)
-          .innerJoin(
-            branches,
-            and(
-              eq(branches.id, terminals.branchId),
-              eq(branches.businessId, terminals.businessId),
-            ),
-          )
-          .where(
-            and(
-              eq(terminals.id, requestedTerminalId),
-              eq(terminals.status, 'active'),
-            ),
-          );
-
-        const membership = userRows.find(
-          (row) =>
-            terminal &&
-            row.businessId === terminal.businessId &&
-            (row.branchId === null || row.branchId === terminal.branchId),
-        );
-        if (!terminal || !membership) {
-          throw new UnauthorizedException(
-            'Terminal is not active for an assigned business branch',
-          );
+        let terminal:
+          | { terminalId: string; businessId: string; branchId: string }
+          | undefined;
+        if (requestedTerminalId) {
+          [terminal] = await tx
+            .select({
+              terminalId: terminals.id,
+              businessId: terminals.businessId,
+              branchId: terminals.branchId,
+            })
+            .from(terminals)
+            .innerJoin(
+              branches,
+              and(
+                eq(branches.id, terminals.branchId),
+                eq(branches.businessId, terminals.businessId),
+              ),
+            )
+            .where(
+              and(
+                eq(terminals.id, requestedTerminalId),
+                eq(terminals.status, 'active'),
+              ),
+            );
         }
+
+        const membership = userRows.find((row) =>
+          terminal
+            ? row.businessId === terminal.businessId &&
+              (row.branchId === null || row.branchId === terminal.branchId)
+            : row.businessId !== null,
+        );
+        if (!membership?.businessId) {
+          throw new UnauthorizedException('No active business membership');
+        }
+        if (requestedTerminalId && !terminal) {
+          throw new UnauthorizedException('Terminal is not active');
+        }
+        const activeBranchId = terminal?.branchId ?? membership.branchId;
 
         const effectivePermissions = membership.roleId
           ? await this.getEffectivePermissions(
@@ -751,7 +765,7 @@ export class UserAuthService {
           set_config('app.is_platform_user', 'false', true),
           set_config('app.user_id', ${user.userId}, true),
           set_config('app.business_id', ${membership.businessId!}, true),
-          set_config('app.branch_id', ${terminal.branchId}, true)
+          set_config('app.branch_id', ${activeBranchId ?? ''}, true)
       `);
         await this.auditLogs.insertUserEvent(tx, {
           ...auditContext,
@@ -768,7 +782,7 @@ export class UserAuthService {
             name: user.name,
             isPlatform: false,
             businessId: membership.businessId,
-            branchId: terminal.branchId,
+            branchId: activeBranchId ?? undefined,
             isOwner: membership.isOwner,
             ...(membership.roleId
               ? {

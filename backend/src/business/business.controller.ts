@@ -56,7 +56,7 @@ export class BusinessController {
     ) {
       throw new ForbiddenException('Business owner access required');
     }
-    return this.businessService.getBusinessProfile(params.businessId);
+    return this.businessService.getBusinessProfile(params.businessId, user);
   }
 
   @Get(':businessId/branches')
