@@ -10,14 +10,9 @@ const mockFn = () => jest.fn<(...args: any[]) => any>();
 
 describe('BusinessController', () => {
   const service = {
-<<<<<<< HEAD
-    getBusinessProfile: jest.fn(),
-    listBranches: jest.fn(),
-    updateBusinessProfile: jest.fn(),
-=======
     getBusinessProfile: mockFn(),
+    listBranches: mockFn(),
     updateBusinessProfile: mockFn(),
->>>>>>> 0b8110a22a00fa0d26a51394aef6f3c6094c2388
   };
   const controller = new BusinessController(service as never);
   const businessId = '00000000-0000-4000-8000-000000000001';

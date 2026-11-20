@@ -12,11 +12,13 @@ import { BusinessService } from '../business.service';
 import { BusinessUtilsService } from '../business.utils.service';
 import { ListBranchesQueryDto } from '../dto/list-branches-query.dto';
 
+const mockFn = () => jest.fn<(...args: any[]) => any>();
+
 describe('BusinessService.listBranches', () => {
-  const database = { transactionWithSession: jest.fn() };
-  const redis = { get: jest.fn() };
+  const database = { transactionWithSession: mockFn() };
+  const redis = { get: mockFn() };
   const objectStore = {};
-  const auditLogs = { insertUserEvent: jest.fn() };
+  const auditLogs = { insertUserEvent: mockFn() };
   const businessId = '00000000-0000-4000-8000-000000000001';
   const branchId = '00000000-0000-4000-8000-000000000002';
   const session = {
@@ -27,7 +29,7 @@ describe('BusinessService.listBranches', () => {
   let service: BusinessService;
   let membership: { branchId: string | null; isOwner: boolean };
   let branchRows: Array<Record<string, unknown>>;
-  let branchWhere: jest.Mock;
+  let branchWhere: ReturnType<typeof mockFn>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -44,18 +46,18 @@ describe('BusinessService.listBranches', () => {
         updatedAt: new Date('2026-10-16T12:00:00.000Z'),
       },
     ];
-    branchWhere = jest.fn(() => ({
-      orderBy: jest.fn(() => ({
-        limit: jest.fn().mockResolvedValue(branchRows),
+    branchWhere = mockFn().mockImplementation(() => ({
+      orderBy: mockFn().mockImplementation(() => ({
+        limit: mockFn().mockResolvedValue(branchRows),
       })),
     }));
     const tx = {
-      select: jest.fn(() => ({
-        from: jest.fn((table: unknown) =>
+      select: mockFn().mockImplementation(() => ({
+        from: mockFn().mockImplementation((table: unknown) =>
           table === businessMemberships
             ? {
-                where: jest.fn(() => ({
-                  limit: jest.fn().mockResolvedValue([membership]),
+                where: mockFn().mockImplementation(() => ({
+                  limit: mockFn().mockResolvedValue([membership]),
                 })),
               }
             : { where: branchWhere },
@@ -136,10 +138,10 @@ describe('BusinessService.listBranches', () => {
     database.transactionWithSession.mockImplementation(
       async (_session: unknown, callback: (transaction: unknown) => unknown) =>
         callback({
-          select: jest.fn(() => ({
-            from: jest.fn(() => ({
-              where: jest.fn(() => ({
-                limit: jest.fn().mockResolvedValue([]),
+          select: mockFn().mockImplementation(() => ({
+            from: mockFn().mockImplementation(() => ({
+              where: mockFn().mockImplementation(() => ({
+                limit: mockFn().mockResolvedValue([]),
               })),
             })),
           })),

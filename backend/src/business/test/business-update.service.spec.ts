@@ -67,10 +67,9 @@ describe('BusinessService.updateBusinessProfile', () => {
       isActive: false,
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     };
-    const membershipLimit = mockFn()
-      .mockImplementation(async () =>
-        activeMembership ? [{ id: 'membership' }] : [],
-      );
+    const membershipLimit = mockFn().mockImplementation(async () =>
+      activeMembership ? [{ id: 'membership' }] : [],
+    );
     const businessLimit = mockFn().mockImplementation(() => ({
       for: mockFn().mockResolvedValue([current]),
     }));
@@ -81,10 +80,12 @@ describe('BusinessService.updateBusinessProfile', () => {
     const valuesInsert = mockFn().mockResolvedValue(undefined);
     const whereUpdate = mockFn().mockImplementation(() => ({
       returning: mockFn().mockResolvedValue([
-          { updatedAt: new Date('2026-02-01T00:00:00.000Z') },
-        ]),
+        { updatedAt: new Date('2026-02-01T00:00:00.000Z') },
+      ]),
     }));
-    const setUpdate = mockFn().mockImplementation(() => ({ where: whereUpdate }));
+    const setUpdate = mockFn().mockImplementation(() => ({
+      where: whereUpdate,
+    }));
     tx = {
       select: mockFn().mockImplementation(() => ({
         from: mockFn().mockImplementation(() => ({ where: whereSelect })),
