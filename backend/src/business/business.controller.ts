@@ -20,7 +20,10 @@ import {
   RequiredRoles,
 } from '../authentication/decorators/required_permission.decorator';
 import type { AuthenticatedUser } from '../authentication/strategies/jwt.strategy';
-import { BusinessIdParamDto } from './dto/business-id-param.dto';
+import {
+  BusinessBranchParamDto,
+  BusinessIdParamDto,
+} from './dto/business-id-param.dto';
 import { UpdateBusinessHeaders } from './decorators/update-business-headers.decorator';
 import { UpdateBusinessHeadersDto } from './dto/update-business-headers.dto';
 import type { UpdateBusinessDto } from './dto/update-business.dto';
@@ -71,6 +74,28 @@ export class BusinessController {
       throw new ForbiddenException('Business branch access required');
     }
     return this.businessService.listBranches(params.businessId, user, query);
+  }
+
+  @Get(':businessId/branches/:branchId')
+  @RequiredRoles('branches.read')
+  @RequireConfiguredRoles()
+  getBranch(
+    @Param() params: BusinessBranchParamDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const user = request.user;
+    if (
+      user?.isPlatform === true ||
+      !user?.businessId ||
+      user.businessId !== params.businessId
+    ) {
+      throw new ForbiddenException('Business branch access required');
+    }
+    return this.businessService.getBranchDetails(
+      params.businessId,
+      params.branchId,
+      user,
+    );
   }
 
   @Patch(':businessId')

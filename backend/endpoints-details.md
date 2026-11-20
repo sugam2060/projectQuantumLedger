@@ -966,3 +966,67 @@ unconfigured `branches.read`; 503 for an unexpected database failure.
   }
 }
 ```
+
+## GET /api/v1/businesses/{businessId}/branches/{branchId}
+
+**Description:** Reads a branch profile and current operational summary.
+**Auth:** the active owner or a business member with an explicit `branches.read`
+role assignment. A branch-scoped member can read only their assigned branch; a
+business-wide member and the owner can read any branch in the business. Role
+configuration is required for non-owner users; platform users are denied.
+**Headers:** `Authorization: Bearer <access-token>` and optional
+`x-client-type: web|desktop|mobile` (required when using the web access-token
+cookie). **Response:** `branch` contains `id`, `businessId`, `name`, `code`,
+`address`, `contactNumber`, current `status`, `createdAt`, and `updatedAt`.
+`summary.terminals` contains counts by `active`, `inactive`, and `maintenance`
+plus `total`. `summary.members` contains active and inactive membership counts
+directly assigned to this branch plus `total`; business-wide memberships are
+excluded. Counts reflect current state. **Audit:** none for this read.
+**Errors:** 401 for authentication failure; 403 for wrong-business, platform,
+inactive membership, or missing role permission; 404 when the branch does not
+exist in the requested business or is outside the member's branch scope; 503
+for an unexpected database failure.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "GET /businesses/{businessId}/branches/{branchId}",
+  "requestData": {
+    "pathParams": {
+      "businessId": "00000000-0000-4000-8000-000000000001",
+      "branchId": "00000000-0000-4000-8000-000000000002"
+    },
+    "queryParams": null,
+    "headers": {
+      "Authorization": "Bearer <access-token>",
+      "x-client-type": "desktop"
+    },
+    "body": null
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": {
+      "branch": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "businessId": "00000000-0000-4000-8000-000000000001",
+        "name": "Main Branch",
+        "code": "MAIN",
+        "address": "Main Street, Kathmandu",
+        "contactNumber": "+977-1-5550100",
+        "status": "active",
+        "createdAt": "2026-10-15T12:00:00.000Z",
+        "updatedAt": "2026-10-16T12:00:00.000Z"
+      },
+      "summary": {
+        "terminals": {
+          "active": 2,
+          "inactive": 0,
+          "maintenance": 1,
+          "total": 3
+        },
+        "members": { "active": 4, "inactive": 1, "total": 5 }
+      }
+    }
+  }
+}
+```

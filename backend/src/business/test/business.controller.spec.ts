@@ -11,6 +11,7 @@ const mockFn = () => jest.fn<(...args: any[]) => any>();
 describe('BusinessController', () => {
   const service = {
     getBusinessProfile: mockFn(),
+    getBranchDetails: mockFn(),
     listBranches: mockFn(),
     updateBusinessProfile: mockFn(),
   };
@@ -122,5 +123,29 @@ describe('BusinessController', () => {
     expect(service.listBranches).toHaveBeenCalledWith(businessId, user, {
       limit: 50,
     });
+  });
+
+  it('registers branch detail read as fail-closed role access', () => {
+    const handler = Object.getOwnPropertyDescriptor(
+      BusinessController.prototype,
+      'getBranch',
+    )?.value;
+    expect(Reflect.getMetadata(REQUIRED_ROLES, handler)).toBe('branches.read');
+    expect(Reflect.getMetadata(REQUIRE_CONFIGURED_ROLES, handler)).toBe(true);
+  });
+
+  it('routes branch detail requests with the authenticated user', async () => {
+    const response = { branch: { id: businessId }, summary: {} };
+    const branchId = '00000000-0000-4000-8000-000000000002';
+    const user = { isOwner: false, businessId, userId: 'user-id' };
+    service.getBranchDetails.mockResolvedValue(response);
+    await expect(
+      controller.getBranch({ businessId, branchId }, { user } as never),
+    ).resolves.toBe(response);
+    expect(service.getBranchDetails).toHaveBeenCalledWith(
+      businessId,
+      branchId,
+      user,
+    );
   });
 });
