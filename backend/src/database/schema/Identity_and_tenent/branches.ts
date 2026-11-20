@@ -6,6 +6,7 @@ import {
   timestamp,
   pgPolicy,
   uniqueIndex,
+  index,
   check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -33,6 +34,11 @@ export const branches = pgTable(
   (table) => [
     // Unique branch code per business to prevent duplicates
     uniqueIndex('branches_business_code_uq').on(table.businessId, table.code),
+    index('branches_business_created_id_idx').on(
+      table.businessId,
+      table.createdAt,
+      table.id,
+    ),
 
     // Check constraint to ensure branch code isn't empty
     check('branches_code_chk', sql`btrim(code) <> ''`),

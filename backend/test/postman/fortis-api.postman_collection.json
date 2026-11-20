@@ -129,6 +129,41 @@
       "key": "logoutTestRefreshToken",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "businessId",
+      "value": "00000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "ownerAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "businessUpdateIdempotencyKey",
+      "value": "business-profile-update-001",
+      "type": "string"
+    },
+    {
+      "key": "branchFrom",
+      "value": "2026-10-01T00:00:00+05:45",
+      "type": "string"
+    },
+    {
+      "key": "branchTo",
+      "value": "2026-10-29T23:59:59+05:45",
+      "type": "string"
+    },
+    {
+      "key": "branchLimit",
+      "value": "50",
+      "type": "string"
+    },
+    {
+      "key": "branchCursor",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -1222,6 +1257,226 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Business owner profile",
+      "item": [
+        {
+          "name": "GET /businesses/{businessId} (owner only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}"
+              },
+              {
+                "key": "x-client-type",
+                "value": "desktop"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/businesses/{{businessId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Sensitive registration data is omitted', () => { const body = pm.response.json(); pm.expect(body).not.to.have.property('pan'); pm.expect(body).not.to.have.property('documents'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /businesses/{businessId} (owner only)",
+          "request": {
+            "method": "PATCH",
+            "description": "Requires an owner access token for businessId. Multipart file fields are optional; configure local file paths. Only approved profile fields and document replacement are allowed. Do not set Content-Type manually; Postman must add its multipart boundary.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{businessUpdateIdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "desktop",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/businesses/{{businessId}}",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "reason",
+                  "value": "Approved profile update",
+                  "type": "text"
+                },
+                {
+                  "key": "displayName",
+                  "value": "Updated Trading Name",
+                  "type": "text"
+                },
+                {
+                  "key": "country",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "city",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "postalCode",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "addressLine1",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "addressLine2",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "primaryContactNumber",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "primaryContactEmail",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "panCardFront",
+                  "type": "file",
+                  "src": "{{panCardFrontPath}}",
+                  "disabled": true
+                },
+                {
+                  "key": "panCardBack",
+                  "type": "file",
+                  "src": "{{panCardBackPath}}",
+                  "disabled": true
+                },
+                {
+                  "key": "businessRegistrationCertificate",
+                  "type": "file",
+                  "src": "{{businessRegistrationPath}}",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains changed fields without document URLs', () => { const body = pm.response.json(); pm.expect(body.businessId).to.eql(pm.collectionVariables.get('businessId')); pm.expect(body.changedFields).to.be.an('object'); pm.expect(body).not.to.have.property('documents'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /businesses/{businessId}/branches (owner or authorized role)",
+          "request": {
+            "method": "GET",
+            "description": "Requires an owner token or a role explicitly assigned the branches.read endpoint key. An assigned branch membership sees only that branch; a membership with no branch assignment has business-wide scope. Enable the cursor query parameter after a page returns nextCursor.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "desktop",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches?from={{branchFrom}}&to={{branchTo}}&limit={{branchLimit}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{branchFrom}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{branchTo}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{branchLimit}}"
+                },
+                {
+                  "key": "cursor",
+                  "value": "{{branchCursor}}",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains branch items and cursor', () => { const body = pm.response.json(); pm.expect(body.items).to.be.an('array'); pm.expect(body.nextCursor === null || typeof body.nextCursor === 'string').to.eql(true); body.items.forEach((branch) => { pm.expect(branch.id).to.be.a('string'); pm.expect(branch.status).to.be.oneOf(['active', 'inactive']); }); });",
+                  "if (pm.response.code === 200 && pm.response.json().nextCursor) pm.collectionVariables.set('branchCursor', pm.response.json().nextCursor);"
                 ]
               }
             }

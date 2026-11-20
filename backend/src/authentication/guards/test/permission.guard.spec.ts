@@ -3,7 +3,10 @@ const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionGuard } from '../permission.guard';
-import { REQUIRED_ROLES } from '../../decorators/required_permission.decorator';
+import {
+  REQUIRE_CONFIGURED_ROLES,
+  REQUIRED_ROLES,
+} from '../../decorators/required_permission.decorator';
 import type { AuthenticatedUser } from '../../strategies/jwt.strategy';
 
 describe('PermissionGuard', () => {
@@ -47,7 +50,8 @@ describe('PermissionGuard', () => {
   it('checks the endpoint key and denies users without an assigned role', async () => {
     reflector.getAllAndOverride
       .mockReturnValueOnce(false)
-      .mockReturnValue('inventory.create');
+      .mockReturnValueOnce('inventory.create')
+      .mockReturnValueOnce(false);
     endpointAccess.hasAccess.mockResolvedValue(false);
 
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
@@ -60,13 +64,36 @@ describe('PermissionGuard', () => {
     expect(endpointAccess.hasAccess).toHaveBeenCalledWith(
       request.user,
       'inventory.create',
+      { requireConfiguration: false },
+    );
+  });
+
+  it('requires endpoint configuration when metadata requests fail-closed access', async () => {
+    reflector.getAllAndOverride
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce('branches.read')
+      .mockReturnValueOnce(true);
+    endpointAccess.hasAccess.mockResolvedValue(false);
+
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(reflector.getAllAndOverride).toHaveBeenCalledWith(
+      REQUIRE_CONFIGURED_ROLES,
+      expect.any(Array),
+    );
+    expect(endpointAccess.hasAccess).toHaveBeenCalledWith(
+      request.user,
+      'branches.read',
+      { requireConfiguration: true },
     );
   });
 
   it('allows users whose active role matches the endpoint configuration', async () => {
     reflector.getAllAndOverride
       .mockReturnValueOnce(false)
-      .mockReturnValue('inventory.create');
+      .mockReturnValueOnce('inventory.create')
+      .mockReturnValueOnce(false);
     endpointAccess.hasAccess.mockResolvedValue(true);
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
@@ -95,7 +122,8 @@ describe('PermissionGuard', () => {
   it('bypasses endpoint role checks for an authenticated business owner', async () => {
     reflector.getAllAndOverride
       .mockReturnValueOnce(false)
-      .mockReturnValue('inventory.create');
+      .mockReturnValueOnce('inventory.create')
+      .mockReturnValueOnce(false);
     request.user = {
       subjectId: 'owner-user-1',
       userId: 'owner-user-1',

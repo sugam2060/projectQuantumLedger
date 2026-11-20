@@ -204,6 +204,7 @@ export class EndpointAccessService {
   async hasAccess(
     session: RequestSession,
     endpointKey: string,
+    options: { requireConfiguration?: boolean } = {},
   ): Promise<boolean> {
     if (!session.businessId || !session.userId) return false;
 
@@ -219,7 +220,7 @@ export class EndpointAccessService {
         );
 
       // Unconfigured endpoints keep their existing access behavior.
-      if (configuredRoles.length === 0) return true;
+      if (configuredRoles.length === 0) return !options.requireConfiguration;
 
       const [membership] = await tx
         .select({ roleId: businessMemberships.roleId })

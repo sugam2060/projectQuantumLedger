@@ -792,3 +792,177 @@ already-cleared configuration leaves it cleared.
   no `@RateLimit` decorator have no route-specific limit.
 - The endpoint catalog contains only routes currently decorated with
   `@RequiredRoles`; it is not a list of every API route.
+## GET /api/v1/businesses/{businessId}
+
+**Description:** Returns the authenticated owner's business profile and current
+activation state. **Auth:** business owner only; the JWT must identify the same
+business as the path parameter. Platform users and non-owner users are denied.
+The route is registered with the `business.read` permission key; the owner-only
+check also applies after the global permission guard.
+**Headers:** `Authorization: Bearer <owner-access-token>` and optional
+`x-client-type: web|desktop|mobile` (used by client-specific authentication
+behavior; not a business selector). **Errors:** 400 for an invalid UUID, 401 for
+missing/invalid authentication, 403 unless the caller is the owner of that
+business, and 404 when the business does not exist. PAN and registration
+document references are not returned.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "GET /businesses/{businessId}",
+  "requestData": {
+    "pathParams": { "businessId": "00000000-0000-4000-8000-000000000001" },
+    "queryParams": null,
+    "headers": {
+      "Authorization": "Bearer <owner-access-token>",
+      "x-client-type": "desktop"
+    },
+    "body": null
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "legalName": "Example Trading Pvt Ltd",
+      "displayName": "Example Trading",
+      "address": "Main Street, Kathmandu",
+      "addressDetails": {
+        "country": "NP",
+        "city": "Kathmandu",
+        "postalCode": "44600",
+        "addressLine1": "Main Street",
+        "addressLine2": null
+      },
+      "primaryContactNumber": "+977-1-5550100",
+      "primaryContactEmail": "owner@example.com",
+      "isActive": true,
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
+## PATCH /api/v1/businesses/{businessId}
+
+**Description:** Updates approved business profile fields and optionally replaces
+business documents. **Auth:** only the active business owner for the path business;
+the route is registered with `business.update`. **Headers:**
+`Authorization: Bearer <owner-access-token>`, `Idempotency-Key`, and
+`x-client-type: web|desktop|mobile`. Use multipart form data; the client must set
+the multipart boundary. **Permitted fields:** `reason` (required), `displayName`,
+`country`, `city`, `postalCode`, `addressLine1`, `addressLine2`,
+`primaryContactNumber`, and `primaryContactEmail`. Optional files:
+`panCardFront`, `panCardBack`, `businessRegistrationCertificate` (one per field,
+up to 10 MB each). Profile address fields update `addressDetails` and keep the
+legacy `address` column synchronized. PAN, legal name, active status, identifiers,
+and system timestamps are prohibited. **Idempotency:** the same owner, business,
+key, and request payload replays the original response for seven days; reusing a
+key with a different payload or an in-progress request returns 409. The key hash
+includes uploaded file contents. **Audit:** profile changes and their audit event
+are committed in the same database transaction; the required reason and before /
+after profile values are recorded. Document audit metadata records changed file
+field names, not document URLs. **Errors:** 403 for non-owners or business mismatch;
+400 for an invalid business UUID or missing/invalid required headers; 404 for a
+missing business; 409 for idempotency conflicts; 413 for a file larger than
+10 MB; 422 for invalid or prohibited fields, missing reason, incomplete address
+or documents, or an empty update; 503 if the idempotency service is unavailable.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "PATCH /businesses/{businessId}",
+  "requestData": {
+    "pathParams": { "businessId": "00000000-0000-4000-8000-000000000001" },
+    "queryParams": null,
+    "headers": {
+      "Authorization": "Bearer <owner-access-token>",
+      "Content-Type": "multipart/form-data; boundary=<generated-by-client>",
+      "Idempotency-Key": "idem_sample_001",
+      "x-client-type": "desktop"
+    },
+    "body": {
+      "reason": "Approved operation",
+      "displayName": "Example Trading",
+      "primaryContactEmail": "owner@example.com",
+      "panCardFront": "<file part; optional>",
+      "panCardBack": "<file part; optional>",
+      "businessRegistrationCertificate": "<file part; optional>"
+    }
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": {
+      "businessId": "00000000-0000-4000-8000-000000000001",
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "changedFields": {
+        "displayName": "Example Trading",
+        "primaryContactEmail": "owner@example.com",
+        "documents": ["panCard.frontImage"]
+      }
+    }
+  }
+}
+```
+
+
+## GET /api/v1/businesses/{businessId}/branches
+
+**Description:** Lists business branches with their current operational status.
+**Auth:** the active owner or a business member with an explicit `branches.read`
+role assignment. This endpoint fails closed until roles are configured. A
+branch-scoped membership sees only its assigned branch; a membership with a null
+branch assignment and the owner see all branches in the business. Platform users
+are denied. **Headers:** `Authorization: Bearer <access-token>` and optional
+`x-client-type: web|desktop|mobile` (required when using the web access-token
+cookie). **Query:** optional timezone-aware ISO `from` and `to` filter `createdAt`
+inclusively; `from` must not be after `to`. `limit` defaults to 50 and must be
+1–100. `cursor` is an opaque cursor returned by the previous page and is bound to
+the same business, date range, and membership scope. **Ordering:** newest branch
+first by `createdAt`, then `id`; pagination uses a stable keyset cursor.
+**Response:** `items` contains `id`, `name`, `code`, `address`, `contactNumber`,
+`status` (`active` or `inactive`), `createdAt`, and `updatedAt`. `nextCursor` is
+null on the last page. Status is current; the database does not retain status
+history. **Audit:** none for this read. **Errors:** 400 for an invalid business
+UUID, date range, limit, or cursor; 401 for authentication failure; 403 for
+wrong-business, platform, inactive membership, missing role assignment, or
+unconfigured `branches.read`; 503 for an unexpected database failure.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "GET /businesses/{businessId}/branches",
+  "requestData": {
+    "pathParams": { "businessId": "00000000-0000-4000-8000-000000000001" },
+    "queryParams": {
+      "from": "2026-10-01T00:00:00+05:45",
+      "to": "2026-10-29T23:59:59+05:45",
+      "limit": 50,
+      "cursor": null
+    },
+    "headers": {
+      "Authorization": "Bearer <access-token>",
+      "x-client-type": "desktop"
+    },
+    "body": null
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": {
+      "items": [
+        {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "name": "Main Branch",
+          "code": "MAIN",
+          "address": "Main Street, Kathmandu",
+          "contactNumber": "+977-1-5550100",
+          "status": "active",
+          "createdAt": "2026-10-15T12:00:00.000Z",
+          "updatedAt": "2026-10-16T12:00:00.000Z"
+        }
+      ],
+      "nextCursor": null
+    }
+  }
+}
+```
