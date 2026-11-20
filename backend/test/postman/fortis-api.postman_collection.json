@@ -164,6 +164,11 @@
       "key": "branchCursor",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "branchId",
+      "value": "00000000-0000-4000-8000-000000000002",
+      "type": "string"
     }
   ],
   "item": [
@@ -1477,6 +1482,43 @@
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "pm.test('Response contains branch items and cursor', () => { const body = pm.response.json(); pm.expect(body.items).to.be.an('array'); pm.expect(body.nextCursor === null || typeof body.nextCursor === 'string').to.eql(true); body.items.forEach((branch) => { pm.expect(branch.id).to.be.a('string'); pm.expect(branch.status).to.be.oneOf(['active', 'inactive']); }); });",
                   "if (pm.response.code === 200 && pm.response.json().nextCursor) pm.collectionVariables.set('branchCursor', pm.response.json().nextCursor);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /businesses/{businessId}/branches/{branchId} (owner or authorized role)",
+          "request": {
+            "method": "GET",
+            "description": "Returns branch profile and current terminal status/member counts. Members assigned to another branch receive 404; business-wide members can read any branch.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ownerAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "desktop",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["businesses", "{{businessId}}", "branches", "{{branchId}}"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains branch and operational summary', () => { const body = pm.response.json(); pm.expect(body.branch.id).to.eql(pm.collectionVariables.get('branchId')); pm.expect(body.summary.terminals).to.include.all.keys('active', 'inactive', 'maintenance', 'total'); pm.expect(body.summary.members).to.include.all.keys('active', 'inactive', 'total'); });"
                 ]
               }
             }

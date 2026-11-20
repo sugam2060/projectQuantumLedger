@@ -85,6 +85,13 @@
       "when": 1795170000000,
       "tag": "0010_branches_business_created_cursor_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795170100000,
+      "tag": "0011_business_membership_branch_summary_idx",
+      "breakpoints": true
     }
   ]
 }

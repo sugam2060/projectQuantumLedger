@@ -8,12 +8,13 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { and, desc, eq, gte, lt, lte, or } from 'drizzle-orm';
+import { and, count, desc, eq, gte, lt, lte, or } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
   business,
   businessMemberships,
   branches,
+  terminals,
   type BusinessDocuments,
 } from '../database/schema';
 import type { RequestSession } from '../database/request_context.service';
@@ -178,6 +179,140 @@ export class BusinessService {
       );
       throw new ServiceUnavailableException(
         'Branch list is temporarily unavailable',
+      );
+    }
+  }
+
+  async getBranchDetails(
+    businessId: string,
+    branchId: string,
+    session: RequestSession,
+  ) {
+    if (
+      !session.userId ||
+      session.isPlatform === true ||
+      session.businessId !== businessId
+    ) {
+      throw new ForbiddenException('Business branch access required');
+    }
+
+    try {
+      return await this.database.transactionWithSession(session, async (tx) => {
+        const [membership] = await tx
+          .select({
+            branchId: businessMemberships.branchId,
+            isOwner: businessMemberships.isOwner,
+          })
+          .from(businessMemberships)
+          .where(
+            and(
+              eq(businessMemberships.businessId, businessId),
+              eq(businessMemberships.userId, session.userId!),
+              eq(businessMemberships.isActive, true),
+            ),
+          )
+          .limit(1);
+
+        if (!membership || (session.isOwner === true && !membership.isOwner)) {
+          throw new ForbiddenException('Active business membership required');
+        }
+        if (
+          !membership.isOwner &&
+          membership.branchId !== null &&
+          membership.branchId !== branchId
+        ) {
+          throw new NotFoundException('Branch was not found');
+        }
+
+        const [row] = await tx
+          .select({
+            id: branches.id,
+            businessId: branches.businessId,
+            name: branches.name,
+            code: branches.code,
+            address: branches.address,
+            contactNumber: branches.contactNumber,
+            isActive: branches.isActive,
+            createdAt: branches.createdAt,
+            updatedAt: branches.updatedAt,
+          })
+          .from(branches)
+          .where(
+            and(eq(branches.businessId, businessId), eq(branches.id, branchId)),
+          )
+          .limit(1);
+
+        if (!row) throw new NotFoundException('Branch was not found');
+
+        const terminalRows = await tx
+          .select({ status: terminals.status, total: count().mapWith(Number) })
+          .from(terminals)
+          .where(
+            and(
+              eq(terminals.businessId, businessId),
+              eq(terminals.branchId, branchId),
+            ),
+          )
+          .groupBy(terminals.status);
+        const memberRows = await tx
+          .select({
+            isActive: businessMemberships.isActive,
+            total: count().mapWith(Number),
+          })
+          .from(businessMemberships)
+          .where(
+            and(
+              eq(businessMemberships.businessId, businessId),
+              eq(businessMemberships.branchId, branchId),
+            ),
+          )
+          .groupBy(businessMemberships.isActive);
+
+        const terminalCounts = {
+          active: 0,
+          inactive: 0,
+          maintenance: 0,
+        };
+        for (const terminal of terminalRows) {
+          if (terminal.status in terminalCounts) {
+            terminalCounts[terminal.status as keyof typeof terminalCounts] =
+              terminal.total;
+          }
+        }
+        const memberCounts = { active: 0, inactive: 0 };
+        for (const member of memberRows) {
+          memberCounts[member.isActive ? 'active' : 'inactive'] = member.total;
+        }
+
+        const { isActive, ...branch } = row;
+        return {
+          branch: {
+            ...branch,
+            status: isActive ? 'active' : 'inactive',
+          },
+          summary: {
+            terminals: {
+              ...terminalCounts,
+              total: Object.values(terminalCounts).reduce(
+                (total, value) => total + value,
+                0,
+              ),
+            },
+            members: {
+              ...memberCounts,
+              total: memberCounts.active + memberCounts.inactive,
+            },
+          },
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(
+        `Failed to read branch ${branchId} for business ${businessId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new ServiceUnavailableException(
+        'Branch details are temporarily unavailable',
       );
     }
   }

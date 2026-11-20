@@ -5,6 +5,7 @@
   timestamp,
   pgPolicy,
   uniqueIndex,
+  index,
   check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -39,6 +40,11 @@ export const businessMemberships = pgTable(
     uniqueIndex('business_memberships_user_business_uq').on(
       table.userId,
       table.businessId,
+    ),
+    index('business_memberships_business_branch_active_idx').on(
+      table.businessId,
+      table.branchId,
+      table.isActive,
     ),
     check(
       'business_memberships_role_required_chk',
