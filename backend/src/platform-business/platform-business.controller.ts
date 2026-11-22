@@ -26,6 +26,11 @@ import { ProvisionBusinessDto } from './dto/provision-business.dto';
 import { ProvisionBusinessHeadersDto } from './dto/provision-business-headers.dto';
 import { ProvisionBusinessQueryDto } from './dto/provision-business-query.dto';
 import { ProvisionBusinessHeaders } from './decorators/provision-business-headers.decorator';
+import { BusinessListHeaders } from './decorators/business-list-headers.decorator';
+import { BusinessListHeadersDto } from './dto/business-list-headers.dto';
+import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
+import { BusinessBranchParamsDto } from './dto/business-branch-params.dto';
+import { CreateBusinessBranchDto } from './dto/create-business-branch.dto';
 import type { AuthenticatedUser } from '../authentication/strategies/jwt.strategy';
 import type { Request } from 'express';
 
@@ -68,17 +73,26 @@ export class PlatformBusinessController {
       throw new ForbiddenException('Platform user authentication required');
     }
 
-    return this.platformBusiness.getBusinessDetails(
-      businessId,
+    return this.platformBusiness.getBusinessDetails(businessId, platformUserId);
+  }
+
+  @Get()
+  async listBusinesses(
+    @Query() query: ListBusinessesQueryDto,
+    @BusinessListHeaders() _headers: BusinessListHeadersDto,
+    @Req() request: PlatformAuthenticatedRequest,
+  ) {
+    const user = request.user;
+    const platformUserId = user?.isPlatform
+      ? (user.platformUserId ?? user.subjectId ?? user.userId ?? user.sub)
+      : undefined;
+    if (!platformUserId) {
+      throw new ForbiddenException('Platform user authentication required');
+    }
+
+    return this.platformBusiness.listBusinesses(
+      { page: query.page, limit: query.limit },
       platformUserId,
-      {
-        method: request.method,
-        endpointPath: request.route?.path,
-        requestId: request.header('x-request-id'),
-        clientType,
-        ipAddress: request.ip,
-        userAgent: request.header('user-agent'),
-      },
     );
   }
 
@@ -112,14 +126,6 @@ export class PlatformBusinessController {
       businessId,
       branchId,
       platformUserId,
-      {
-        method: request.method,
-        endpointPath: request.route?.path,
-        requestId: request.header('x-request-id'),
-        clientType,
-        ipAddress: request.ip,
-        userAgent: request.header('user-agent'),
-      },
     );
   }
 
@@ -148,6 +154,41 @@ export class PlatformBusinessController {
     }
     return this.platformBusiness.provisionBusiness(
       query.requested_business_id,
+      body,
+      headers.idempotencyKey,
+      platformUserId,
+      {
+        method: request.method,
+        endpointPath: request.route?.path,
+        requestId: request.header('x-request-id'),
+        clientType: request.header('x-client-type'),
+        ipAddress: request.ip,
+        userAgent: request.header('user-agent'),
+      },
+    );
+  }
+
+  @Post('businesses/:businessId/branches')
+  @HttpCode(HttpStatus.CREATED)
+  async createBranch(
+    @Param() params: BusinessBranchParamsDto,
+    @Body() body: CreateBusinessBranchDto,
+    @ProvisionBusinessHeaders() headers: ProvisionBusinessHeadersDto,
+    @Req() request: PlatformAuthenticatedRequest,
+  ) {
+    const isPlatformUser = request.user?.isPlatform === true;
+    const platformUserId = isPlatformUser
+      ? (request.user.platformUserId ??
+        request.user.subjectId ??
+        request.user.userId ??
+        request.user.sub)
+      : undefined;
+    if (!platformUserId) {
+      throw new ForbiddenException('Platform user authentication required');
+    }
+
+    return this.platformBusiness.createBranch(
+      params.businessId,
       body,
       headers.idempotencyKey,
       platformUserId,

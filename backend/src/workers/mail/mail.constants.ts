@@ -7,6 +7,7 @@ export const MAIL_TEMPLATE_FILES = {
   'otp-verification': 'otp-verification.html',
   'user-invitation': 'user-invitation.html',
   'redeem-code': 'redeem-code.html',
+  'branch-created': 'branch-created.html',
   'marketing-email': 'marketing-email.html',
 } as const;
 

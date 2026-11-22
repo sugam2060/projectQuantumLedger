@@ -13,6 +13,8 @@ describe('PlatformBusinessController', () => {
     provisionBusiness: jest.fn(),
     getBusinessDetails: jest.fn(),
     getBranchDetails: jest.fn(),
+    createBranch: jest.fn(),
+    listBusinesses: jest.fn(),
   };
   let controller: PlatformBusinessController;
 
@@ -55,10 +57,6 @@ describe('PlatformBusinessController', () => {
     expect(platformBusiness.getBusinessDetails).toHaveBeenCalledWith(
       '00000000-0000-4000-8000-000000000010',
       'platform-user-id',
-      expect.objectContaining({
-        method: 'GET',
-        clientType: 'mobile',
-      }),
     );
 
     await expect(
@@ -100,7 +98,6 @@ describe('PlatformBusinessController', () => {
       '00000000-0000-4000-8000-000000000010',
       '00000000-0000-4000-8000-000000000011',
       'platform-user-id',
-      expect.objectContaining({ method: 'GET', clientType: 'desktop' }),
     );
 
     await expect(
@@ -110,6 +107,36 @@ describe('PlatformBusinessController', () => {
         { ...request, user: { isPlatform: false } } as never,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('lists businesses only for authenticated platform users', async () => {
+    const result = {
+      data: [{ id: 'business-id', isActive: false }],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    };
+    platformBusiness.listBusinesses.mockResolvedValue(result);
+    const handler = Reflect.get(
+      PlatformBusinessController.prototype,
+      'listBusinesses',
+    );
+
+    expect(Reflect.getMetadata(IS_PUBLIC, handler)).not.toBe(true);
+    await expect(
+      controller.listBusinesses({ page: 1, limit: 20 }, { clientType: 'web' }, {
+        user: { isPlatform: true, platformUserId: 'platform-user-id' },
+      } as never),
+    ).resolves.toBe(result);
+    expect(platformBusiness.listBusinesses).toHaveBeenCalledWith(
+      { page: 1, limit: 20 },
+      'platform-user-id',
+    );
+
+    await expect(
+      controller.listBusinesses({ page: 1, limit: 20 }, { clientType: 'web' }, {
+        user: { isPlatform: false },
+      } as never),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(platformBusiness.listBusinesses).toHaveBeenCalledTimes(1);
   });
 
   it('makes the combined upload and request route public and rate limited', () => {
@@ -241,6 +268,52 @@ describe('PlatformBusinessController', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(platformBusiness.provisionBusiness).not.toHaveBeenCalled();
+  });
+
+  it('creates branches only for platform users and forwards the audit context', async () => {
+    const result = {
+      branch: { id: 'branch-id', name: 'Main Branch' },
+      terminals: [],
+    };
+    platformBusiness.createBranch.mockResolvedValue(result);
+    const request = {
+      user: { isPlatform: true, platformUserId: 'platform-user-id' },
+      method: 'POST',
+      route: { path: '/platform/businesses/:businessId/branches' },
+      ip: '127.0.0.1',
+      header: jest.fn().mockReturnValue(undefined),
+    };
+    const handler = PlatformBusinessController.prototype.createBranch;
+
+    expect(Reflect.getMetadata(IS_PUBLIC, handler)).not.toBe(true);
+    await expect(
+      controller.createBranch(
+        { businessId: 'business-id' } as never,
+        { name: 'Main Branch', code: 'MAIN' },
+        { clientType: 'web', idempotencyKey: 'key-1' },
+        request as never,
+      ),
+    ).resolves.toBe(result);
+    expect(platformBusiness.createBranch).toHaveBeenCalledWith(
+      'business-id',
+      { name: 'Main Branch', code: 'MAIN' },
+      'key-1',
+      'platform-user-id',
+      expect.objectContaining({
+        method: 'POST',
+        endpointPath: '/platform/businesses/:businessId/branches',
+      }),
+    );
+
+    await expect(
+      controller.createBranch(
+        { businessId: 'business-id' } as never,
+        { name: 'Main Branch', code: 'MAIN' },
+        { clientType: 'web', idempotencyKey: 'key-2' },
+        { user: { isPlatform: false } } as never,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(platformBusiness.createBranch).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a request if any required document file is missing', async () => {

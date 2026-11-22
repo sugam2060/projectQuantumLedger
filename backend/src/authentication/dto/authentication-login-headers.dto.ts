@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsUUID, ValidateIf } from 'class-validator';
 import { ClientType } from './clientLogin.dto';
 
 export class AuthenticationLoginHeadersDto {
@@ -6,6 +6,12 @@ export class AuthenticationLoginHeadersDto {
   @IsEnum(ClientType)
   clientType?: ClientType;
 
+  @ValidateIf(
+    (headers: AuthenticationLoginHeadersDto) =>
+      (headers.clientType !== undefined &&
+        headers.clientType !== ClientType.WEB) ||
+      headers.terminalId !== undefined,
+  )
   @IsUUID()
-  terminalId!: string;
+  terminalId?: string;
 }

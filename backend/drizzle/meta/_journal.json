@@ -78,6 +78,34 @@
       "when": 1794864600000,
       "tag": "0009_owner_redemption_membership_insert",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795170000000,
+      "tag": "0010_branches_business_created_cursor_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795170100000,
+      "tag": "0011_business_membership_branch_summary_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795180000000,
+      "tag": "0012_terminal_activation_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795181000000,
+      "tag": "0013_one_active_business_membership_per_user",
+      "breakpoints": true
     }
   ]
 }

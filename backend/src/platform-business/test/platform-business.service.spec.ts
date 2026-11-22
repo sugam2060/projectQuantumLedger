@@ -82,6 +82,97 @@ describe('PlatformBusinessService', () => {
     );
   });
 
+  it('returns business details without writing a read audit event', async () => {
+    const businessRow = { id: 'business-id', displayName: 'Example Retail' };
+    const branchRows = [{ id: 'branch-id', isActive: false }];
+    const membershipRows = [{ id: 'membership-id', isActive: false }];
+    const businessQuery = {
+      from: jest.fn(),
+      where: jest.fn(),
+      limit: jest.fn().mockResolvedValue([businessRow]),
+    };
+    businessQuery.from.mockReturnValue(businessQuery);
+    businessQuery.where.mockReturnValue(businessQuery);
+    const branchesQuery = {
+      from: jest.fn(),
+      where: jest.fn().mockResolvedValue(branchRows),
+    };
+    branchesQuery.from.mockReturnValue(branchesQuery);
+    const membershipsQuery = {
+      from: jest.fn(),
+      leftJoin: jest.fn(),
+      where: jest.fn().mockResolvedValue(membershipRows),
+    };
+    membershipsQuery.from.mockReturnValue(membershipsQuery);
+    membershipsQuery.leftJoin.mockReturnValue(membershipsQuery);
+    const tx = {
+      select: jest
+        .fn()
+        .mockReturnValueOnce(businessQuery)
+        .mockReturnValueOnce(branchesQuery)
+        .mockReturnValueOnce(membershipsQuery),
+    };
+    database.transactionWithSession.mockImplementation(
+      async (_session: unknown, callback: (transaction: unknown) => unknown) =>
+        callback(tx),
+    );
+
+    await expect(
+      service.getBusinessDetails('business-id', 'platform-user-id'),
+    ).resolves.toEqual({
+      business: businessRow,
+      branches: branchRows,
+      memberships: membershipRows,
+    });
+    expect(auditLogs.insertPlatformEvent).not.toHaveBeenCalled();
+  });
+
+  it('returns a paginated business directory containing active and inactive records', async () => {
+    const activeBusiness = {
+      id: 'active-id',
+      isActive: true,
+    };
+    const inactiveBusiness = {
+      id: 'inactive-id',
+      isActive: false,
+    };
+    const rows = [activeBusiness, inactiveBusiness];
+    const query = {
+      from: jest.fn(),
+      orderBy: jest.fn(),
+      limit: jest.fn(),
+      offset: jest.fn().mockResolvedValue(rows),
+    };
+    query.from.mockReturnValue(query);
+    query.orderBy.mockReturnValue(query);
+    query.limit.mockReturnValue(query);
+    const tx = {
+      select: jest
+        .fn()
+        .mockReturnValueOnce({
+          from: jest.fn().mockResolvedValue([{ total: 2 }]),
+        })
+        .mockReturnValueOnce(query),
+    };
+    database.transactionWithSession.mockImplementation(
+      async (_session: unknown, callback: (transaction: unknown) => unknown) =>
+        callback(tx),
+    );
+
+    await expect(
+      service.listBusinesses({ page: 2, limit: 2 }, 'platform-user-id'),
+    ).resolves.toEqual({
+      data: rows,
+      pagination: { page: 2, limit: 2, total: 2, totalPages: 1 },
+    });
+    expect(database.transactionWithSession).toHaveBeenCalledWith(
+      { isPlatform: true, platformUserId: 'platform-user-id' },
+      expect.any(Function),
+    );
+    expect(query.limit).toHaveBeenCalledWith(2);
+    expect(query.offset).toHaveBeenCalledWith(2);
+  });
+
   it('uploads all documents and saves their Cloudinary IDs and URLs with the request', async () => {
     const values = jest.fn().mockResolvedValue(undefined);
     const tx = { insert: jest.fn().mockReturnValue({ values }) };
@@ -215,7 +306,7 @@ describe('PlatformBusinessService', () => {
     const returningRows = [
       [{ id: 'business-id', displayName: 'Example Retail' }],
       [{ id: 'branch-id' }],
-      [{ id: 'terminal-id' }],
+      [{ id: 'terminal-id', terminalCode: 'POS-A1B2C3D4E5F60718' }],
     ];
     const tx = {
       select: jest.fn(() => {
@@ -284,7 +375,8 @@ describe('PlatformBusinessService', () => {
     expect(insertedValues[2]).toMatchObject({
       businessId: 'business-id',
       branchId: 'branch-id',
-      terminalCode: 'POS-01',
+      terminalCode: expect.stringMatching(/^POS-[A-F0-9]{16}$/),
+      status: 'inactive',
     });
     expect(insertedValues[3]).toMatchObject({
       businessId: 'business-id',
@@ -296,6 +388,11 @@ describe('PlatformBusinessService', () => {
     };
     expect(outbox.payload.template).toBe('redeem-code');
     expect(outbox.payload.context.redeemCode).toBeTruthy();
+    expect(outbox.payload.context).toMatchObject({
+      businessId: 'business-id',
+      branchId: 'branch-id',
+      terminalCode: expect.stringMatching(/^POS-[A-F0-9]{16}$/),
+    });
     expect(JSON.stringify(result)).not.toContain(
       String(outbox.payload.context.redeemCode),
     );
