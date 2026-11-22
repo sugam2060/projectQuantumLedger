@@ -305,7 +305,8 @@ include PAN values or document URLs. **Auth:** signed-in platform manager
 (platform-user JWT); `Authorization` and `x-client-type` headers are required,
 and `x-client-type` must be `web`, `desktop`, or `mobile`. **Errors:** 400 for
 invalid pagination or client-type headers; 401 when the access token is missing
-or invalid; 403 for a non-platform user. **Pagination:** `page` defaults to 1;
+or invalid; 403 for a non-platform user. **Audit:** none for this read.
+**Pagination:** `page` defaults to 1;
 `limit` defaults to 20 and is capped at 100. **Success:** 200.
 
 ```json
