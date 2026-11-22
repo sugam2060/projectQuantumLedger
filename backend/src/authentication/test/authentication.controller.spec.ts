@@ -57,6 +57,9 @@ describe('AuthenticationController', () => {
         name: 'Business Owner',
         password: 'correct-horse',
         redeemCode: 'AABBCCDDEEFF001122334455',
+        businessId: '00000000-0000-4000-8000-000000000001',
+        branchId: '00000000-0000-4000-8000-000000000002',
+        terminalCode: 'POS-A1B2C3D4E5F60718',
       };
       const result = { userId: 'user-id', businessId: 'business-id' };
       authServiceMock.registerOwner.mockResolvedValue(result);
@@ -160,6 +163,25 @@ describe('AuthenticationController', () => {
           { type: 'custom', metatype: AuthenticationMeHeadersDto },
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
+
+      await expect(
+        pipe.transform(
+          { clientType: ClientType.WEB },
+          { type: 'custom', metatype: AuthenticationMeHeadersDto },
+        ),
+      ).resolves.toMatchObject({ clientType: ClientType.WEB });
+      await expect(
+        pipe.transform(
+          { clientType: ClientType.MOBILE },
+          { type: 'custom', metatype: AuthenticationMeHeadersDto },
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        pipe.transform(
+          { clientType: ClientType.DESKTOP },
+          { type: 'custom', metatype: AuthenticationMeHeadersDto },
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
@@ -203,6 +225,34 @@ describe('AuthenticationController', () => {
       expect(parameterTypes[0]).toBe(ClientLoginDTO);
     });
 
+    it('requires a terminal for mobile and desktop, but not web login', async () => {
+      const pipe = new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        validateCustomDecorators: true,
+      });
+      await expect(
+        pipe.transform(
+          { clientType: ClientType.WEB },
+          { type: 'custom', metatype: AuthenticationLoginHeadersDto },
+        ),
+      ).resolves.toMatchObject({ clientType: ClientType.WEB });
+      for (const clientType of [ClientType.MOBILE, ClientType.DESKTOP]) {
+        await expect(
+          pipe.transform(
+            { clientType },
+            { type: 'custom', metatype: AuthenticationLoginHeadersDto },
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      }
+      await expect(
+        pipe.transform(
+          { clientType: ClientType.WEB, terminalId: 'bad-id' },
+          { type: 'custom', metatype: AuthenticationLoginHeadersDto },
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('should successfully login and return result for web client with cookies', async () => {
       const mockResult = {
         accessToken: 'mock-access-token',
@@ -218,7 +268,6 @@ describe('AuthenticationController', () => {
         mockDto,
         {
           clientType: ClientType.WEB,
-          terminalId: '00000000-0000-4000-8000-000000000002',
         },
         mockRequest,
         mockResponse,
@@ -226,7 +275,7 @@ describe('AuthenticationController', () => {
 
       expect(authServiceMock.userLogin).toHaveBeenCalledWith(
         mockDto,
-        '00000000-0000-4000-8000-000000000002',
+        undefined,
         expect.objectContaining({ endpointPath: '/authentication/login' }),
       );
       expect(mockResponse.cookie).toHaveBeenCalledTimes(2);
@@ -434,7 +483,6 @@ describe('AuthenticationController', () => {
         'body-refresh-token',
         {
           clientType: ClientType.WEB,
-          terminalId: '00000000-0000-4000-8000-000000000002',
         },
         mockRequest,
         mockResponse,
@@ -442,7 +490,7 @@ describe('AuthenticationController', () => {
 
       expect(authServiceMock.refreshAccessToken).toHaveBeenCalledWith(
         'body-refresh-token',
-        '00000000-0000-4000-8000-000000000002',
+        undefined,
         expect.objectContaining({ endpointPath: '/authentication/refresh' }),
       );
       expect(mockResponse.cookie).toHaveBeenCalledTimes(2);
@@ -473,7 +521,6 @@ describe('AuthenticationController', () => {
         undefined,
         {
           clientType: ClientType.WEB,
-          terminalId: '00000000-0000-4000-8000-000000000002',
         },
         mockRequestWithoutBodyToken,
         mockResponse,
@@ -481,7 +528,7 @@ describe('AuthenticationController', () => {
 
       expect(authServiceMock.refreshAccessToken).toHaveBeenCalledWith(
         'cookie-refresh-token',
-        '00000000-0000-4000-8000-000000000002',
+        undefined,
         expect.objectContaining({ endpointPath: '/authentication/refresh' }),
       );
       expect(result).toEqual({

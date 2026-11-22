@@ -8,6 +8,7 @@ import { UtilsModule } from './utils/utils.module';
 import { RedisModule } from './redis/redis.module';
 import { RolesPermissionsModule } from './roles-permissions/roles-permissions.module';
 import { PlatformBusinessModule } from './platform-business/platform-business.module';
+import { BusinessModule } from './business/business.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { PlatformBusinessModule } from './platform-business/platform-business.mo
     RedisModule,
     RolesPermissionsModule,
     PlatformBusinessModule,
+    BusinessModule,
   ],
   controllers: [AppController],
   providers: [AppService],

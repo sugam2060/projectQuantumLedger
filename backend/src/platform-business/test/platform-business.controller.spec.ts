@@ -11,7 +11,12 @@ describe('PlatformBusinessController', () => {
   const platformBusiness = {
     submitBusinessRequest: jest.fn(),
     provisionBusiness: jest.fn(),
+<<<<<<< HEAD
     getBusinessDetails: jest.fn(),
+=======
+    createBranch: jest.fn(),
+    listBusinesses: jest.fn(),
+>>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   };
   let controller: PlatformBusinessController;
 
@@ -26,6 +31,7 @@ describe('PlatformBusinessController', () => {
     controller = module.get(PlatformBusinessController);
   });
 
+<<<<<<< HEAD
   it('allows only platform users to read business details', async () => {
     const result = {
       business: { id: '00000000-0000-4000-8000-000000000010' },
@@ -66,6 +72,36 @@ describe('PlatformBusinessController', () => {
         user: { isPlatform: false },
       } as never),
     ).rejects.toBeInstanceOf(ForbiddenException);
+=======
+  it('lists businesses only for authenticated platform users', async () => {
+    const result = {
+      data: [{ id: 'business-id', isActive: false }],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    };
+    platformBusiness.listBusinesses.mockResolvedValue(result);
+    const handler = Reflect.get(
+      PlatformBusinessController.prototype,
+      'listBusinesses',
+    );
+
+    expect(Reflect.getMetadata(IS_PUBLIC, handler)).not.toBe(true);
+    await expect(
+      controller.listBusinesses({ page: 1, limit: 20 }, { clientType: 'web' }, {
+        user: { isPlatform: true, platformUserId: 'platform-user-id' },
+      } as never),
+    ).resolves.toBe(result);
+    expect(platformBusiness.listBusinesses).toHaveBeenCalledWith(
+      { page: 1, limit: 20 },
+      'platform-user-id',
+    );
+
+    await expect(
+      controller.listBusinesses({ page: 1, limit: 20 }, { clientType: 'web' }, {
+        user: { isPlatform: false },
+      } as never),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(platformBusiness.listBusinesses).toHaveBeenCalledTimes(1);
+>>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   });
 
   it('makes the combined upload and request route public and rate limited', () => {
@@ -197,6 +233,52 @@ describe('PlatformBusinessController', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(platformBusiness.provisionBusiness).not.toHaveBeenCalled();
+  });
+
+  it('creates branches only for platform users and forwards the audit context', async () => {
+    const result = {
+      branch: { id: 'branch-id', name: 'Main Branch' },
+      terminals: [],
+    };
+    platformBusiness.createBranch.mockResolvedValue(result);
+    const request = {
+      user: { isPlatform: true, platformUserId: 'platform-user-id' },
+      method: 'POST',
+      route: { path: '/platform/businesses/:businessId/branches' },
+      ip: '127.0.0.1',
+      header: jest.fn().mockReturnValue(undefined),
+    };
+    const handler = PlatformBusinessController.prototype.createBranch;
+
+    expect(Reflect.getMetadata(IS_PUBLIC, handler)).not.toBe(true);
+    await expect(
+      controller.createBranch(
+        { businessId: 'business-id' } as never,
+        { name: 'Main Branch', code: 'MAIN' },
+        { clientType: 'web', idempotencyKey: 'key-1' },
+        request as never,
+      ),
+    ).resolves.toBe(result);
+    expect(platformBusiness.createBranch).toHaveBeenCalledWith(
+      'business-id',
+      { name: 'Main Branch', code: 'MAIN' },
+      'key-1',
+      'platform-user-id',
+      expect.objectContaining({
+        method: 'POST',
+        endpointPath: '/platform/businesses/:businessId/branches',
+      }),
+    );
+
+    await expect(
+      controller.createBranch(
+        { businessId: 'business-id' } as never,
+        { name: 'Main Branch', code: 'MAIN' },
+        { clientType: 'web', idempotencyKey: 'key-2' },
+        { user: { isPlatform: false } } as never,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(platformBusiness.createBranch).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a request if any required document file is missing', async () => {

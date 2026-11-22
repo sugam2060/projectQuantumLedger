@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Fortis POS API v1",
-    "description": "Postman requests for every API route currently declared by the backend controllers. Set credentials, terminal/role IDs, and local document file paths in collection variables before running. Start with the login requests. User login requires a terminal assigned to that user; role-management requests require an owner token and valid role ID. The public business request accepts one multipart submission with all three documents. Logout requests support web cookies and desktop/mobile refresh tokens.",
+    "description": "Organized by user type and workflow. Set baseUrl and credentials in collection or environment variables. User login and refresh save returned tokens for subsequent requests; owner logins also populate ownerAccessToken. Web authentication uses HTTP-only cookies, while desktop/mobile return bearer tokens. Platform manager requests use separate platform tokens.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -106,6 +106,11 @@
       "type": "string"
     },
     {
+      "key": "branchCreationIdempotencyKey",
+      "value": "platform-branch-create-001",
+      "type": "string"
+    },
+    {
       "key": "platformUserInviteIdempotencyKey",
       "value": "platform-user-inv-123",
       "type": "string"
@@ -134,11 +139,51 @@
       "key": "logoutTestRefreshToken",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "businessId",
+      "value": "00000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "ownerAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "businessUpdateIdempotencyKey",
+      "value": "business-profile-update-001",
+      "type": "string"
+    },
+    {
+      "key": "branchFrom",
+      "value": "2026-10-01T00:00:00+05:45",
+      "type": "string"
+    },
+    {
+      "key": "branchTo",
+      "value": "2026-10-29T23:59:59+05:45",
+      "type": "string"
+    },
+    {
+      "key": "branchLimit",
+      "value": "50",
+      "type": "string"
+    },
+    {
+      "key": "branchCursor",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "branchId",
+      "value": "00000000-0000-4000-8000-000000000002",
+      "type": "string"
     }
   ],
   "item": [
     {
-      "name": "Application",
+      "name": "01. Public & onboarding",
       "item": [
         {
           "name": "GET /",
@@ -208,7 +253,7 @@
       ]
     },
     {
-      "name": "User authentication",
+      "name": "02. User authentication (business users)",
       "item": [
         {
           "name": "POST /authentication/login",
@@ -240,10 +285,20 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Web clients may omit x-terminal-id and use their sole active membership for business/branch context. Mobile and desktop clients must provide the active assigned x-terminal-id. Set userClientType to web and remove the terminal header for the web flow."
           },
           "response": [],
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('userClientType') === 'web') pm.request.headers.remove('x-terminal-id');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -251,10 +306,23 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "if (body.accessToken) pm.collectionVariables.set('accessToken', body.accessToken);",
-                  "if (body.refreshToken) pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token ?? body.tokens?.accessToken ?? body.tokens?.access_token;",
+                  "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token ?? body.tokens?.refreshToken ?? body.tokens?.refresh_token;",
+                  "if (token) {",
+                  "  pm.collectionVariables.set('accessToken', token);",
+                  "  try { pm.environment.set('accessToken', token); } catch (_) {}",
+                  "}",
+                  "if (refresh) {",
+                  "  pm.collectionVariables.set('refreshToken', refresh);",
+                  "  try { pm.environment.set('refreshToken', refresh); } catch (_) {}",
+                  "}",
+                  "if (token && body.memberships?.some((membership) => membership.isOwner === true)) {",
+                  "  pm.collectionVariables.set('ownerAccessToken', token);",
+                  "  try { pm.environment.set('ownerAccessToken', token); } catch (_) {}",
+                  "}",
                   "const roleId = body.memberships?.find((membership) => membership.roleId)?.roleId;",
-                  "if (roleId) pm.collectionVariables.set('roleId', roleId); else pm.collectionVariables.unset('roleId');"
+                  "if (roleId) { pm.collectionVariables.set('roleId', roleId); try { pm.environment.set('roleId', roleId); } catch (_) {} }",
+                  "if (pm.collectionVariables.get('userClientType') !== 'web') pm.test('Bearer access token is available to later requests', () => { pm.expect(token).to.be.a('string').and.not.empty; pm.expect(pm.variables.replaceIn('{{accessToken}}')).to.eql(token); });"
                 ]
               }
             }
@@ -290,10 +358,20 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Web clients may omit x-terminal-id and refresh using their sole active membership. Mobile and desktop clients must provide the active assigned x-terminal-id. Set userClientType to web and remove the terminal header for the web flow."
           },
           "response": [],
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('userClientType') === 'web') pm.request.headers.remove('x-terminal-id');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -301,8 +379,23 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "if (body.accessToken) pm.collectionVariables.set('accessToken', body.accessToken);",
-                  "if (body.refreshToken) pm.collectionVariables.set('refreshToken', body.refreshToken);"
+                  "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token ?? body.tokens?.accessToken ?? body.tokens?.access_token;",
+                  "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token ?? body.tokens?.refreshToken ?? body.tokens?.refresh_token;",
+                  "if (token) {",
+                  "  pm.collectionVariables.set('accessToken', token);",
+                  "  try { pm.environment.set('accessToken', token); } catch (_) {}",
+                  "}",
+                  "if (refresh) {",
+                  "  pm.collectionVariables.set('refreshToken', refresh);",
+                  "  try { pm.environment.set('refreshToken', refresh); } catch (_) {}",
+                  "}",
+                  "if (token && body.memberships?.some((membership) => membership.isOwner === true)) {",
+                  "  pm.collectionVariables.set('ownerAccessToken', token);",
+                  "  try { pm.environment.set('ownerAccessToken', token); } catch (_) {}",
+                  "}",
+                  "const roleId = body.memberships?.find((membership) => membership.roleId)?.roleId;",
+                  "if (roleId) { pm.collectionVariables.set('roleId', roleId); try { pm.environment.set('roleId', roleId); } catch (_) {} }",
+                  "if (pm.collectionVariables.get('userClientType') !== 'web') pm.test('Bearer access token is available to later requests', () => { pm.expect(token).to.be.a('string').and.not.empty; pm.expect(pm.variables.replaceIn('{{accessToken}}')).to.eql(token); });"
                 ]
               }
             }
@@ -432,63 +525,26 @@
                 }
               ]
             },
-            "url": "{{baseUrl}}/authentication/me"
+            "url": "{{baseUrl}}/authentication/me",
+            "description": "Requires an access token. x-terminal-id is optional for web and required for mobile/desktop; when omitted, session.terminalId is null. The request example uses the default desktop client."
           },
           "response": [],
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('userClientType') === 'web') pm.request.headers.remove('x-terminal-id');"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST /authentication/register-owner",
-          "request": {
-            "method": "POST",
-            "description": "Web-only owner activation. First provision a business, then paste the code received by email into ownerRedeemCode. The response includes the initial terminal ID for subsequent login.",
-            "header": [
-              {
-                "key": "X-Client-Type",
-                "value": "web",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/authentication/register-owner",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"name\": \"Example Owner\",\n  \"password\": \"{{ownerPassword}}\",\n  \"redeemCode\": \"{{ownerRedeemCode}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
-                  "const body = pm.response.json();",
-                  "pm.expect(body.isOwner).to.eql(true);",
-                  "pm.expect(body.roleId).to.eql(null);",
-                  "pm.expect(body.branchId).to.eql(null);",
-                  "pm.collectionVariables.set(\"userId\", body.userId);",
-                  "if (body.initialTerminalId) pm.collectionVariables.set(\"terminalId\", body.initialTerminalId);"
                 ]
               }
             }
@@ -539,10 +595,13 @@
                     "exec": [
                       "pm.test('Login succeeds for the normal user', () => pm.response.to.have.status(200));",
                       "const body = pm.response.json();",
-                      "pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
-                      "pm.expect(body.refreshToken).to.be.a('string').and.not.empty;",
-                      "pm.collectionVariables.set('logoutTestAccessToken', body.accessToken);",
-                      "pm.collectionVariables.set('logoutTestRefreshToken', body.refreshToken);"
+                      "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token;",
+                      "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token;",
+                      "pm.expect(token).to.be.a('string').and.not.empty;",
+                      "pm.expect(refresh).to.be.a('string').and.not.empty;",
+                      "pm.collectionVariables.set('logoutTestAccessToken', token);",
+                      "pm.collectionVariables.set('logoutTestRefreshToken', refresh);",
+                      "try { pm.environment.set('logoutTestAccessToken', token); pm.environment.set('logoutTestRefreshToken', refresh); } catch (_) {}"
                     ]
                   }
                 }
@@ -648,10 +707,518 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Business user desktop/mobile authentication. Run login first; the response script saves accessToken and refreshToken for subsequent requests. Web login uses cookies and does not return bearer tokens in the response body."
     },
     {
-      "name": "Platform authentication",
+      "name": "03. Business owner ? activation",
+      "item": [
+        {
+          "name": "POST /authentication/register-owner",
+          "request": {
+            "method": "POST",
+            "description": "Web-only owner activation. Use the redemption code and initial terminal activation details received by email. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
+            "header": [
+              {
+                "key": "X-Client-Type",
+                "value": "web",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/authentication/register-owner",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"name\": \"Example Owner\",\n  \"password\": \"{{ownerPassword}}\",\n  \"redeemCode\": \"{{ownerRedeemCode}}\",\n  \"businessId\": \"{{businessId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"terminalCode\": \"{{terminalCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.expect(body.isOwner).to.eql(true);",
+                  "pm.expect(body.roleId).to.eql(null);",
+                  "pm.expect(body.branchId).to.eql(null);",
+                  "pm.collectionVariables.set(\"userId\", body.userId);",
+                  "if (body.initialTerminalId) pm.collectionVariables.set(\"terminalId\", body.initialTerminalId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /authentication/login (business owner web session)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/authentication/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"password\": \"{{ownerPassword}}\",\n  \"remember\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Sign in as the business owner before running owner operations. The web login sets an HttpOnly access_token cookie; Postman stores and sends it automatically to the same baseUrl. Set ownerEmail and ownerPassword first. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Owner login returned a user profile', () => pm.expect(pm.response.json().user).to.be.an('object'));",
+                  "pm.test('Web access cookie was set', () => pm.expect(pm.response.headers.get('Set-Cookie') || '').to.include('access_token='));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Register the owner if needed, then log in as the owner with the web client. Postman stores the HttpOnly cookie for the owner-only terminal activation flow."
+    },
+    {
+      "name": "04. Business owner ? profile & branches",
+      "item": [
+        {
+          "name": "GET /businesses/{businessId} (owner only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/businesses/{{businessId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Sensitive registration data is omitted', () => { const body = pm.response.json(); pm.expect(body).not.to.have.property('pan'); pm.expect(body).not.to.have.property('documents'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /businesses/{businessId} (owner only)",
+          "request": {
+            "method": "PATCH",
+            "description": "Requires an owner access token for businessId. Multipart file fields are optional; configure local file paths. Only approved profile fields and document replacement are allowed. Do not set Content-Type manually; Postman must add its multipart boundary. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{businessUpdateIdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/businesses/{{businessId}}",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "reason",
+                  "value": "Approved profile update",
+                  "type": "text"
+                },
+                {
+                  "key": "displayName",
+                  "value": "Updated Trading Name",
+                  "type": "text"
+                },
+                {
+                  "key": "country",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "city",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "postalCode",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "addressLine1",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "addressLine2",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "primaryContactNumber",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "primaryContactEmail",
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
+                },
+                {
+                  "key": "panCardFront",
+                  "type": "file",
+                  "src": "{{panCardFrontPath}}",
+                  "disabled": true
+                },
+                {
+                  "key": "panCardBack",
+                  "type": "file",
+                  "src": "{{panCardBackPath}}",
+                  "disabled": true
+                },
+                {
+                  "key": "businessRegistrationCertificate",
+                  "type": "file",
+                  "src": "{{businessRegistrationPath}}",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains changed fields without document URLs', () => { const body = pm.response.json(); pm.expect(body.businessId).to.eql(pm.collectionVariables.get('businessId')); pm.expect(body.changedFields).to.be.an('object'); pm.expect(body).not.to.have.property('documents'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /businesses/{businessId}/branches (owner or authorized role)",
+          "request": {
+            "method": "GET",
+            "description": "Requires an owner token or a role explicitly assigned the branches.read endpoint key. An assigned branch membership sees only that branch; a membership with no branch assignment has business-wide scope. Enable the cursor query parameter after a page returns nextCursor. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches?from={{branchFrom}}&to={{branchTo}}&limit={{branchLimit}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{branchFrom}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{branchTo}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{branchLimit}}"
+                },
+                {
+                  "key": "cursor",
+                  "value": "{{branchCursor}}",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains branch items and cursor', () => { const body = pm.response.json(); pm.expect(body.items).to.be.an('array'); pm.expect(body.nextCursor === null || typeof body.nextCursor === 'string').to.eql(true); body.items.forEach((branch) => { pm.expect(branch.id).to.be.a('string'); pm.expect(branch.status).to.be.oneOf(['active', 'inactive']); }); });",
+                  "if (pm.response.code === 200 && pm.response.json().nextCursor) pm.collectionVariables.set('branchCursor', pm.response.json().nextCursor);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /businesses/{businessId}/branches/{branchId} (owner or authorized role)",
+          "request": {
+            "method": "GET",
+            "description": "Returns branch profile and current terminal status/member counts. Members assigned to another branch receive 404; business-wide members can read any branch. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response contains branch and operational summary', () => { const body = pm.response.json(); pm.expect(body.branch.id).to.eql(pm.collectionVariables.get('branchId')); pm.expect(body.summary.terminals).to.include.all.keys('active', 'inactive', 'maintenance', 'total'); pm.expect(body.summary.members).to.include.all.keys('active', 'inactive', 'total'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /businesses/{businessId}/branches/{branchId}/terminals/activate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/terminals/activate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"terminalCode\": \"{{terminalCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Terminal is active', () => pm.expect(pm.response.json().status).to.eql('active'));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Run the business owner web login in the activation folder first. Web authentication uses the HttpOnly access_token cookie stored by Postman. Set businessId and branchId to the target records."
+    },
+    {
+      "name": "05. Business owner ? roles & endpoint access",
+      "item": [
+        {
+          "name": "GET /business/endpoint-access/endpoints",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/business/endpoint-access/endpoints"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /business/endpoint-access",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/business/endpoint-access"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /business/endpoint-access/:endpointKey",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/business/endpoint-access/{{endpointKey}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleIds\": [\n    \"{{roleId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /business/endpoint-access/:endpointKey",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/business/endpoint-access/{{endpointKey}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Owner only. Log in through the Business owner ? activation folder first; these authenticated requests use Postman?s saved web access cookie."
+    },
+    {
+      "name": "06. Platform manager ? authentication",
       "item": [
         {
           "name": "POST /platform/user/login",
@@ -689,8 +1256,11 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "if (body.accessToken) pm.collectionVariables.set('platformAccessToken', body.accessToken);",
-                  "if (body.refreshToken) pm.collectionVariables.set('platformRefreshToken', body.refreshToken);"
+                  "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token ?? body.tokens?.accessToken ?? body.tokens?.access_token;",
+                  "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token ?? body.tokens?.refreshToken ?? body.tokens?.refresh_token;",
+                  "if (token) { pm.collectionVariables.set('platformAccessToken', token); try { pm.environment.set('platformAccessToken', token); } catch (_) {} }",
+                  "if (refresh) { pm.collectionVariables.set('platformRefreshToken', refresh); try { pm.environment.set('platformRefreshToken', refresh); } catch (_) {} }",
+                  "pm.test('Platform bearer access token is available to later requests', () => { pm.expect(token).to.be.a('string').and.not.empty; pm.expect(pm.variables.replaceIn('{{platformAccessToken}}')).to.eql(token); });"
                 ]
               }
             }
@@ -723,8 +1293,11 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "if (body.accessToken) pm.collectionVariables.set('platformAccessToken', body.accessToken);",
-                  "if (body.refreshToken) pm.collectionVariables.set('platformRefreshToken', body.refreshToken);"
+                  "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token ?? body.tokens?.accessToken ?? body.tokens?.access_token;",
+                  "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token ?? body.tokens?.refreshToken ?? body.tokens?.refresh_token;",
+                  "if (token) { pm.collectionVariables.set('platformAccessToken', token); try { pm.environment.set('platformAccessToken', token); } catch (_) {} }",
+                  "if (refresh) { pm.collectionVariables.set('platformRefreshToken', refresh); try { pm.environment.set('platformRefreshToken', refresh); } catch (_) {} }",
+                  "pm.test('Platform bearer access token is available to later requests', () => { pm.expect(token).to.be.a('string').and.not.empty; pm.expect(pm.variables.replaceIn('{{platformAccessToken}}')).to.eql(token); });"
                 ]
               }
             }
@@ -823,10 +1396,11 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Platform manager authentication. Run login first; response scripts save platformAccessToken and platformRefreshToken for platform API requests."
     },
     {
-      "name": "Platform business request",
+      "name": "07. Platform manager ? businesses",
       "item": [
         {
           "name": "POST /platform/businesses/request (multipart with files)",
@@ -1021,11 +1595,135 @@
               }
             }
           ]
+        },
+        {
+          "name": "POST /platform/businesses/{businessId}/branches",
+          "request": {
+            "method": "POST",
+            "description": "Platform manager only and idempotent. Creates a branch and one or more inactive terminals with cryptographically random activation codes. The active owner receives branch and terminal details by email.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{platformAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{branchCreationIdempotencyKey}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/platform/businesses/{{businessId}}/branches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "businesses",
+                "{{businessId}}",
+                "branches"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Downtown Branch\",\n  \"code\": \"DOWNTOWN\",\n  \"address\": \"Main Street, Kathmandu\",\n  \"contactNumber\": \"+977-1-5550100\",\n  \"terminals\": [\n    { \"name\": \"Front Counter\" },\n    { \"name\": \"Cafe Counter\" }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) { const body = pm.response.json(); pm.test('Response contains branch and generated activation codes', () => { pm.expect(body.branch.id).to.be.a('string'); pm.expect(body.branch.name).to.eql('Downtown Branch'); pm.expect(body.terminals).to.have.length(2); body.terminals.forEach((terminal) => pm.expect(terminal.terminalCode).to.match(/^POS-[A-F0-9]{16}$/)); }); pm.collectionVariables.set('branchId', body.branch.id); pm.collectionVariables.set('terminalCode', body.terminals[0].terminalCode); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /platform/businesses",
+          "request": {
+            "method": "GET",
+            "description": "Lists registered active and inactive businesses. Requires a platform access token and a supported x-client-type.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{platformAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{platformClientType}}",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/platform/businesses?page=1&limit=20"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Response contains business data and pagination metadata', () => {",
+                  "    pm.expect(body.data).to.be.an('array');",
+                  "    pm.expect(body.pagination).to.include({ page: 1, limit: 20 });",
+                  "    pm.expect(body.pagination.total).to.be.a('number');",
+                  "    pm.expect(body.pagination.totalPages).to.be.a('number');",
+                  "  });",
+                  "  pm.test('Every result exposes status without sensitive identifiers or documents', () => {",
+                  "    body.data.forEach((business) => {",
+                  "      pm.expect(business.isActive).to.be.a('boolean');",
+                  "      pm.expect(business).not.to.have.property('pan');",
+                  "      pm.expect(business).not.to.have.property('documents');",
+                  "    });",
+                  "  });",
+                  "  const provisionedBusinessId = pm.collectionVariables.get('provisionedBusinessId');",
+                  "  if (provisionedBusinessId) {",
+                  "    pm.test('Includes the business created earlier in this collection run as inactive', () => {",
+                  "      const provisionedBusiness = body.data.find((business) => business.id === provisionedBusinessId);",
+                  "      pm.expect(provisionedBusiness, 'The newly provisioned business should be in the first page').to.be.an('object');",
+                  "      pm.expect(provisionedBusiness.isActive).to.eql(false);",
+                  "    });",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "Platform users",
+      "name": "08. Platform manager ? user administration",
       "item": [
         {
           "name": "POST /platform/users/invite",
@@ -1074,136 +1772,6 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "pm.expect(pm.response.json()).to.deep.equal({ message: 'Invite sent to Jane Manager' });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Endpoint role access",
-      "item": [
-        {
-          "name": "GET /business/endpoint-access/endpoints",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/business/endpoint-access/endpoints"
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET /business/endpoint-access",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "url": "{{baseUrl}}/business/endpoint-access"
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "PUT /business/endpoint-access/:endpointKey",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "url": "{{baseUrl}}/business/endpoint-access/{{endpointKey}}",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"roleIds\": [\n    \"{{roleId}}\"\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "DELETE /business/endpoint-access/:endpointKey",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "url": "{{baseUrl}}/business/endpoint-access/{{endpointKey}}"
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
                 ]
               }
             }

@@ -6,9 +6,13 @@ import {
   HttpStatus,
   ForbiddenException,
   Get,
+<<<<<<< HEAD
   Param,
   ParseUUIDPipe,
+=======
+>>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   Post,
+  Param,
   Query,
   Req,
   UploadedFiles,
@@ -26,6 +30,11 @@ import { ProvisionBusinessDto } from './dto/provision-business.dto';
 import { ProvisionBusinessHeadersDto } from './dto/provision-business-headers.dto';
 import { ProvisionBusinessQueryDto } from './dto/provision-business-query.dto';
 import { ProvisionBusinessHeaders } from './decorators/provision-business-headers.decorator';
+import { BusinessListHeaders } from './decorators/business-list-headers.decorator';
+import { BusinessListHeadersDto } from './dto/business-list-headers.dto';
+import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
+import { BusinessBranchParamsDto } from './dto/business-branch-params.dto';
+import { CreateBusinessBranchDto } from './dto/create-business-branch.dto';
 import type { AuthenticatedUser } from '../authentication/strategies/jwt.strategy';
 import type { Request } from 'express';
 
@@ -43,6 +52,7 @@ export interface BusinessRequestFiles {
 export class PlatformBusinessController {
   constructor(private readonly platformBusiness: PlatformBusinessService) {}
 
+<<<<<<< HEAD
   @Get('business/:business_id')
   @HttpCode(HttpStatus.OK)
   async getBusiness(
@@ -63,11 +73,23 @@ export class PlatformBusinessController {
         request.user.subjectId ??
         request.user.userId ??
         request.user.sub)
+=======
+  @Get()
+  async listBusinesses(
+    @Query() query: ListBusinessesQueryDto,
+    @BusinessListHeaders() _headers: BusinessListHeadersDto,
+    @Req() request: PlatformAuthenticatedRequest,
+  ) {
+    const user = request.user;
+    const platformUserId = user?.isPlatform
+      ? (user.platformUserId ?? user.subjectId ?? user.userId ?? user.sub)
+>>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
       : undefined;
     if (!platformUserId) {
       throw new ForbiddenException('Platform user authentication required');
     }
 
+<<<<<<< HEAD
     return this.platformBusiness.getBusinessDetails(
       businessId,
       platformUserId,
@@ -83,6 +105,15 @@ export class PlatformBusinessController {
   }
 
   @Post('businesses/create')
+=======
+    return this.platformBusiness.listBusinesses(
+      { page: query.page, limit: query.limit },
+      platformUserId,
+    );
+  }
+
+  @Post('create')
+>>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   @HttpCode(HttpStatus.CREATED)
   @RateLimit({
     requests: 20,
@@ -121,7 +152,46 @@ export class PlatformBusinessController {
     );
   }
 
+<<<<<<< HEAD
   @Post('businesses/request')
+=======
+  @Post(':businessId/branches')
+  @HttpCode(HttpStatus.CREATED)
+  async createBranch(
+    @Param() params: BusinessBranchParamsDto,
+    @Body() body: CreateBusinessBranchDto,
+    @ProvisionBusinessHeaders() headers: ProvisionBusinessHeadersDto,
+    @Req() request: PlatformAuthenticatedRequest,
+  ) {
+    const isPlatformUser = request.user?.isPlatform === true;
+    const platformUserId = isPlatformUser
+      ? (request.user.platformUserId ??
+        request.user.subjectId ??
+        request.user.userId ??
+        request.user.sub)
+      : undefined;
+    if (!platformUserId) {
+      throw new ForbiddenException('Platform user authentication required');
+    }
+
+    return this.platformBusiness.createBranch(
+      params.businessId,
+      body,
+      headers.idempotencyKey,
+      platformUserId,
+      {
+        method: request.method,
+        endpointPath: request.route?.path,
+        requestId: request.header('x-request-id'),
+        clientType: request.header('x-client-type'),
+        ipAddress: request.ip,
+        userAgent: request.header('user-agent'),
+      },
+    );
+  }
+
+  @Post('request')
+>>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   @HttpCode(HttpStatus.CREATED)
   @Public()
   @RateLimit({

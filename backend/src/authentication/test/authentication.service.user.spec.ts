@@ -258,6 +258,18 @@ describe('UserAuthService', () => {
       expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
     });
 
+    it('returns a null terminal ID for a web session without the header', async () => {
+      const result = await service.getCurrentUser(
+        authenticatedUser,
+        ClientType.WEB,
+        undefined,
+        false,
+      );
+
+      expect(result.session.terminalId).toBeNull();
+      expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
+    });
+
     it('rejects platform tokens on the user profile endpoint', async () => {
       await expect(
         service.getCurrentUser(
@@ -512,30 +524,16 @@ describe('UserAuthService', () => {
           },
         ]),
       };
-      const terminalQuery = {
-        from: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            terminalId: 'terminal123',
-            businessId: 'business123',
-            branchId: 'branch123',
-          },
-        ]),
-      };
       dbMock.transaction.mockImplementation(async (callback: any) =>
         callback({
           execute: jest.fn().mockResolvedValue(undefined),
-          select: jest
-            .fn()
-            .mockReturnValueOnce(userQuery)
-            .mockReturnValueOnce(terminalQuery),
+          select: jest.fn().mockReturnValueOnce(userQuery),
         }),
       );
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
       jwtServiceMock.signAsync.mockResolvedValue('owner-access-token');
 
-      const result = await service.userLogin(ownerDto, 'terminal123');
+      const result = await service.userLogin(ownerDto);
 
       expect(result).toMatchObject({
         accessToken: 'owner-access-token',
@@ -552,12 +550,91 @@ describe('UserAuthService', () => {
       expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
         isOwner: true,
         businessId: 'business123',
-        branchId: 'branch123',
+        branchId: undefined,
       });
       expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
         'role_id',
       );
       expect(permissionsCacheMock.set).not.toHaveBeenCalled();
+    });
+
+    it('uses a branch-scoped membership for web login without a terminal ID', async () => {
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            userId: 'cashier-user',
+            userEmail: 'cashier@example.com',
+            userName: 'Cashier',
+            userPasswordHash: '$2a$10$hashedPassword',
+            userStatus: 'active',
+            businessId: 'business123',
+            branchId: 'cashier-branch',
+            isOwner: false,
+            roleId: null,
+            roleName: null,
+            roleVersion: null,
+            rolePermissions: null,
+          },
+        ]),
+      };
+      const tx = {
+        execute: jest.fn().mockResolvedValue(undefined),
+        select: jest.fn().mockReturnValueOnce(userQuery),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback(tx),
+      );
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+      jwtServiceMock.signAsync.mockResolvedValue('cashier-access-token');
+
+      await service.userLogin({ ...mockDto, remember: false });
+
+      expect(tx.select).toHaveBeenCalledTimes(1);
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
+        businessId: 'business123',
+        branchId: 'cashier-branch',
+      });
+      expect(auditLogsMock.insertUserEvent).toHaveBeenCalledWith(
+        tx,
+        expect.objectContaining({ terminalId: undefined }),
+      );
+    });
+
+    it('rejects web login when the user has no active business membership', async () => {
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            userId: 'unassigned-user',
+            userEmail: 'test@example.com',
+            userName: 'Unassigned User',
+            userPasswordHash: '$2a$10$hashedPassword',
+            userStatus: 'active',
+            businessId: null,
+            branchId: null,
+            isOwner: null,
+            roleId: null,
+            roleName: null,
+            roleVersion: null,
+            rolePermissions: null,
+          },
+        ]),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback({
+          execute: jest.fn().mockResolvedValue(undefined),
+          select: jest.fn().mockReturnValueOnce(userQuery),
+        }),
+      );
+      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
+
+      await expect(service.userLogin(mockDto)).rejects.toThrow(
+        'No active business membership',
+      );
+      expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
     });
 
     it('rejects login when terminal is not active for a matching membership', async () => {
@@ -730,6 +807,9 @@ describe('UserAuthService', () => {
         name: 'Business Owner',
         password: 'secure-password',
         redeemCode: 'AABBCCDDEEFF001122334455',
+        businessId: 'business-id',
+        branchId: 'branch-id',
+        terminalCode: 'POS-A1B2C3D4E5F60718',
       });
 
       expect(result).toMatchObject({
@@ -749,8 +829,8 @@ describe('UserAuthService', () => {
         isOwner: true,
         isActive: true,
       });
-      expect(tx.update).toHaveBeenCalledTimes(2);
-      expect(tx.execute).toHaveBeenCalledTimes(3);
+      expect(tx.update).toHaveBeenCalledTimes(3);
+      expect(tx.execute).toHaveBeenCalledTimes(4);
     });
 
     it('rejects a redemption code that is not visible or no longer redeemable', async () => {
@@ -778,6 +858,9 @@ describe('UserAuthService', () => {
           name: 'Business Owner',
           password: 'secure-password',
           redeemCode: 'INVALID',
+          businessId: 'business-id',
+          branchId: 'branch-id',
+          terminalCode: 'POS-A1B2C3D4E5F60718',
         }),
       ).rejects.toThrow(UnauthorizedException);
       expect(tx.insert).not.toHaveBeenCalled();
@@ -847,6 +930,9 @@ describe('UserAuthService', () => {
         name: 'Owner Name',
         password: 'existing-password',
         redeemCode: 'AABBCCDDEEFF001122334455',
+        businessId: 'business-id',
+        branchId: 'branch-id',
+        terminalCode: 'POS-A1B2C3D4E5F60718',
       });
 
       expect(bcrypt.compare).toHaveBeenCalledWith(
@@ -996,24 +1082,10 @@ describe('UserAuthService', () => {
           },
         ]),
       };
-      const terminalQuery = {
-        from: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            terminalId: 'terminal123',
-            businessId: 'business123',
-            branchId: 'branch123',
-          },
-        ]),
-      };
       dbMock.transaction.mockImplementation(async (callback: any) =>
         callback({
           execute: jest.fn().mockResolvedValue(undefined),
-          select: jest
-            .fn()
-            .mockReturnValueOnce(userQuery)
-            .mockReturnValueOnce(terminalQuery),
+          select: jest.fn().mockReturnValueOnce(userQuery),
         }),
       );
       jwtServiceMock.signAsync.mockResolvedValue('owner-access-token');
@@ -1024,7 +1096,7 @@ describe('UserAuthService', () => {
       redisServiceMock.delete.mockResolvedValue(undefined);
 
       await expect(
-        service.refreshAccessToken(mockRefreshToken, 'terminal123'),
+        service.refreshAccessToken(mockRefreshToken),
       ).resolves.toMatchObject({
         accessToken: 'owner-access-token',
         effectivePermissions: [],
@@ -1033,12 +1105,89 @@ describe('UserAuthService', () => {
       expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
         isOwner: true,
         businessId: 'business123',
-        branchId: 'branch123',
+        branchId: undefined,
       });
       expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
         'role_id',
       );
       expect(permissionsCacheMock.set).not.toHaveBeenCalled();
+    });
+
+    it('refreshes a branch-scoped membership without a web terminal ID', async () => {
+      redisServiceMock.get.mockResolvedValue('cashier-user');
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            userId: 'cashier-user',
+            email: 'cashier@example.com',
+            name: 'Cashier',
+            status: 'active',
+            businessId: 'business123',
+            branchId: 'cashier-branch',
+            isOwner: false,
+            roleId: null,
+            roleVersion: null,
+            permissions: null,
+          },
+        ]),
+      };
+      const tx = {
+        execute: jest.fn().mockResolvedValue(undefined),
+        select: jest.fn().mockReturnValueOnce(userQuery),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback(tx),
+      );
+      jwtServiceMock.signAsync.mockResolvedValue('cashier-access-token');
+      utilsServiceMock.generateRefreshToken.mockReturnValue(
+        'cashier-new-refresh',
+      );
+      redisServiceMock.set.mockResolvedValue(undefined);
+      redisServiceMock.delete.mockResolvedValue(undefined);
+
+      await service.refreshAccessToken(mockRefreshToken);
+
+      expect(tx.select).toHaveBeenCalledTimes(1);
+      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
+        businessId: 'business123',
+        branchId: 'cashier-branch',
+      });
+    });
+
+    it('rejects refresh when the user has no active business membership', async () => {
+      redisServiceMock.get.mockResolvedValue('unassigned-user');
+      const userQuery = {
+        from: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([
+          {
+            userId: 'unassigned-user',
+            email: 'unassigned@example.com',
+            name: 'Unassigned User',
+            status: 'active',
+            businessId: null,
+            branchId: null,
+            isOwner: null,
+            roleId: null,
+            roleVersion: null,
+            permissions: null,
+          },
+        ]),
+      };
+      dbMock.transaction.mockImplementation(async (callback: any) =>
+        callback({
+          execute: jest.fn().mockResolvedValue(undefined),
+          select: jest.fn().mockReturnValueOnce(userQuery),
+        }),
+      );
+
+      await expect(
+        service.refreshAccessToken(mockRefreshToken),
+      ).rejects.toThrow('No active business membership');
+      expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
+      expect(utilsServiceMock.generateRefreshToken).not.toHaveBeenCalled();
     });
   });
 

@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -7,7 +8,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, count, desc, eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
 import {
   branches,
@@ -18,6 +19,10 @@ import {
   ownerRedemptions,
   roles,
   terminals,
+<<<<<<< HEAD
+=======
+  businessMemberships,
+>>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   users,
 } from '../database/schema';
 import type { BusinessDocuments } from '../database/schema/Identity_and_tenent/businesses';
@@ -25,6 +30,7 @@ import { ObjectStoreService } from '../utils/objectStore.service';
 import type { StoredObject } from '../utils/objectStore.service';
 import type { BusinessRequestDto } from './dto/business-request.dto';
 import type { ProvisionBusinessDto } from './dto/provision-business.dto';
+import type { CreateBusinessBranchDto } from './dto/create-business-branch.dto';
 import type { MailJob } from '../workers/mail/mail.types';
 import { RedisService } from '../redis/redis.service';
 import { MailOutboxPublisher } from './mail-outbox.publisher';
@@ -34,6 +40,7 @@ import {
 } from '../database/audit-log.service';
 
 const PROVISION_OPERATION = 'platform.businesses.create';
+const CREATE_BRANCH_OPERATION = 'platform.businesses.create_branch';
 const IDEMPOTENCY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const IDEMPOTENCY_TTL_SECONDS = IDEMPOTENCY_TTL_MS / 1000;
 const IDEMPOTENCY_LOCK_TTL_SECONDS = 5 * 60;
@@ -51,14 +58,21 @@ export class PlatformBusinessService {
     private readonly outboxPublisher: MailOutboxPublisher,
   ) {}
 
+<<<<<<< HEAD
   async getBusinessDetails(
     businessId: string,
     platformUserId: string,
     auditContext: AuditRequestContext = {},
+=======
+  async listBusinesses(
+    pagination: { page: number; limit: number },
+    platformUserId: string,
+>>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   ) {
     return this.database.transactionWithSession(
       { isPlatform: true, platformUserId },
       async (tx) => {
+<<<<<<< HEAD
         const [businessRow] = await tx
           .select()
           .from(business)
@@ -123,11 +137,248 @@ export class PlatformBusinessService {
           business: businessRow,
           branches: businessBranches,
           memberships: membershipRows,
+=======
+        const [totalRow] = await tx.select({ total: count() }).from(business);
+        const rows = await tx
+          .select({
+            id: business.id,
+            legalName: business.legalName,
+            displayName: business.displayName,
+            isActive: business.isActive,
+            primaryContactNumber: business.primaryContactNumber,
+            primaryContactEmail: business.primaryContactEmail,
+            createdAt: business.createdAt,
+            updatedAt: business.updatedAt,
+          })
+          .from(business)
+          .orderBy(desc(business.createdAt), desc(business.id))
+          .limit(pagination.limit)
+          .offset((pagination.page - 1) * pagination.limit);
+
+        const total = totalRow?.total ?? 0;
+        return {
+          data: rows,
+          pagination: {
+            page: pagination.page,
+            limit: pagination.limit,
+            total,
+            totalPages: Math.ceil(total / pagination.limit),
+          },
+>>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
         };
       },
     );
   }
 
+<<<<<<< HEAD
+=======
+  async createBranch(
+    businessId: string,
+    input: CreateBusinessBranchDto,
+    idempotencyKey: string,
+    platformUserId: string,
+    auditContext: AuditRequestContext = {},
+  ) {
+    const name = input.name.trim();
+    const code = input.code.trim().toUpperCase();
+    const address = input.address?.trim() || null;
+    const contactNumber = input.contactNumber?.trim() || null;
+    const terminalNames = input.terminals?.length
+      ? input.terminals.map((terminal) => terminal.name.trim())
+      : ['Initial Terminal'];
+    const requestHash = createHash('sha256')
+      .update(
+        JSON.stringify({
+          businessId,
+          name,
+          code,
+          address,
+          contactNumber,
+          terminalNames,
+        }),
+      )
+      .digest('hex');
+    const idempotencyKeyHash = createHash('sha256')
+      .update(idempotencyKey)
+      .digest('hex');
+    const redisKey = `idempotency:${platformUserId}:${CREATE_BRANCH_OPERATION}:${idempotencyKeyHash}`;
+
+    const cachedResponse = await this.readIdempotency(redisKey, requestHash);
+    if (cachedResponse) return cachedResponse;
+
+    const reservation = JSON.stringify({
+      state: 'pending',
+      requestHash,
+      owner: randomUUID(),
+    });
+    let reserved: boolean;
+    try {
+      reserved = await this.redis.setIfAbsent(
+        `${redisKey}:lock`,
+        reservation,
+        IDEMPOTENCY_LOCK_TTL_SECONDS,
+      );
+    } catch {
+      throw new ServiceUnavailableException(
+        'Idempotency service is unavailable',
+      );
+    }
+    if (!reserved) {
+      const replay = await this.readIdempotency(redisKey, requestHash);
+      if (replay) return replay;
+      throw new ConflictException(
+        'A request with this Idempotency-Key is in progress',
+      );
+    }
+
+    try {
+      const response = await this.database.transactionWithSession(
+        { isPlatform: true, platformUserId },
+        async (tx) => {
+          const [existingBusiness] = await tx
+            .select({ id: business.id, displayName: business.displayName })
+            .from(business)
+            .where(eq(business.id, businessId))
+            .limit(1);
+          if (!existingBusiness) {
+            throw new NotFoundException('Business was not found');
+          }
+
+          const [branch] = await tx
+            .insert(branches)
+            .values({
+              businessId,
+              name,
+              code,
+              address,
+              contactNumber,
+            })
+            .returning({ id: branches.id, name: branches.name });
+          if (!branch) throw new Error('Branch could not be created');
+
+          const terminalValues = terminalNames.map((terminalName) => ({
+            businessId,
+            branchId: branch.id,
+            name: terminalName,
+            terminalCode: generateTerminalCode(),
+            status: 'inactive',
+          }));
+          const createdTerminals = await tx
+            .insert(terminals)
+            .values(terminalValues)
+            .returning({
+              id: terminals.id,
+              name: terminals.name,
+              terminalCode: terminals.terminalCode,
+            });
+          if (createdTerminals.length !== terminalValues.length) {
+            throw new Error('One or more terminals could not be created');
+          }
+
+          const owners = await tx
+            .select({ email: users.emailNormalized })
+            .from(businessMemberships)
+            .innerJoin(users, eq(users.id, businessMemberships.userId))
+            .where(
+              and(
+                eq(businessMemberships.businessId, businessId),
+                eq(businessMemberships.isOwner, true),
+                eq(businessMemberships.isActive, true),
+                eq(users.status, 'active'),
+              ),
+            );
+          if (owners.length === 0) {
+            throw new ConflictException(
+              'Business has no active owner to notify about the branch',
+            );
+          }
+
+          const now = new Date();
+          for (const owner of owners) {
+            const mailJob: MailJob = {
+              id: randomUUID(),
+              to: owner.email,
+              subject: `New branch created for ${existingBusiness.displayName ?? 'your business'}`,
+              template: 'branch-created',
+              context: {
+                businessName: existingBusiness.displayName ?? 'Your business',
+                businessId,
+                branchName: branch.name,
+                branchId: branch.id,
+                branchCode: code,
+                address,
+                contactNumber,
+                terminals: createdTerminals.map(
+                  ({ id, name, terminalCode }) => ({ id, name, terminalCode }),
+                ),
+                homeUrl: '#',
+              },
+              correlationId: branch.id,
+              createdAt: now.toISOString(),
+            };
+            await tx.insert(mailOutbox).values({
+              businessId,
+              payload: mailJob,
+            });
+          }
+
+          const result = {
+            branch: { id: branch.id, name: branch.name },
+            terminals: createdTerminals,
+          };
+          await this.auditLogs.insertPlatformEvent(tx, {
+            ...auditContext,
+            platformUserId,
+            businessId,
+            action: 'branch.created',
+            responseStatus: 201,
+            metadata: {
+              branchId: branch.id,
+              terminalIds: createdTerminals.map((terminal) => terminal.id),
+            },
+          });
+          return result;
+        },
+      );
+
+      this.outboxPublisher.notifyOutboxAvailable();
+
+      try {
+        await this.redis.set(
+          `${redisKey}:result`,
+          JSON.stringify({ requestHash, response }),
+          IDEMPOTENCY_TTL_SECONDS,
+        );
+      } catch {
+        this.logger.warn(
+          'Branch creation committed but its idempotency result could not be cached',
+        );
+      }
+      return response;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      if (postgresErrorCode(error) === '23505') {
+        throw new ConflictException(
+          'A branch with this code already exists for the business',
+        );
+      }
+      this.logger.error(
+        `Failed to create branch for business ${businessId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new ServiceUnavailableException(
+        'Branch creation is temporarily unavailable',
+      );
+    } finally {
+      try {
+        await this.redis.compareAndDelete(`${redisKey}:lock`, reservation);
+      } catch {
+        this.logger.warn('Could not release branch creation idempotency lock');
+      }
+    }
+  }
+
+>>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   async submitBusinessRequest(
     request: BusinessRequestDto,
     files: {
@@ -365,10 +616,13 @@ export class PlatformBusinessService {
               businessId: createdBusiness.id,
               branchId: branch.id,
               name: 'Initial Terminal',
-              terminalCode: 'POS-01',
-              status: 'active',
+              terminalCode: generateTerminalCode(),
+              status: 'inactive',
             })
-            .returning({ id: terminals.id });
+            .returning({
+              id: terminals.id,
+              terminalCode: terminals.terminalCode,
+            });
           if (!terminal)
             throw new Error('Initial terminal could not be created');
 
@@ -419,6 +673,10 @@ export class PlatformBusinessService {
             context: {
               redeemCode,
               expiresAt: expiresAt.toISOString(),
+              businessName: createdBusiness.displayName,
+              businessId: createdBusiness.id,
+              branchId: branch.id,
+              terminalCode: terminal.terminalCode,
               homeUrl: '#',
             },
             correlationId: requestId,
@@ -499,4 +757,8 @@ function postgresErrorCode(error: unknown): string | undefined {
     return error.cause.code;
   }
   return undefined;
+}
+
+function generateTerminalCode(): string {
+  return `POS-${randomBytes(8).toString('hex').toUpperCase()}`;
 }

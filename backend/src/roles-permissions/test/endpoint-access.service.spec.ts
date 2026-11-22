@@ -122,4 +122,25 @@ describe('EndpointAccessService', () => {
       ),
     ).resolves.toBe(false);
   });
+
+  it('denies access when a fail-closed endpoint has no role configuration', async () => {
+    const transaction = {
+      select: jest.fn(() => ({
+        from: jest.fn(() => ({
+          where: jest.fn().mockResolvedValue([]),
+        })),
+      })),
+    };
+    database.transactionWithSession.mockImplementation(
+      async (_session, callback) => callback(transaction),
+    );
+
+    await expect(
+      service.hasAccess(
+        { userId: 'user-1', businessId: 'business-1' },
+        'branches.read',
+        { requireConfiguration: true },
+      ),
+    ).resolves.toBe(false);
+  });
 });
