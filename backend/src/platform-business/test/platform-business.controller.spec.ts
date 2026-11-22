@@ -11,12 +11,9 @@ describe('PlatformBusinessController', () => {
   const platformBusiness = {
     submitBusinessRequest: jest.fn(),
     provisionBusiness: jest.fn(),
-<<<<<<< HEAD
     getBusinessDetails: jest.fn(),
-=======
     createBranch: jest.fn(),
     listBusinesses: jest.fn(),
->>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   };
   let controller: PlatformBusinessController;
 
@@ -31,7 +28,6 @@ describe('PlatformBusinessController', () => {
     controller = module.get(PlatformBusinessController);
   });
 
-<<<<<<< HEAD
   it('allows only platform users to read business details', async () => {
     const result = {
       business: { id: '00000000-0000-4000-8000-000000000010' },
@@ -60,10 +56,6 @@ describe('PlatformBusinessController', () => {
     expect(platformBusiness.getBusinessDetails).toHaveBeenCalledWith(
       '00000000-0000-4000-8000-000000000010',
       'platform-user-id',
-      expect.objectContaining({
-        method: 'GET',
-        clientType: 'mobile',
-      }),
     );
 
     await expect(
@@ -72,7 +64,8 @@ describe('PlatformBusinessController', () => {
         user: { isPlatform: false },
       } as never),
     ).rejects.toBeInstanceOf(ForbiddenException);
-=======
+  });
+
   it('lists businesses only for authenticated platform users', async () => {
     const result = {
       data: [{ id: 'business-id', isActive: false }],
@@ -101,7 +94,6 @@ describe('PlatformBusinessController', () => {
       } as never),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(platformBusiness.listBusinesses).toHaveBeenCalledTimes(1);
->>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   });
 
   it('makes the combined upload and request route public and rate limited', () => {

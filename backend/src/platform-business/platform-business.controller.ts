@@ -6,13 +6,9 @@ import {
   HttpStatus,
   ForbiddenException,
   Get,
-<<<<<<< HEAD
   Param,
   ParseUUIDPipe,
-=======
->>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   Post,
-  Param,
   Query,
   Req,
   UploadedFiles,
@@ -52,7 +48,6 @@ export interface BusinessRequestFiles {
 export class PlatformBusinessController {
   constructor(private readonly platformBusiness: PlatformBusinessService) {}
 
-<<<<<<< HEAD
   @Get('business/:business_id')
   @HttpCode(HttpStatus.OK)
   async getBusiness(
@@ -73,7 +68,14 @@ export class PlatformBusinessController {
         request.user.subjectId ??
         request.user.userId ??
         request.user.sub)
-=======
+      : undefined;
+    if (!platformUserId) {
+      throw new ForbiddenException('Platform user authentication required');
+    }
+
+    return this.platformBusiness.getBusinessDetails(businessId, platformUserId);
+  }
+
   @Get()
   async listBusinesses(
     @Query() query: ListBusinessesQueryDto,
@@ -83,37 +85,18 @@ export class PlatformBusinessController {
     const user = request.user;
     const platformUserId = user?.isPlatform
       ? (user.platformUserId ?? user.subjectId ?? user.userId ?? user.sub)
->>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
       : undefined;
     if (!platformUserId) {
       throw new ForbiddenException('Platform user authentication required');
     }
 
-<<<<<<< HEAD
-    return this.platformBusiness.getBusinessDetails(
-      businessId,
-      platformUserId,
-      {
-        method: request.method,
-        endpointPath: request.route?.path,
-        requestId: request.header('x-request-id'),
-        clientType,
-        ipAddress: request.ip,
-        userAgent: request.header('user-agent'),
-      },
-    );
-  }
-
-  @Post('businesses/create')
-=======
     return this.platformBusiness.listBusinesses(
       { page: query.page, limit: query.limit },
       platformUserId,
     );
   }
 
-  @Post('create')
->>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
+  @Post('businesses/create')
   @HttpCode(HttpStatus.CREATED)
   @RateLimit({
     requests: 20,
@@ -152,10 +135,7 @@ export class PlatformBusinessController {
     );
   }
 
-<<<<<<< HEAD
-  @Post('businesses/request')
-=======
-  @Post(':businessId/branches')
+  @Post('businesses/:businessId/branches')
   @HttpCode(HttpStatus.CREATED)
   async createBranch(
     @Param() params: BusinessBranchParamsDto,
@@ -190,8 +170,7 @@ export class PlatformBusinessController {
     );
   }
 
-  @Post('request')
->>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
+  @Post('businesses/request')
   @HttpCode(HttpStatus.CREATED)
   @Public()
   @RateLimit({

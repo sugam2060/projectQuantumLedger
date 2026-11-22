@@ -360,6 +360,93 @@ or invalid; 403 for a non-platform user. **Pagination:** `page` defaults to 1;
 }
 ```
 
+### `GET /api/v1/platform/business/{business_id}`
+
+**Description:** Returns the selected business, all of its branches (active and
+inactive), and all business memberships (active and inactive). Memberships
+include the associated user, role, and branch when present. **Auth:** signed-in
+platform manager (platform-user JWT); `Authorization` and `x-client-type`
+headers are required, and `x-client-type` must be `web`, `desktop`, or
+`mobile`. **Audit:** none for this read. **Errors:** 400 for an invalid business
+UUID or client-type header; 401 when the access token is missing or invalid; 403
+for a non-platform user; 404 when the business does not exist. **Success:** 200.
+
+```json
+{
+  "phase": 1,
+  "endpoint": "GET /api/v1/platform/business/{business_id}",
+  "requestData": {
+    "pathParams": {
+      "business_id": "8b6dd8d2-53d4-4f52-87a1-5e8187423d56"
+    },
+    "queryParams": null,
+    "headers": {
+      "Authorization": "Bearer <platform-access-token>",
+      "x-client-type": "web"
+    },
+    "body": null
+  },
+  "responseData": {
+    "httpStatus": 200,
+    "body": {
+      "business": {
+        "id": "8b6dd8d2-53d4-4f52-87a1-5e8187423d56",
+        "legalName": "Example Retail Pvt. Ltd.",
+        "displayName": "Example Retail",
+        "pan": "<business-pan>",
+        "address": "Main Street, Kathmandu",
+        "addressDetails": {
+          "country": "NP",
+          "city": "Kathmandu",
+          "postalCode": "44600",
+          "addressLine1": "Main Street",
+          "addressLine2": null
+        },
+        "documents": {},
+        "primaryContactNumber": "+9779812345678",
+        "primaryContactEmail": "owner@example.com",
+        "isActive": true,
+        "createdBy": "a8c6dd8d-2f52-4f52-87a1-5e8187423d56",
+        "createdAt": "2026-11-13T02:15:00.000Z",
+        "updatedAt": "2026-11-13T02:15:00.000Z"
+      },
+      "branches": [
+        {
+          "id": "01234567-89ab-4cde-8f01-23456789abcd",
+          "businessId": "8b6dd8d2-53d4-4f52-87a1-5e8187423d56",
+          "name": "Main Branch",
+          "code": "MAIN",
+          "address": "Main Street",
+          "contactNumber": "+9779812345678",
+          "isActive": true,
+          "createdAt": "2026-11-13T02:15:00.000Z",
+          "updatedAt": "2026-11-13T02:15:00.000Z"
+        }
+      ],
+      "memberships": [
+        {
+          "id": "c8c6dd8d-2f52-4f52-87a1-5e8187423d56",
+          "isOwner": true,
+          "isActive": true,
+          "branchId": null,
+          "roleId": null,
+          "createdAt": "2026-11-13T02:15:00.000Z",
+          "updatedAt": "2026-11-13T02:15:00.000Z",
+          "user": {
+            "id": "d8c6dd8d-2f52-4f52-87a1-5e8187423d56",
+            "email": "owner@example.com",
+            "name": "Example Owner",
+            "status": "active"
+          },
+          "role": null,
+          "branch": null
+        }
+      ]
+    }
+  }
+}
+```
+
 ### `POST /api/v1/platform/businesses/request`
 
 **Description:** Submits a public business workspace provisioning request for

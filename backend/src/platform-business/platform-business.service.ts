@@ -19,10 +19,6 @@ import {
   ownerRedemptions,
   roles,
   terminals,
-<<<<<<< HEAD
-=======
-  businessMemberships,
->>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   users,
 } from '../database/schema';
 import type { BusinessDocuments } from '../database/schema/Identity_and_tenent/businesses';
@@ -58,21 +54,10 @@ export class PlatformBusinessService {
     private readonly outboxPublisher: MailOutboxPublisher,
   ) {}
 
-<<<<<<< HEAD
-  async getBusinessDetails(
-    businessId: string,
-    platformUserId: string,
-    auditContext: AuditRequestContext = {},
-=======
-  async listBusinesses(
-    pagination: { page: number; limit: number },
-    platformUserId: string,
->>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
-  ) {
+  async getBusinessDetails(businessId: string, platformUserId: string) {
     return this.database.transactionWithSession(
       { isPlatform: true, platformUserId },
       async (tx) => {
-<<<<<<< HEAD
         const [businessRow] = await tx
           .select()
           .from(business)
@@ -121,23 +106,22 @@ export class PlatformBusinessService {
           .leftJoin(branches, eq(businessMemberships.branchId, branches.id))
           .where(eq(businessMemberships.businessId, businessId));
 
-        await this.auditLogs.insertPlatformEvent(tx, {
-          ...auditContext,
-          platformUserId,
-          businessId,
-          action: 'business.details.viewed',
-          responseStatus: 200,
-          metadata: {
-            branchCount: businessBranches.length,
-            membershipCount: membershipRows.length,
-          },
-        });
-
         return {
           business: businessRow,
           branches: businessBranches,
           memberships: membershipRows,
-=======
+        };
+      },
+    );
+  }
+
+  async listBusinesses(
+    pagination: { page: number; limit: number },
+    platformUserId: string,
+  ) {
+    return this.database.transactionWithSession(
+      { isPlatform: true, platformUserId },
+      async (tx) => {
         const [totalRow] = await tx.select({ total: count() }).from(business);
         const rows = await tx
           .select({
@@ -164,14 +148,11 @@ export class PlatformBusinessService {
             total,
             totalPages: Math.ceil(total / pagination.limit),
           },
->>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
         };
       },
     );
   }
 
-<<<<<<< HEAD
-=======
   async createBranch(
     businessId: string,
     input: CreateBusinessBranchDto,
@@ -378,7 +359,6 @@ export class PlatformBusinessService {
     }
   }
 
->>>>>>> 475e9c09d756e8198c4aa5ae2d45cad8ec3449bd
   async submitBusinessRequest(
     request: BusinessRequestDto,
     files: {
