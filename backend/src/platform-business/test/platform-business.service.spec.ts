@@ -82,6 +82,51 @@ describe('PlatformBusinessService', () => {
     );
   });
 
+  it('returns business details without writing a read audit event', async () => {
+    const businessRow = { id: 'business-id', displayName: 'Example Retail' };
+    const branchRows = [{ id: 'branch-id', isActive: false }];
+    const membershipRows = [{ id: 'membership-id', isActive: false }];
+    const businessQuery = {
+      from: jest.fn(),
+      where: jest.fn(),
+      limit: jest.fn().mockResolvedValue([businessRow]),
+    };
+    businessQuery.from.mockReturnValue(businessQuery);
+    businessQuery.where.mockReturnValue(businessQuery);
+    const branchesQuery = {
+      from: jest.fn(),
+      where: jest.fn().mockResolvedValue(branchRows),
+    };
+    branchesQuery.from.mockReturnValue(branchesQuery);
+    const membershipsQuery = {
+      from: jest.fn(),
+      leftJoin: jest.fn(),
+      where: jest.fn().mockResolvedValue(membershipRows),
+    };
+    membershipsQuery.from.mockReturnValue(membershipsQuery);
+    membershipsQuery.leftJoin.mockReturnValue(membershipsQuery);
+    const tx = {
+      select: jest
+        .fn()
+        .mockReturnValueOnce(businessQuery)
+        .mockReturnValueOnce(branchesQuery)
+        .mockReturnValueOnce(membershipsQuery),
+    };
+    database.transactionWithSession.mockImplementation(
+      async (_session: unknown, callback: (transaction: unknown) => unknown) =>
+        callback(tx),
+    );
+
+    await expect(
+      service.getBusinessDetails('business-id', 'platform-user-id'),
+    ).resolves.toEqual({
+      business: businessRow,
+      branches: branchRows,
+      memberships: membershipRows,
+    });
+    expect(auditLogs.insertPlatformEvent).not.toHaveBeenCalled();
+  });
+
   it('returns a paginated business directory containing active and inactive records', async () => {
     const activeBusiness = {
       id: 'active-id',

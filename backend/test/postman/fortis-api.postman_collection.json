@@ -96,6 +96,11 @@
       "type": "string"
     },
     {
+      "key": "businessId",
+      "value": "00000000-0000-4000-8000-000000000010",
+      "type": "string"
+    },
+    {
       "key": "provisioningIdempotencyKey",
       "value": "provision-business-req-1092",
       "type": "string"
@@ -1489,6 +1494,44 @@
                 "exec": [
                   "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
                   "pm.expect(pm.response.json().message).to.include('request has been submitted');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /platform/business/{business_id}",
+          "request": {
+            "method": "GET",
+            "description": "Platform-manager-only business detail lookup. Returns the business, every branch (active and inactive), and business memberships with their user, role, and branch details.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{platformAccessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Client-Type",
+                "value": "{{platformClientType}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/platform/business/{{businessId}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.eql(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('business');",
+                  "  pm.expect(body).to.have.property('branches');",
+                  "  pm.expect(body).to.have.property('memberships');",
+                  "}"
                 ]
               }
             }

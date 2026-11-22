@@ -11,6 +11,7 @@ describe('PlatformBusinessController', () => {
   const platformBusiness = {
     submitBusinessRequest: jest.fn(),
     provisionBusiness: jest.fn(),
+    getBusinessDetails: jest.fn(),
     createBranch: jest.fn(),
     listBusinesses: jest.fn(),
   };
@@ -25,6 +26,44 @@ describe('PlatformBusinessController', () => {
       ],
     }).compile();
     controller = module.get(PlatformBusinessController);
+  });
+
+  it('allows only platform users to read business details', async () => {
+    const result = {
+      business: { id: '00000000-0000-4000-8000-000000000010' },
+      branches: [],
+      memberships: [],
+    };
+    platformBusiness.getBusinessDetails.mockResolvedValue(result);
+    const request = {
+      user: { isPlatform: true, platformUserId: 'platform-user-id' },
+      method: 'GET',
+      route: { path: '/platform/business/:business_id' },
+      ip: '127.0.0.1',
+      header: jest
+        .fn()
+        .mockImplementation((name: string) =>
+          name === 'x-client-type' ? 'mobile' : undefined,
+        ),
+    };
+
+    await expect(
+      controller.getBusiness(
+        '00000000-0000-4000-8000-000000000010',
+        request as never,
+      ),
+    ).resolves.toBe(result);
+    expect(platformBusiness.getBusinessDetails).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000010',
+      'platform-user-id',
+    );
+
+    await expect(
+      controller.getBusiness('00000000-0000-4000-8000-000000000010', {
+        ...request,
+        user: { isPlatform: false },
+      } as never),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('lists businesses only for authenticated platform users', async () => {
