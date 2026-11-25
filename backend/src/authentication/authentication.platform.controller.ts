@@ -13,7 +13,7 @@ import {
 import type { Request, Response } from 'express';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { Public } from './decorators/public.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { RateLimit } from './decorators/rate-limit.decorator';
 import { ClientType } from './dto/clientLogin.dto';
 import { PlatformRefreshHeadersDto } from './dto/platform-refresh-headers.dto';

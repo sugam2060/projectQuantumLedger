@@ -2,7 +2,7 @@ import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
-import { IS_PUBLIC } from '../../authentication/decorators/public.decorator';
+import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 import { RATE_LIMIT_KEY } from '../../authentication/decorators/rate-limit.decorator';
 import { PlatformBusinessController } from '../platform-business.controller';
 import { PlatformBusinessService } from '../platform-business.service';
@@ -120,7 +120,7 @@ describe('PlatformBusinessController', () => {
       'listBusinesses',
     );
 
-    expect(Reflect.getMetadata(IS_PUBLIC, handler)).not.toBe(true);
+    expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).not.toBe(true);
     await expect(
       controller.listBusinesses({ page: 1, limit: 20 }, { clientType: 'web' }, {
         user: { isPlatform: true, platformUserId: 'platform-user-id' },
@@ -141,7 +141,7 @@ describe('PlatformBusinessController', () => {
 
   it('makes the combined upload and request route public and rate limited', () => {
     const handler = PlatformBusinessController.prototype.submitRequest;
-    expect(Reflect.getMetadata(IS_PUBLIC, handler)).toBe(true);
+    expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).toBe(true);
     expect(Reflect.getMetadata(RATE_LIMIT_KEY, handler)).toEqual(
       expect.objectContaining({ requests: 5, windowMs: 60 * 60_000 }),
     );
@@ -204,7 +204,7 @@ describe('PlatformBusinessController', () => {
     };
     const handler = PlatformBusinessController.prototype.provisionBusiness;
 
-    expect(Reflect.getMetadata(IS_PUBLIC, handler)).not.toBe(true);
+    expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).not.toBe(true);
     expect(Reflect.getMetadata(RATE_LIMIT_KEY, handler)).toEqual(
       expect.objectContaining({ requests: 20 }),
     );
@@ -285,7 +285,7 @@ describe('PlatformBusinessController', () => {
     };
     const handler = PlatformBusinessController.prototype.createBranch;
 
-    expect(Reflect.getMetadata(IS_PUBLIC, handler)).not.toBe(true);
+    expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).not.toBe(true);
     await expect(
       controller.createBranch(
         { businessId: 'business-id' } as never,

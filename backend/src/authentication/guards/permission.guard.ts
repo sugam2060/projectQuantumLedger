@@ -1,4 +1,4 @@
-﻿import {
+import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
@@ -6,7 +6,7 @@
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { EndpointAccessService } from '../../roles-permissions/endpoint-access.service';
-import { IS_PUBLIC } from '../decorators/public.decorator';
+import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 import {
   REQUIRE_CONFIGURED_ROLES,
   REQUIRED_ROLES,
@@ -21,7 +21,7 @@ export class PermissionGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, [
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);

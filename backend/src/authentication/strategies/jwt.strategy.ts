@@ -3,19 +3,9 @@ import type { ConfigType } from '@nestjs/config';
 import { authConfig } from '../../config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { RequestSession } from '../../database/request_context.service';
+import type { AuthenticatedUser } from '../../common/types';
 
-export interface AuthenticatedUser extends RequestSession {
-  subjectId: string;
-  sub?: string;
-  permissions: string[];
-  name?: string;
-  roleId?: string;
-  roleVersion?: number;
-  isBootstrap?: boolean;
-  tokenIssuedAt?: number;
-  tokenExpiresAt?: number;
-}
+export type { AuthenticatedUser };
 
 interface JwtPayload {
   sub?: unknown;

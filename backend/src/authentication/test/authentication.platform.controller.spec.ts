@@ -4,7 +4,7 @@ import { Test } from '@nestjs/testing';
 import { ClientType } from '../dto/clientLogin.dto';
 import { AuthenticationPlatformController } from '../authentication.platform.controller';
 import { PlatformAuthService } from '../authentication.service.platform';
-import { IS_PUBLIC } from '../decorators/public.decorator';
+import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 import { RATE_LIMIT_KEY } from '../decorators/rate-limit.decorator';
 
 describe('AuthenticationPlatformController', () => {
@@ -38,7 +38,7 @@ describe('AuthenticationPlatformController', () => {
   it('keeps platform login public and rate limited', () => {
     const loginHandler = AuthenticationPlatformController.prototype.login;
 
-    expect(Reflect.getMetadata(IS_PUBLIC, loginHandler)).toBe(true);
+    expect(Reflect.getMetadata(IS_PUBLIC_KEY, loginHandler)).toBe(true);
     expect(Reflect.getMetadata(RATE_LIMIT_KEY, loginHandler)).toEqual(
       expect.objectContaining({ requests: 20, windowMs: 60_000 }),
     );

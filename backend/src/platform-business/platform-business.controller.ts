@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { Public } from '../authentication/decorators/public.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { RateLimit } from '../authentication/decorators/rate-limit.decorator';
 import { BusinessUploadHeaders } from './decorators/business-upload-headers.decorator';
 import { BusinessUploadHeaderDto } from './dto/business-upload-header.dto';

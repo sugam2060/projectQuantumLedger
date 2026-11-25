@@ -12,7 +12,7 @@ import {
 import type { Request, Response } from 'express';
 import { UserAuthService } from './authentication.service.user';
 import { ClientLoginDTO, ClientType } from './dto/clientLogin.dto';
-import { Public } from './decorators/public.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { RateLimit } from './decorators/rate-limit.decorator';
 import { RequiredRoles } from './decorators/required_permission.decorator';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';

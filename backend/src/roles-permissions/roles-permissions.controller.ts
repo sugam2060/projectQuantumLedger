@@ -16,7 +16,7 @@ import { EndpointAccessService } from './endpoint-access.service';
 import { EndpointAccessCatalogService } from './endpoint-access-catalog.service';
 import { EndpointKeyParamsDto } from './dto/endpoint-key-params.dto';
 import { SetEndpointRolesDto } from './dto/set-endpoint-roles.dto';
-import { Public } from '../authentication/decorators/public.decorator';
+import { Public } from '../common/decorators/public.decorator';
 
 interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
