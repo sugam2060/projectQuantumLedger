@@ -4,23 +4,50 @@ NestJS backend: PostgreSQL (Drizzle ORM), Redis, RabbitMQ, Passport auth, NestJS
 
 
 # Claude.md and AGENTS.md file update rule:
-@updateRule.md
+Update this file (and `CLAUDE.md`) in the same change whenever folder layout, commands, workflow rules or env vars change.
 
 ## Commands
 
 ```bash
 npm run start:dev | start:prod
-npm run db:generate | db:migrate | db:studio
+npm run db:generate | db:migrate
 npm run test | test:e2e | test:cov
 ```
 
-## Available PostgreSQL function:
-- @database_files/phase1_function.sql
+## SQL functions, roles and grants
+
+Raw SQL that Drizzle cannot generate lives in `script/` and is applied by `script/migrate.ts`
+around the Drizzle migrations (`npm run db:migrate`).
 
 ## Structure
 
-Feature modules in `src/<feature>/`: `.module.ts`, `.controller.ts`, `.service.ts`, `dto/`, `*.spec.ts`.
-Infra modules: `database/` (Drizzle schema), `redis/`, `rabbitmq/`. E2E tests in `test/`.
+Feature folders sit directly under `src/` (no `src/modules/`). Each feature follows one template:
+
+```
+src/<feature>/
+  <feature>.module.ts       wiring only
+  <name>.controller.ts      thin HTTP layer (one per route group; several allowed)
+  <name>.service.ts         business rules, throws HttpExceptions
+  <name>.repository.ts      ALL SQL / Drizzle for that route group
+  dto/                      one class per <action>.dto.ts + index.ts barrel
+  types/                    one concept per <name>.type.ts + index.ts barrel
+  decorators/ guards/ pipes/ strategies/ utils/   only when the feature owns them
+  test/                     unit specs (*.spec.ts)
+  index.ts                  public barrel; other features import only from it
+  README.md                 endpoints, rules, gotchas, tests
+```
+
+Current features: `authentication/`, `audit-logs/`, `businesses/`, `platform/`, `roles-permissions/`.
+Cross-cutting and infra folders:
+
+- `common/`: framework pieces used by 2+ features (`decorators/`, `guards/`, `types/`, `utils/`). No business rules, no SQL, no imports from feature folders.
+- `config/`: one `registerAs` file per concern + `types/` + `env.validation.ts`. The only place that reads `process.env` (besides `script/`).
+- `database/`: pool provider, `DatabaseService`, Drizzle schemas grouped by domain in `schemas/{auth,business,audit}/`, one table per file.
+- `redis/`, `storage/`: infra modules (Redis client, object storage).
+- `script/`: `migrate.ts` and raw SQL. `drizzle/`: migrations.
+
+Global guards and the global pipe are registered once in `AppModule`, as an ordered and commented list.
+Express-level setup lives in `src/app.setup.ts` (`configureApp`), which `main.ts` and e2e tests share.
 Follow existing modules before introducing new patterns.
 
 ## Postman API Collection
@@ -39,9 +66,14 @@ Follow existing modules before introducing new patterns.
   collection as JSON and confirm its route list covers every controller route
   before completing API work.
 
-Place unit tests in a `test/` folder inside the same directory as the code they cover. Each folder gets its own `test/`:
-- `auth/` → tests in `auth/test/`
-- `auth/guards/` → tests in `auth/guards/test/`
+Tests:
+
+- Unit specs go in one `test/` folder per feature or infra folder: `src/<feature>/test/*.spec.ts`
+  (also `src/common/test/`, `src/config/test/`). Subfolders such as `guards/` do not get their own `test/`.
+- E2E specs go in `test/<area>/*.e2e-spec.ts` (`authentication`, `authorization`, `businesses`, `platform`,
+  `database`, `common`, `app`). Shared e2e helpers go in `test/<area>/helpers/`.
+- `test/common/route-baseline.e2e-spec.ts` records every route (method + path + public flag). A route change
+  must be intentional: regenerate with `UPDATE_ROUTE_BASELINE=1` and note it in the change.
 
 
 ## Architecture Rules
@@ -50,7 +82,8 @@ Place unit tests in a `test/` folder inside the same directory as the code they 
 - Config only via `ConfigModule`; no `process.env` elsewhere.
 - No `any`; derive types from Drizzle schema and DTOs.
 - Multi-step DB writes use transactions.
-- Auth/security rules: see `src/auth/AGENTS.md`.
+- SQL and Drizzle calls only in `*.repository.ts`; services never touch `DatabaseService`.
+- Auth/security rules: see `src/authentication/README.md`.
 
 ## NestJS Building Blocks (use where needed; never inline this logic in services/controllers)
 
@@ -69,7 +102,7 @@ Before writing a handler, check if any of these apply. If one does, use it and a
 
 1. Service unit tests (`*.service.spec.ts`): mock deps; success, edge, error paths.
 2. Controller unit tests (`*.controller.spec.ts`), plus guards/pipes/interceptors involved.
-3. E2E tests (`test/*.e2e-spec.ts`): real app module + test DB; cover auth, validation, errors.
+3. E2E tests (`test/<area>/*.e2e-spec.ts`): real app module + test DB; cover auth, validation, errors.
 4. Run tests, confirm they fail for the right reason.
 5. Implement until all pass.
 6. Run `npm run test`, `npm run test:e2e`, type check, lint.
@@ -82,7 +115,7 @@ Decompose large tasks; parallelize independent subtasks; sequence dependent ones
 
 ## Health
 
-`GET /health/live` and `GET /health/ready` (PostgreSQL, Redis, RabbitMQ) must keep passing.
+Health endpoints (`GET /health/live`, `GET /health/ready`) are planned but not implemented yet.
 
 ## Env
 
@@ -90,4 +123,4 @@ See `.env.example`: `DATABASE_URL`, `REDIS_URL`, `RABBITMQ_URL`, `OBSERVE_APP_KE
 
 ## Done When
 
-Tests written first and passing; migrations generated if schema changed; health checks pass; no type/lint errors.
+Tests written first and passing; migrations generated if schema changed; route baseline intentional; no type/lint errors.
