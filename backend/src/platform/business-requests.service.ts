@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditLogsService, type AuditRequestContext } from '../audit-logs';
 import type { BusinessDocuments } from '../database/schemas/business/businesses';
-import { ObjectStoreService } from '../utils/objectStore.service';
-import type { StoredObject } from '../utils/objectStore.service';
+import { ObjectStoreService, type StoredObject } from '../storage';
 import { BusinessRequestsRepository } from './business-requests.repository';
 import type { BusinessRequestDto } from './dto/business-request.dto';
 import type { BusinessRequestUploads } from './types';

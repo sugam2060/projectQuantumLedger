@@ -7,7 +7,7 @@ import {
   type UploadApiResponse,
 } from 'cloudinary';
 import { PassThrough } from 'stream';
-import { CloudinaryObjectStoreService } from '../cloudinary.service';
+import { CloudinaryObjectStoreService } from '../cloudinary-object-store.service';
 
 type UploadStreamMock = (
   options?: UploadApiOptions,

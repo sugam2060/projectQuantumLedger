@@ -2,7 +2,7 @@ import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { createHash } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
-import { ObjectStoreService } from '../../utils/objectStore.service';
+import { ObjectStoreService } from '../../storage/object-store.service';
 import { BusinessRequestsRepository } from '../business-requests.repository';
 import { BusinessRequestsService } from '../business-requests.service';
 import { RedisService } from '../../redis/redis.service';

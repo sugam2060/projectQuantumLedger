@@ -3,7 +3,7 @@ const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
-import { ObjectStoreService } from '../../utils/objectStore.service';
+import { ObjectStoreService } from '../../storage/object-store.service';
 import { AuditLogsService } from '../../audit-logs';
 import { PlatformBusinessesRepository } from '../platform-businesses.repository';
 import { PlatformBusinessesService } from '../platform-businesses.service';

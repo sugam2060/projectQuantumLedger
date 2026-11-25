@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuditLogsModule } from '../audit-logs';
 import { appConfig } from '../config';
 import { RedisModule } from '../redis/redis.module';
+import { StorageModule } from '../storage';
 import { UtilsModule } from '../utils/utils.module';
 import { BusinessRequestsController } from './business-requests.controller';
 import { BusinessRequestsRepository } from './business-requests.repository';
@@ -20,6 +21,7 @@ import { PlatformUsersService } from './platform-users.service';
   imports: [
     AuditLogsModule,
     ConfigModule.forFeature(appConfig),
+    StorageModule,
     UtilsModule,
     RedisModule,
   ],

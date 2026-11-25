@@ -14,7 +14,7 @@ import {
   type UploadApiResponse,
 } from 'cloudinary';
 import streamifier from 'streamifier';
-import { ObjectStoreService, type StoredObject } from './objectStore.service';
+import { ObjectStoreService, type StoredObject } from './object-store.service';
 
 @Injectable()
 export class CloudinaryObjectStoreService extends ObjectStoreService {

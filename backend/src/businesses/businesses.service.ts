@@ -8,7 +8,7 @@ import {
 import { AuditLogsService, type AuditRequestContext } from '../audit-logs';
 import type { RequestSession } from '../database/request_context.service';
 import type { business, BusinessDocuments } from '../database/schemas';
-import { ObjectStoreService } from '../utils/objectStore.service';
+import { ObjectStoreService } from '../storage';
 import { BusinessUpdateIdempotencyService } from './business-update-idempotency.service';
 import { BusinessesRepository } from './businesses.repository';
 import type { UpdateBusinessDto } from './dto/update-business.dto';
