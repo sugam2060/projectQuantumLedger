@@ -1,9 +1,6 @@
 {
-<<<<<<< HEAD
   "id": "560f3bf3-4b2d-4d61-934f-acde4b32560c",
   "prevId": "721b7491-d74c-4387-aa59-95cfc142bbaf",
-=======
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -385,15 +382,12 @@
           "primaryKey": false,
           "notNull": false
         },
-<<<<<<< HEAD
         "provisioned_business_id": {
           "name": "provisioned_business_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-=======
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -445,7 +439,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-<<<<<<< HEAD
         },
         "business_provisioning_requests_provisioned_business_uq": {
           "name": "business_provisioning_requests_provisioned_business_uq",
@@ -462,8 +455,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-=======
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
         }
       },
       "foreignKeys": {
@@ -479,7 +470,6 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
-<<<<<<< HEAD
         },
         "business_provisioning_requests_provisioned_business_id_business_id_fk": {
           "name": "business_provisioning_requests_provisioned_business_id_business_id_fk",
@@ -493,8 +483,6 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
-=======
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
         }
       },
       "compositePrimaryKeys": {},
@@ -545,7 +533,6 @@
       },
       "isRLSEnabled": true
     },
-<<<<<<< HEAD
     "public.owner_redemptions": {
       "name": "owner_redemptions",
       "schema": "",
@@ -1047,8 +1034,6 @@
       },
       "isRLSEnabled": true
     },
-=======
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
     "public.business_memberships": {
       "name": "business_memberships",
       "schema": "",
@@ -1209,11 +1194,7 @@
           "to": [
             "fortis_app"
           ],
-<<<<<<< HEAD
           "withCheck": "\n            business_id = app_business_id()\n            OR app_is_platform() = true\n        "
-=======
-          "withCheck": "\n            (business_id = app_business_id() AND app_is_owner() = true)\n            OR app_is_platform() = true\n        "
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
         },
         "business_memberships_update": {
           "name": "business_memberships_update",
@@ -1227,13 +1208,8 @@
         }
       },
       "checkConstraints": {
-<<<<<<< HEAD
         "business_memberships_role_required_chk": {
           "name": "business_memberships_role_required_chk",
-=======
-        "business_memberships_role_required_for_non_owner_chk": {
-          "name": "business_memberships_role_required_for_non_owner_chk",
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
           "value": "is_owner = true OR role_id IS NOT NULL"
         }
       },
@@ -2148,11 +2124,7 @@
           "to": [
             "fortis_app"
           ],
-<<<<<<< HEAD
           "withCheck": "\n            EXISTS (\n                SELECT 1 FROM invitations \n                WHERE email_normalized = \"users\".\"email_normalized\"\n                AND consumed_at IS NULL\n                AND revoked_at IS NULL\n            )\n            OR EXISTS (\n                SELECT 1 FROM owner_redemptions r\n                WHERE r.email_normalized = users.email_normalized\n                  AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')\n                  AND r.consumed_at IS NULL\n                  AND r.revoked_at IS NULL\n                  AND r.expires_at > now()\n            )\n            OR public.app_is_platform() = true\n        "
-=======
-          "withCheck": "\n            EXISTS (\n                SELECT 1 FROM invitations \n                WHERE email_normalized = \"users\".\"email_normalized\"\n                AND consumed_at IS NULL\n                AND revoked_at IS NULL\n            )\n            OR public.app_is_platform() = true\n        "
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
         },
         "users_select": {
           "name": "users_select",
@@ -2161,11 +2133,7 @@
           "to": [
             "fortis_app"
           ],
-<<<<<<< HEAD
           "using": "\n            id = public.app_user_id()\n            OR (\n              email_normalized = NULLIF(current_setting('app.registration_email', true), '')\n              AND EXISTS (\n                SELECT 1 FROM owner_redemptions r\n                WHERE r.email_normalized = users.email_normalized\n                  AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')\n                  AND r.consumed_at IS NULL\n                  AND r.revoked_at IS NULL\n                  AND r.expires_at > now()\n              )\n            )\n            OR EXISTS (\n                SELECT 1 FROM business_memberships m1\n                JOIN business_memberships m2 ON m1.business_id = m2.business_id\n                WHERE m1.user_id = public.app_user_id() \n                  AND m2.user_id = users.id \n                  AND m1.business_id = public.app_business_id()\n                  AND m1.is_active = true\n                  AND m2.is_active = true\n            )\n            OR public.app_is_platform() = true\n        "
-=======
-          "using": "\n            id = public.app_user_id()\n            OR EXISTS (\n                SELECT 1 FROM business_memberships m1\n                JOIN business_memberships m2 ON m1.business_id = m2.business_id\n                WHERE m1.user_id = public.app_user_id() \n                  AND m2.user_id = users.id \n                  AND m1.business_id = public.app_business_id()\n                  AND m1.is_active = true\n                  AND m2.is_active = true\n            )\n            OR public.app_is_platform() = true\n        "
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
         },
         "users_update": {
           "name": "users_update",
@@ -2535,7 +2503,6 @@
       },
       "checkConstraints": {},
       "isRLSEnabled": true
-<<<<<<< HEAD
     },
     "public.platform_audit_logs": {
       "name": "platform_audit_logs",
@@ -2690,8 +2657,6 @@
       },
       "checkConstraints": {},
       "isRLSEnabled": true
-=======
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
     }
   },
   "enums": {},
@@ -2701,18 +2666,8 @@
   "policies": {},
   "views": {},
   "_meta": {
-<<<<<<< HEAD
     "columns": {},
     "schemas": {},
     "tables": {}
   }
 }
-=======
-    "schemas": {},
-    "tables": {},
-    "columns": {}
-  },
-  "id": "9dd47590-a228-4d5f-8ea2-abe515ba7f39",
-  "prevId": "721b7491-d74c-4387-aa59-95cfc142bbaf"
-}
->>>>>>> bdacfd05c23559ab8d0cdea05038c87d9a80c8fe
