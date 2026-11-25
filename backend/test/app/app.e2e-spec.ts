@@ -6,7 +6,8 @@ import { AppModule } from '../../src/app.module';
 import { configureApp } from '../../src/app.setup';
 import { JwtService } from '@nestjs/jwt';
 import { REDIS_CLIENT } from '../../src/redis/redis.constants';
-import { RABBITMQ_OPTIONS } from '../../src/utils/rabbitmq.config';
+import { getQueueToken } from '@nestjs/bullmq';
+import { EMAIL_QUEUE } from '../../src/jobs/email/types';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -18,8 +19,8 @@ describe('AppController (e2e)', () => {
     })
       .overrideProvider(REDIS_CLIENT)
       .useValue({ quit: async () => 'OK' })
-      .overrideProvider(RABBITMQ_OPTIONS)
-      .useValue({ connection: null, prefetchCount: 10 })
+      .overrideProvider(getQueueToken(EMAIL_QUEUE))
+      .useValue({ add: async () => undefined })
       .compile();
 
     app = configureApp(moduleFixture.createNestApplication());

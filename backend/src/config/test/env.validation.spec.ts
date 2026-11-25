@@ -79,4 +79,16 @@ describe('validateEnv', () => {
       validateEnv({ ...validEnv(), AUTH_THROTTLE_LIMIT: '0' }),
     ).toThrow('AUTH_THROTTLE_LIMIT');
   });
+
+  it('treats empty optional values as unset', () => {
+    expect(() =>
+      validateEnv({ ...validEnv(), MAIL_REPLY_TO: '', FRONTEND_BASE_URL: ' ' }),
+    ).not.toThrow();
+  });
+
+  it('still fails when a required value is empty', () => {
+    expect(() => validateEnv({ ...validEnv(), JWT_SECRET: '' })).toThrow(
+      'JWT_SECRET',
+    );
+  });
 });

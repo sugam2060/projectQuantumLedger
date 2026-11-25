@@ -18,7 +18,7 @@ describe('PlatformUsersService', () => {
   const config: { frontendBaseUrl: string | undefined } = {
     frontendBaseUrl: 'https://frontend.example/',
   };
-  const outboxPublisher = { notifyOutboxAvailable: jest.fn() };
+  const emailProducer = { send: jest.fn().mockResolvedValue(undefined) };
   let service: PlatformUsersService;
 
   beforeEach(() => {
@@ -47,7 +47,7 @@ describe('PlatformUsersService', () => {
       new PlatformUsersRepository(database as unknown as DatabaseService),
       redis as unknown as RedisService,
       config as never,
-      outboxPublisher as never,
+      emailProducer as never,
     );
   });
 
@@ -88,7 +88,7 @@ describe('PlatformUsersService', () => {
       }),
       expect.any(Function),
     );
-    expect(inserted).toHaveLength(2);
+    expect(inserted).toHaveLength(1);
     expect(inserted[0].values).toMatchObject({
       emailNormalized: 'jane@example.com',
       inviteeName: 'Jane Manager',
@@ -99,26 +99,19 @@ describe('PlatformUsersService', () => {
       tokenHash: string;
       expiresAt: Date;
     };
-    const mailJob = inserted[1].values as {
-      payload: { context: Record<string, unknown> };
-      businessId: null;
-      requestId: null;
-    };
-    expect(mailJob).toMatchObject({
-      businessId: null,
-      requestId: null,
-      payload: {
+    expect(emailProducer.send).toHaveBeenCalledWith(
+      expect.objectContaining({
         to: 'jane@example.com',
         template: 'user-invitation',
         context: {
           inviterName: 'Admin',
           invitationUrl: `https://frontend.example/accept/invite/${invitation.tokenHash}`,
         },
-      },
-    });
+      }),
+    );
     expect(invitation.tokenHash).toMatch(/^[a-f0-9]{64}$/);
     expect(invitation.expiresAt.getTime()).toBeGreaterThan(Date.now());
-    expect(outboxPublisher.notifyOutboxAvailable).toHaveBeenCalledTimes(1);
+    expect(emailProducer.send).toHaveBeenCalledTimes(1);
     expect(redis.set).toHaveBeenCalledWith(
       expect.stringContaining(':result'),
       expect.stringContaining('requestHash'),

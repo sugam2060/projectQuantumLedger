@@ -2,6 +2,7 @@ import { plainToInstance } from 'class-transformer';
 import { parseTrustProxy } from './trust-proxy';
 import { isHttpOrigin, splitList } from './env.util';
 import {
+  IsEmail,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -81,6 +82,34 @@ class EnvironmentVariables {
   CORS_ALLOWED_ORIGINS?: string;
 
   @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  MAIL_HOST?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  MAIL_PORT?: number;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  MAIL_SECURE?: string;
+
+  @IsOptional()
+  @IsEmail()
+  MAIL_FROM_EMAIL?: string;
+
+  @IsOptional()
+  @IsEmail()
+  MAIL_REPLY_TO?: string;
+
+  /** "false" runs this instance as enqueue-only (no BullMQ workers). */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  JOBS_WORKERS_ENABLED?: string;
+
+  @IsOptional()
   @IsInt()
   @Min(1000)
   THROTTLE_TTL_MS?: number;
@@ -105,6 +134,7 @@ const NUMERIC_KEYS = [
   'THROTTLE_TTL_MS',
   'THROTTLE_LIMIT',
   'AUTH_THROTTLE_LIMIT',
+  'MAIL_PORT',
 ] as const;
 
 /**
@@ -122,8 +152,14 @@ export function validateEnv(
     }
   }
 
+  // An empty value (`KEY=`) means "not set", as the registerAs readers treat it.
+  const present = Object.fromEntries(
+    Object.entries(config).filter(
+      ([, value]) => !(typeof value === 'string' && value.trim() === ''),
+    ),
+  );
   const candidate = plainToInstance(EnvironmentVariables, {
-    ...config,
+    ...present,
     ...numericOverrides,
   });
   const errors = validateSync(candidate, { skipMissingProperties: false });

@@ -27,7 +27,7 @@ describe('PlatformBusinessesService', () => {
     insertPlatformEvent: jest.fn().mockResolvedValue(undefined),
     logUserEvent: jest.fn().mockResolvedValue(undefined),
   };
-  const outboxPublisher = { notifyOutboxAvailable: jest.fn() };
+  const emailProducer = { send: jest.fn().mockResolvedValue(undefined) };
   let service: PlatformBusinessesService;
 
   const request = {
@@ -78,7 +78,7 @@ describe('PlatformBusinessesService', () => {
       new PlatformBusinessesRepository(database as unknown as DatabaseService),
       redis as unknown as RedisService,
       auditLogs as unknown as AuditLogsService,
-      outboxPublisher as never,
+      emailProducer as never,
     );
   });
 
@@ -173,7 +173,7 @@ describe('PlatformBusinessesService', () => {
     expect(query.offset).toHaveBeenCalledWith(2);
   });
 
-  it('provisions an inactive business with branch, terminal, redemption, audit, and outbox in one platform transaction', async () => {
+  it('provisions an inactive business with branch, terminal, redemption and audit in one platform transaction, then enqueues the owner email', async () => {
     const requestRow = {
       id: 'request-id',
       legalName: 'Example Retail Pvt. Ltd.',
@@ -298,8 +298,11 @@ describe('PlatformBusinessesService', () => {
       requestId: 'request-id',
       emailNormalized: 'owner-login@example.com',
     });
-    const outbox = insertedValues.at(-1) as {
-      payload: { template: string; context: Record<string, unknown> };
+    const outbox = {
+      payload: emailProducer.send.mock.calls[0][0] as {
+        template: string;
+        context: Record<string, unknown>;
+      },
     };
     expect(outbox.payload.template).toBe('redeem-code');
     expect(outbox.payload.context.redeemCode).toBeTruthy();
@@ -316,13 +319,13 @@ describe('PlatformBusinessesService', () => {
       reviewedBy: 'platform-user-id',
       provisionedBusinessId: 'business-id',
     });
-    expect(insertedTables).toHaveLength(5);
+    expect(insertedTables).toHaveLength(4);
     expect(updatedTables).toHaveLength(1);
     expect(auditLogs.insertPlatformEvent).toHaveBeenCalledWith(
       tx,
       expect.objectContaining({ action: 'business.provisioned' }),
     );
-    expect(outboxPublisher.notifyOutboxAvailable).toHaveBeenCalledTimes(1);
+    expect(emailProducer.send).toHaveBeenCalledTimes(1);
     expect(redis.set).toHaveBeenCalledWith(
       expect.stringContaining(':result'),
       expect.stringContaining('requestHash'),

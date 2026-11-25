@@ -6,7 +6,6 @@ import { branches } from './business/branches';
 import { business } from './business/businesses';
 import { businessProvisioningRequests } from './business/business-provisioning-requests';
 import { ownerRedemptions } from './business/owner-redemptions';
-import { mailOutbox } from './business/mail-outbox';
 import { businessMemberships } from './business/business-memberships';
 import { endpointRoleAccess } from './business/endpoint-role-access';
 import { invitations } from './business/invitations';
@@ -30,7 +29,6 @@ export const businessRelations = relations(business, ({ one, many }) => ({
   endpointRoleAccess: many(endpointRoleAccess),
   ownerRedemptions: many(ownerRedemptions),
   platformAuditLogs: many(platformAuditLogs),
-  mailOutbox: many(mailOutbox),
 }));
 
 export const platformUsersRelations = relations(platformUsers, ({ many }) => ({
@@ -56,8 +54,7 @@ export const businessProvisioningRequestRelations = relations(
       fields: [businessProvisioningRequests.id],
       references: [ownerRedemptions.requestId],
     }),
-    mailOutbox: many(mailOutbox),
-  }),
+    }),
 );
 
 export const branchesRelations = relations(branches, ({ one, many }) => ({
@@ -118,17 +115,6 @@ export const platformAuditLogsRelations = relations(
     }),
   }),
 );
-
-export const mailOutboxRelations = relations(mailOutbox, ({ one }) => ({
-  business: one(business, {
-    fields: [mailOutbox.businessId],
-    references: [business.id],
-  }),
-  request: one(businessProvisioningRequests, {
-    fields: [mailOutbox.requestId],
-    references: [businessProvisioningRequests.id],
-  }),
-}));
 
 export const rolesRelations = relations(roles, ({ one, many }) => ({
   business: one(business, {

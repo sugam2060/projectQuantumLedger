@@ -27,7 +27,6 @@ describe('BusinessRequestsService', () => {
     insertPlatformEvent: jest.fn().mockResolvedValue(undefined),
     logUserEvent: jest.fn().mockResolvedValue(undefined),
   };
-  const outboxPublisher = { notifyOutboxAvailable: jest.fn() };
   let service: BusinessRequestsService;
 
   const request = {

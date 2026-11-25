@@ -14,10 +14,9 @@ import {
   postgresErrorCode,
 } from '../common/utils/postgres-error.util';
 import { RedisService } from '../redis/redis.service';
-import type { MailJob } from '../workers/mail/mail.types';
+import { EmailProducer, type MailJob } from '../jobs/email';
 import type { CreateBusinessBranchDto } from './dto/create-business-branch.dto';
 import type { ProvisionBusinessDto } from './dto/provision-business.dto';
-import { MailOutboxPublisher } from './mail-outbox.publisher';
 import { PlatformBusinessesRepository } from './platform-businesses.repository';
 
 const PROVISION_OPERATION = 'platform.businesses.create';
@@ -36,7 +35,7 @@ export class PlatformBusinessesService {
     private readonly repository: PlatformBusinessesRepository,
     private readonly redis: RedisService,
     private readonly auditLogs: AuditLogsService,
-    private readonly outboxPublisher: MailOutboxPublisher,
+    private readonly emailProducer: EmailProducer,
   ) {}
 
   async getBusinessDetails(businessId: string, platformUserId: string) {
@@ -196,7 +195,7 @@ export class PlatformBusinessesService {
     }
 
     try {
-      const response = await this.repository.inPlatformTransaction(
+      const committed = await this.repository.inPlatformTransaction(
         platformUserId,
         async (tx) => {
           const existingBusiness = await this.repository.findBusinessSummary(
@@ -242,6 +241,7 @@ export class PlatformBusinessesService {
           }
 
           const now = new Date();
+          const mailJobs: MailJob[] = [];
           for (const owner of owners) {
             const mailJob: MailJob = {
               id: randomUUID(),
@@ -264,10 +264,7 @@ export class PlatformBusinessesService {
               correlationId: branch.id,
               createdAt: now.toISOString(),
             };
-            await this.repository.enqueueMail(tx, {
-              businessId,
-              payload: mailJob,
-            });
+            mailJobs.push(mailJob);
           }
 
           const result = {
@@ -285,11 +282,11 @@ export class PlatformBusinessesService {
               terminalIds: createdTerminals.map((terminal) => terminal.id),
             },
           });
-          return result;
+          return { result, mailJobs };
         },
       );
-
-      this.outboxPublisher.notifyOutboxAvailable();
+      const { result: response, mailJobs } = committed;
+      await this.sendAfterCommit(mailJobs, 'branch.created');
 
       try {
         await this.redis.set(
@@ -383,7 +380,7 @@ export class PlatformBusinessesService {
     const expiresAt = new Date(now.getTime() + REDEMPTION_TTL_MS);
 
     try {
-      const response = await this.repository.inPlatformTransaction(
+      const provisioned = await this.repository.inPlatformTransaction(
         platformUserId,
         async (tx) => {
           const request = await this.repository.lockProvisioningRequest(
@@ -533,16 +530,11 @@ export class PlatformBusinessesService {
             correlationId: requestId,
             createdAt: now.toISOString(),
           };
-          await this.repository.enqueueMail(tx, {
-            businessId: createdBusiness.id,
-            requestId,
-            payload: mailJob,
-          });
-
-          return response;
+          return { response, mailJob };
         },
       );
-      this.outboxPublisher.notifyOutboxAvailable();
+      const { response, mailJob } = provisioned;
+      await this.sendAfterCommit([mailJob], 'business.provisioned');
       try {
         await this.redis.set(
           `${redisKey}:result`,
@@ -567,6 +559,23 @@ export class PlatformBusinessesService {
         await this.redis.compareAndDelete(`${redisKey}:lock`, reservation);
       } catch {
         this.logger.warn('Could not release provisioning idempotency lock');
+      }
+    }
+  }
+
+  /**
+   * Enqueues email after the transaction committed. A queue failure is logged and
+   * does not fail the request: the data is saved and staff can resend.
+   */
+  private async sendAfterCommit(jobs: MailJob[], event: string): Promise<void> {
+    for (const job of jobs) {
+      try {
+        await this.emailProducer.send(job);
+      } catch (error) {
+        this.logger.error(
+          `Could not enqueue ${job.template} email after ${event} (correlationId=${job.correlationId ?? job.id})`,
+          error instanceof Error ? error.stack : undefined,
+        );
       }
     }
   }

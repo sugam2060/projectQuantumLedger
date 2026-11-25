@@ -1,5 +1,9 @@
 {
-  "moduleFileExtensions": ["js", "json", "ts"],
+  "moduleFileExtensions": [
+    "js",
+    "json",
+    "ts"
+  ],
   "rootDir": "..",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
@@ -20,9 +24,14 @@
   "transformIgnorePatterns": [
     "/node_modules/(?!(@nestjs|axios|@angular|rxjs)/)"
   ],
-  "extensionsToTreatAsEsm": [".ts"],
+  "extensionsToTreatAsEsm": [
+    ".ts"
+  ],
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/src/$1",
     "^(\\.{1,2}/.*)\\.js$": "$1"
-  }
+  },
+  "setupFiles": [
+    "<rootDir>/test/setup/e2e-env.ts"
+  ]
 }

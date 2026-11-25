@@ -4,3 +4,4 @@ export type { DatabaseConfig } from './database-config.type';
 export type { RedisConfig } from './redis-config.type';
 export type { StorageConfig } from './storage-config.type';
 export type { ThrottleConfig } from './throttle-config.type';
+export type { MailConfig } from './mail-config.type';

@@ -5,6 +5,8 @@ import { AppModule } from '../../src/app.module';
 import { configureApp } from '../../src/app.setup';
 import { RedisService } from '../../src/redis/redis.service';
 import { REDIS_CLIENT } from '../../src/redis/redis.constants';
+import { getQueueToken } from '@nestjs/bullmq';
+import { EMAIL_QUEUE } from '../../src/jobs/email/types';
 
 describe('AuthenticationController (e2e)', () => {
   let app: INestApplication;
@@ -17,6 +19,8 @@ describe('AuthenticationController (e2e)', () => {
       .useValue({})
       .overrideProvider(REDIS_CLIENT)
       .useValue({ quit: async () => 'OK' })
+      .overrideProvider(getQueueToken(EMAIL_QUEUE))
+      .useValue({ add: async () => undefined })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -133,7 +137,9 @@ describe('AuthenticationController (e2e)', () => {
 
   describe('GET /authentication/me', () => {
     it('requires a valid access token', async () => {
-      await request(app.getHttpServer()).get('/api/v1/authentication/me').expect(401);
+      await request(app.getHttpServer())
+        .get('/api/v1/authentication/me')
+        .expect(401);
     });
   });
 

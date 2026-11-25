@@ -6,13 +6,11 @@ import {
   business,
   businessMemberships,
   businessProvisioningRequests,
-  mailOutbox,
   ownerRedemptions,
   roles,
   terminals,
   users,
 } from '../database/schemas';
-import type { MailJob } from '../workers/mail/mail.types';
 import type { PlatformTransaction } from './types';
 
 type NewBusiness = typeof business.$inferInsert;
@@ -296,21 +294,5 @@ export class PlatformBusinessesRepository {
     values: NewOwnerRedemption,
   ): Promise<void> {
     await tx.insert(ownerRedemptions).values(values);
-  }
-
-  /** Queues an email through the transactional outbox (commits with `tx`). */
-  async enqueueMail(
-    tx: PlatformTransaction,
-    input: { businessId: string; requestId?: string; payload: MailJob },
-  ): Promise<void> {
-    await tx.insert(mailOutbox).values(
-      input.requestId === undefined
-        ? { businessId: input.businessId, payload: input.payload }
-        : {
-            businessId: input.businessId,
-            requestId: input.requestId,
-            payload: input.payload,
-          },
-    );
   }
 }

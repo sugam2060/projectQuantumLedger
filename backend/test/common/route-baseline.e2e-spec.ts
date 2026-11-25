@@ -10,7 +10,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AppModule } from '../../src/app.module';
 import { REDIS_CLIENT } from '../../src/redis/redis.constants';
-import { RABBITMQ_OPTIONS } from '../../src/utils/rabbitmq.config';
+import { getQueueToken } from '@nestjs/bullmq';
+import { EMAIL_QUEUE } from '../../src/jobs/email/types';
 
 /**
  * Route baseline: the list of routes (method + path + public flag) the app exposes.
@@ -51,8 +52,8 @@ describe('Route baseline', () => {
     })
       .overrideProvider(REDIS_CLIENT)
       .useValue({ quit: async () => 'OK' })
-      .overrideProvider(RABBITMQ_OPTIONS)
-      .useValue({ connection: null, prefetchCount: 10 })
+      .overrideProvider(getQueueToken(EMAIL_QUEUE))
+      .useValue({ add: async () => undefined })
       .compile();
   });
 

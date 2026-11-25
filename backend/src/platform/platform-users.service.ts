@@ -13,7 +13,7 @@ import {
   postgresErrorCode,
 } from '../common/utils/postgres-error.util';
 import { RedisService } from '../redis/redis.service';
-import { MailOutboxPublisher } from './mail-outbox.publisher';
+import { EmailProducer, type MailJob } from '../jobs/email';
 import { PlatformUsersRepository } from './platform-users.repository';
 import type { InvitePlatformUserDto } from './dto/invite-platform-user.dto';
 
@@ -35,7 +35,7 @@ export class PlatformUsersService {
     private readonly redis: RedisService,
     @Inject(appConfig.KEY)
     private readonly config: ConfigType<typeof appConfig>,
-    private readonly outboxPublisher: MailOutboxPublisher,
+    private readonly emailProducer: EmailProducer,
   ) {}
 
   async invitePlatformUser(
@@ -123,8 +123,9 @@ export class PlatformUsersService {
     const expiresAt = new Date(now.getTime() + INVITATION_TTL_MS);
     const invitationUrl = `${frontendBaseUrl}/accept/invite/${tokenHash}`;
 
+    let mailJob: MailJob;
     try {
-      await this.repository.inInvitationTransaction(
+      mailJob = await this.repository.inInvitationTransaction(
         { platformUserId, inviteeEmail: email },
         async (tx) => {
           const existingPlatformUser =
@@ -143,7 +144,7 @@ export class PlatformUsersService {
             expiresAt,
             invitedByPlatformUserId: platformUserId,
           });
-          await this.repository.enqueueMail(tx, {
+          const job: MailJob = {
             id: randomUUID(),
             to: email,
             subject: 'You are invited to manage Fortis',
@@ -154,10 +155,10 @@ export class PlatformUsersService {
             },
             correlationId: tokenHash,
             createdAt: now.toISOString(),
-          });
+          };
+          return job;
         },
       );
-      this.outboxPublisher.notifyOutboxAvailable();
     } catch (error) {
       if (postgresErrorCode(error) === PG_UNIQUE_VIOLATION) {
         throw new ConflictException(
@@ -165,6 +166,15 @@ export class PlatformUsersService {
         );
       }
       throw error;
+    }
+
+    try {
+      await this.emailProducer.send(mailJob);
+    } catch (error) {
+      this.logger.error(
+        'Platform invitation saved but its email could not be enqueued',
+        error instanceof Error ? error.stack : undefined,
+      );
     }
 
     return { message: `Invite sent to ${name}` };

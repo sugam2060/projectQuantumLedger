@@ -7,7 +7,7 @@ import { ObjectStoreService } from '../../storage/object-store.service';
 import { AuditLogsService } from '../../audit-logs';
 import { PlatformBusinessesRepository } from '../platform-businesses.repository';
 import { PlatformBusinessesService } from '../platform-businesses.service';
-import { MailOutboxPublisher } from '../mail-outbox.publisher';
+import type { EmailProducer } from '../../jobs/email';
 
 describe('PlatformBusinessesService.createBranch', () => {
   const database = { transactionWithSession: jest.fn() };
@@ -72,14 +72,6 @@ describe('PlatformBusinessesService.createBranch', () => {
       }),
       insert: jest.fn((_table: unknown) => ({
         values: (values: unknown) => {
-          if (
-            !Array.isArray(values) &&
-            typeof values === 'object' &&
-            values !== null &&
-            'payload' in values
-          ) {
-            outboxValues.push(values as (typeof outboxValues)[number]);
-          }
           if (Array.isArray(values)) {
             terminalValues = values;
             return { returning: jest.fn().mockResolvedValue(terminalRows) };
@@ -101,7 +93,12 @@ describe('PlatformBusinessesService.createBranch', () => {
       new PlatformBusinessesRepository(database as unknown as DatabaseService),
       redis as unknown as RedisService,
       auditLogs as unknown as AuditLogsService,
-      { notifyOutboxAvailable: jest.fn() } as unknown as MailOutboxPublisher,
+      {
+        send: jest.fn((job: (typeof outboxValues)[number]['payload']) => {
+          outboxValues.push({ payload: job });
+          return Promise.resolve();
+        }),
+      } as unknown as EmailProducer,
     );
   });
 

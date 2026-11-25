@@ -2,7 +2,6 @@ export * from './business/branches';
 export * from './business/businesses';
 export * from './business/business-provisioning-requests';
 export * from './business/owner-redemptions';
-export * from './business/mail-outbox';
 export * from './business/business-memberships';
 export * from './business/endpoint-role-access';
 export * from './business/invitations';

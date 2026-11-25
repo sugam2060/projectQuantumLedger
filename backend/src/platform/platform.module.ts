@@ -2,13 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuditLogsModule } from '../audit-logs';
 import { appConfig } from '../config';
+import { EmailModule } from '../jobs/email';
 import { RedisModule } from '../redis/redis.module';
 import { StorageModule } from '../storage';
-import { UtilsModule } from '../utils/utils.module';
 import { BusinessRequestsController } from './business-requests.controller';
 import { BusinessRequestsRepository } from './business-requests.repository';
 import { BusinessRequestsService } from './business-requests.service';
-import { MailOutboxPublisher } from './mail-outbox.publisher';
 import { PlatformBusinessesController } from './platform-businesses.controller';
 import { PlatformBusinessesRepository } from './platform-businesses.repository';
 import { PlatformBusinessesService } from './platform-businesses.service';
@@ -21,8 +20,8 @@ import { PlatformUsersService } from './platform-users.service';
   imports: [
     AuditLogsModule,
     ConfigModule.forFeature(appConfig),
+    EmailModule,
     StorageModule,
-    UtilsModule,
     RedisModule,
   ],
   controllers: [
@@ -37,7 +36,6 @@ import { PlatformUsersService } from './platform-users.service';
     BusinessRequestsService,
     PlatformUsersRepository,
     PlatformUsersService,
-    MailOutboxPublisher,
   ],
 })
 export class PlatformModule {}
