@@ -2,9 +2,9 @@ import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test } from '@nestjs/testing';
 import { AuthenticationLogoutController } from '../authentication-logout.controller';
-import { PlatformAuthService } from '../authentication.service.platform';
-import { UserAuthService } from '../authentication.service.user';
-import { ClientType } from '../dto/clientLogin.dto';
+import { PlatformAuthenticationService } from '../platform-authentication.service';
+import { AuthenticationService } from '../authentication.service';
+import { ClientType } from '../dto/client-login.dto';
 
 describe('AuthenticationLogoutController', () => {
   const userAuthService = {
@@ -20,8 +20,11 @@ describe('AuthenticationLogoutController', () => {
     const module = await Test.createTestingModule({
       controllers: [AuthenticationLogoutController],
       providers: [
-        { provide: UserAuthService, useValue: userAuthService },
-        { provide: PlatformAuthService, useValue: platformAuthService },
+        { provide: AuthenticationService, useValue: userAuthService },
+        {
+          provide: PlatformAuthenticationService,
+          useValue: platformAuthService,
+        },
       ],
     }).compile();
     controller = module.get(AuthenticationLogoutController);

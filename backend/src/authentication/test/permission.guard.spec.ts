@@ -1,13 +1,13 @@
-﻿import { jest as jestGlobal } from '@jest/globals';
+import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PermissionGuard } from '../permission.guard';
+import { PermissionGuard } from '../guards/permission.guard';
 import {
   REQUIRE_CONFIGURED_ROLES,
   REQUIRED_ROLES,
-} from '../../decorators/required_permission.decorator';
-import type { AuthenticatedUser } from '../../strategies/jwt.strategy';
+} from '../decorators/required_permission.decorator';
+import type { AuthenticatedUser } from '../strategies/jwt.strategy';
 
 describe('PermissionGuard', () => {
   const reflector = {

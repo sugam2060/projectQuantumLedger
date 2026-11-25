@@ -1,5 +1,5 @@
 import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { ClientType } from './clientLogin.dto';
+import { ClientType } from './client-login.dto';
 
 export class PlatformRefreshHeadersDto {
   @IsOptional()

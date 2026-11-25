@@ -6,9 +6,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthenticationController } from './authentication.controller';
 import { AuthenticationLogoutController } from './authentication-logout.controller';
-import { AuthenticationPlatformController } from './authentication.platform.controller';
-import { PlatformAuthService } from './authentication.service.platform';
-import { UserAuthService } from './authentication.service.user';
+import { PlatformAuthenticationController } from './platform-authentication.controller';
+import { PlatformAuthenticationService } from './platform-authentication.service';
+import { AuthenticationService } from './authentication.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UtilsModule } from '../utils/utils.module';
 import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.module';
@@ -39,9 +39,13 @@ import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.m
   controllers: [
     AuthenticationController,
     AuthenticationLogoutController,
-    AuthenticationPlatformController,
+    PlatformAuthenticationController,
   ],
-  providers: [UserAuthService, PlatformAuthService, JwtStrategy],
+  providers: [
+    AuthenticationService,
+    PlatformAuthenticationService,
+    JwtStrategy,
+  ],
   exports: [JwtModule, PassportModule],
 })
 export class AuthenticationModule {}

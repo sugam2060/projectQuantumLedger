@@ -1,20 +1,20 @@
 import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test, TestingModule } from '@nestjs/testing';
-import { UserAuthService } from '../authentication.service.user';
+import { AuthenticationService } from '../authentication.service';
 import { DatabaseService } from '../../database/database.service';
 import { JwtService } from '@nestjs/jwt';
 import { UtilsService } from '../../utils/utils.service';
 import { RedisService } from '../../redis/redis.service';
-import { ClientLoginDTO, ClientType } from '../dto/clientLogin.dto';
+import { ClientLoginDto, ClientType } from '../dto/client-login.dto';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import { EndpointAccessCatalogService } from '../../roles-permissions/endpoint-access-catalog.service';
 import { EffectivePermissionsCacheService } from '../../roles-permissions/effective-permissions-cache.service';
 import { AuditLogsService } from '../../audit-logs';
 
-describe('UserAuthService', () => {
-  let service: UserAuthService;
+describe('AuthenticationService', () => {
+  let service: AuthenticationService;
   let dbMock: any;
   let jwtServiceMock: any;
   let utilsServiceMock: any;
@@ -76,7 +76,7 @@ describe('UserAuthService', () => {
     };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        UserAuthService,
+        AuthenticationService,
         {
           provide: DatabaseService,
           useValue: dbMock,
@@ -105,7 +105,7 @@ describe('UserAuthService', () => {
       ],
     }).compile();
 
-    service = module.get<UserAuthService>(UserAuthService);
+    service = module.get<AuthenticationService>(AuthenticationService);
 
     // Clear all mocks before each test
     jest.clearAllMocks();
@@ -287,7 +287,7 @@ describe('UserAuthService', () => {
   });
 
   describe('userLogin', () => {
-    const mockDto: ClientLoginDTO = {
+    const mockDto: ClientLoginDto = {
       email: 'test@example.com',
       password: 'password123',
       remember: true,
@@ -499,7 +499,7 @@ describe('UserAuthService', () => {
     });
 
     it('authenticates an owner with a null membership branch and no role claims', async () => {
-      const ownerDto: ClientLoginDTO = {
+      const ownerDto: ClientLoginDto = {
         email: 'owner@example.com',
         password: 'password123',
         remember: false,

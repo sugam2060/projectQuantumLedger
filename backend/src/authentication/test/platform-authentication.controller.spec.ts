@@ -1,28 +1,31 @@
 import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test } from '@nestjs/testing';
-import { ClientType } from '../dto/clientLogin.dto';
-import { AuthenticationPlatformController } from '../authentication.platform.controller';
-import { PlatformAuthService } from '../authentication.service.platform';
+import { ClientType } from '../dto/client-login.dto';
+import { PlatformAuthenticationController } from '../platform-authentication.controller';
+import { PlatformAuthenticationService } from '../platform-authentication.service';
 import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 import { RATE_LIMIT_KEY } from '../decorators/rate-limit.decorator';
 
-describe('AuthenticationPlatformController', () => {
+describe('PlatformAuthenticationController', () => {
   const platformAuthService = {
     login: jest.fn(),
     refresh: jest.fn(),
   };
-  let controller: AuthenticationPlatformController;
+  let controller: PlatformAuthenticationController;
 
   beforeEach(async () => {
     jest.clearAllMocks();
     const module = await Test.createTestingModule({
-      controllers: [AuthenticationPlatformController],
+      controllers: [PlatformAuthenticationController],
       providers: [
-        { provide: PlatformAuthService, useValue: platformAuthService },
+        {
+          provide: PlatformAuthenticationService,
+          useValue: platformAuthService,
+        },
       ],
     }).compile();
-    controller = module.get(AuthenticationPlatformController);
+    controller = module.get(PlatformAuthenticationController);
   });
 
   const authResult = {
@@ -36,7 +39,7 @@ describe('AuthenticationPlatformController', () => {
   };
 
   it('keeps platform login public and rate limited', () => {
-    const loginHandler = AuthenticationPlatformController.prototype.login;
+    const loginHandler = PlatformAuthenticationController.prototype.login;
 
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, loginHandler)).toBe(true);
     expect(Reflect.getMetadata(RATE_LIMIT_KEY, loginHandler)).toEqual(

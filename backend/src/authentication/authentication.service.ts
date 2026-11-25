@@ -20,17 +20,14 @@ import {
   ownerRedemptions,
 } from '../database/schemas';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';
-import { ClientLoginDTO, ClientType } from './dto/clientLogin.dto';
+import { ClientLoginDto, ClientType } from './dto/client-login.dto';
 import { UtilsService } from '../utils/utils.service';
 import { RedisService } from '../redis/redis.service';
 import { EndpointAccessCatalogService } from '../roles-permissions/endpoint-access-catalog.service';
 import { EffectivePermissionsCacheService } from '../roles-permissions/effective-permissions-cache.service';
 import bcrypt from 'bcryptjs';
 import type { OwnerRegistrationDto } from './dto/owner-registration.dto';
-import {
-  AuditLogsService,
-  type AuditRequestContext,
-} from '../audit-logs';
+import { AuditLogsService, type AuditRequestContext } from '../audit-logs';
 
 type UserAuthTransaction = Parameters<
   Parameters<DatabaseService['transaction']>[0]
@@ -43,7 +40,7 @@ interface UserRefreshSession {
 }
 
 @Injectable()
-export class UserAuthService {
+export class AuthenticationService {
   constructor(
     private readonly db: DatabaseService,
     private readonly jwtService: JwtService,
@@ -55,7 +52,7 @@ export class UserAuthService {
   ) {}
 
   async userLogin(
-    dto: ClientLoginDTO,
+    dto: ClientLoginDto,
     requestedTerminalId?: string,
     auditContext: AuditRequestContext = {},
   ) {

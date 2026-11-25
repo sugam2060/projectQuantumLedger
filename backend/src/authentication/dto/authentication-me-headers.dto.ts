@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsUUID, ValidateIf } from 'class-validator';
-import { ClientType } from './clientLogin.dto';
+import { ClientType } from './client-login.dto';
 
 export class AuthenticationMeHeadersDto {
   @IsEnum(ClientType)

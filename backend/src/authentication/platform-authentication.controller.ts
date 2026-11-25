@@ -15,15 +15,17 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { Public } from '../common/decorators/public.decorator';
 import { RateLimit } from './decorators/rate-limit.decorator';
-import { ClientType } from './dto/clientLogin.dto';
+import { ClientType } from './dto/client-login.dto';
 import { PlatformRefreshHeadersDto } from './dto/platform-refresh-headers.dto';
 import { PlatformUserLoginDto } from './dto/platform-user-login.dto';
-import { PlatformAuthService } from './authentication.service.platform';
-import type { PlatformAuthResult } from './authentication.service.platform';
+import { PlatformAuthenticationService } from './platform-authentication.service';
+import type { PlatformAuthResult } from './platform-authentication.service';
 
 @Controller('platform/user')
-export class AuthenticationPlatformController {
-  constructor(private readonly platformAuthService: PlatformAuthService) {}
+export class PlatformAuthenticationController {
+  constructor(
+    private readonly platformAuthService: PlatformAuthenticationService,
+  ) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)

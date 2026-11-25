@@ -11,10 +11,7 @@ import { platformUsers } from '../database/schemas';
 import { RedisService } from '../redis/redis.service';
 import { UtilsService } from '../utils/utils.service';
 import { PlatformUserLoginDto } from './dto/platform-user-login.dto';
-import {
-  AuditLogsService,
-  type AuditRequestContext,
-} from '../audit-logs';
+import { AuditLogsService, type AuditRequestContext } from '../audit-logs';
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -37,7 +34,7 @@ export interface PlatformAuthResult {
 }
 
 @Injectable()
-export class PlatformAuthService {
+export class PlatformAuthenticationService {
   constructor(
     private readonly database: DatabaseService,
     private readonly jwtService: JwtService,

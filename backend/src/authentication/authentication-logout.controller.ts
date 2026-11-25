@@ -9,12 +9,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { PlatformAuthService } from './authentication.service.platform';
-import { UserAuthService } from './authentication.service.user';
+import { PlatformAuthenticationService } from './platform-authentication.service';
+import { AuthenticationService } from './authentication.service';
 import { AuthenticationLogoutHeaders } from './decorators/authentication-logout-headers.decorator';
 import { AuthenticationLogoutDto } from './dto/authentication-logout.dto';
 import { AuthenticationLogoutHeadersDto } from './dto/authentication-logout-headers.dto';
-import { ClientType } from './dto/clientLogin.dto';
+import { ClientType } from './dto/client-login.dto';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';
 
 interface AuthenticatedLogoutRequest extends Request {
@@ -24,8 +24,8 @@ interface AuthenticatedLogoutRequest extends Request {
 @Controller('authentication')
 export class AuthenticationLogoutController {
   constructor(
-    private readonly userAuthService: UserAuthService,
-    private readonly platformAuthService: PlatformAuthService,
+    private readonly userAuthService: AuthenticationService,
+    private readonly platformAuthService: PlatformAuthenticationService,
   ) {}
 
   @Post('logout')

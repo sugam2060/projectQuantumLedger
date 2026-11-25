@@ -10,8 +10,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { UserAuthService } from './authentication.service.user';
-import { ClientLoginDTO, ClientType } from './dto/clientLogin.dto';
+import { AuthenticationService } from './authentication.service';
+import { ClientLoginDto, ClientType } from './dto/client-login.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { RateLimit } from './decorators/rate-limit.decorator';
 import { RequiredRoles } from './decorators/required_permission.decorator';
@@ -30,7 +30,7 @@ interface AuthenticatedRequest extends Request {
 
 @Controller('authentication')
 export class AuthenticationController {
-  constructor(private readonly authService: UserAuthService) {}
+  constructor(private readonly authService: AuthenticationService) {}
 
   @Post('register-owner')
   @HttpCode(HttpStatus.CREATED)
@@ -83,7 +83,7 @@ export class AuthenticationController {
   @Public()
   @RequiredRoles('users.login')
   async login(
-    @Body() dto: ClientLoginDTO,
+    @Body() dto: ClientLoginDto,
     @AuthenticationLoginHeaders()
     headers: AuthenticationLoginHeadersDto,
     @ReqDecorator() req: Request,

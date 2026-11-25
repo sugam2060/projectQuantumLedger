@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsUUID, ValidateIf } from 'class-validator';
-import { ClientType } from './clientLogin.dto';
+import { ClientType } from './client-login.dto';
 
 export class AuthenticationLoginHeadersDto {
   @IsOptional()

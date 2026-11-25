@@ -2,8 +2,8 @@ import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { RateLimitGuard } from '../rate-limit.guard';
-import { RateLimitMiddleware } from '../../../utils/ratelimit.middleware';
+import { RateLimitGuard } from '../guards/rate-limit.guard';
+import { RateLimitMiddleware } from '../../utils/ratelimit.middleware';
 
 describe('RateLimitGuard', () => {
   const reflector = { get: jest.fn() };

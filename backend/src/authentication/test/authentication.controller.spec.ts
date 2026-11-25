@@ -2,8 +2,8 @@ import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthenticationController } from '../authentication.controller';
-import { UserAuthService } from '../authentication.service.user';
-import { ClientLoginDTO, ClientType } from '../dto/clientLogin.dto';
+import { AuthenticationService } from '../authentication.service';
+import { ClientLoginDto, ClientType } from '../dto/client-login.dto';
 import { REQUIRED_ROLES } from '../decorators/required_permission.decorator';
 import {
   BadRequestException,
@@ -19,7 +19,7 @@ describe('AuthenticationController', () => {
   let authServiceMock: any;
 
   beforeEach(async () => {
-    // Mock the UserAuthService
+    // Mock the AuthenticationService
     authServiceMock = {
       registerOwner: jest.fn(),
       userLogin: jest.fn(),
@@ -32,7 +32,7 @@ describe('AuthenticationController', () => {
       controllers: [AuthenticationController],
       providers: [
         {
-          provide: UserAuthService,
+          provide: AuthenticationService,
           useValue: authServiceMock,
         },
       ],
@@ -186,7 +186,7 @@ describe('AuthenticationController', () => {
   });
 
   describe('login', () => {
-    const mockDto: ClientLoginDTO = {
+    const mockDto: ClientLoginDto = {
       email: 'test@example.com',
       password: 'password123',
       remember: true,
@@ -222,7 +222,7 @@ describe('AuthenticationController', () => {
         'login',
       ) as unknown[];
 
-      expect(parameterTypes[0]).toBe(ClientLoginDTO);
+      expect(parameterTypes[0]).toBe(ClientLoginDto);
     });
 
     it('requires a terminal for mobile and desktop, but not web login', async () => {

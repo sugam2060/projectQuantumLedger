@@ -5,12 +5,12 @@ import { JwtService } from '@nestjs/jwt';
 import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
 import { UtilsService } from '../../utils/utils.service';
-import { PlatformAuthService } from '../authentication.service.platform';
+import { PlatformAuthenticationService } from '../platform-authentication.service';
 import { PlatformUserLoginDto } from '../dto/platform-user-login.dto';
 import bcrypt from 'bcryptjs';
 import { AuditLogsService } from '../../audit-logs';
 
-describe('PlatformAuthService', () => {
+describe('PlatformAuthenticationService', () => {
   const database = {
     transactionWithSession: jest.fn(),
   };
@@ -25,11 +25,11 @@ describe('PlatformAuthService', () => {
   const auditLogs = {
     logPlatformEvent: jest.fn().mockResolvedValue(undefined),
   };
-  let service: PlatformAuthService;
+  let service: PlatformAuthenticationService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new PlatformAuthService(
+    service = new PlatformAuthenticationService(
       database as unknown as DatabaseService,
       jwt as unknown as JwtService,
       utils as unknown as UtilsService,
