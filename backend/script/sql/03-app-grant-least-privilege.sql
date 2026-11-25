@@ -1,3 +1,18 @@
+-- 03: least-privilege grants for fortis_app. Applied after the Drizzle
+-- migrations (tables must exist). Idempotent, re-run on every migration.
+--
+-- fortis_app gets DML on application tables (RLS decides which rows), EXECUTE on
+-- the app.* functions, and nothing else: no DDL, no migration ledger, and PUBLIC
+-- loses its default rights on both schemas.
+
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON SCHEMA app FROM PUBLIC;
+GRANT USAGE ON SCHEMA app TO fortis_app;
+
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA app FROM PUBLIC;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA app TO fortis_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA app REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
 -- Table privileges let the application perform its operations; RLS policies
 -- limit the rows each request can see or change. Keep the migration ledger
 -- inaccessible to the runtime role.

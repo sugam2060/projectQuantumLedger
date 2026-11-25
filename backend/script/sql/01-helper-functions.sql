@@ -1,3 +1,50 @@
+-- 01: request-context helpers. Applied before the Drizzle migrations because
+-- policies call these functions. Idempotent (CREATE OR REPLACE), re-run every time.
+--
+-- The API sets transaction-local settings (set_config(name, value, true)) at the
+-- start of every transaction; these functions read them. A missing or malformed
+-- value yields NULL, which every policy treats as "deny".
+
+CREATE SCHEMA IF NOT EXISTS app;
+
+CREATE OR REPLACE FUNCTION app.setting_uuid(p_name text)
+RETURNS uuid
+LANGUAGE plpgsql
+STABLE
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_value text := NULLIF(pg_catalog.current_setting(p_name, true), '');
+BEGIN
+  IF v_value IS NULL THEN
+    RETURN NULL;
+  END IF;
+  RETURN v_value::uuid;
+EXCEPTION
+  WHEN invalid_text_representation THEN
+    RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION app.current_user_id()
+RETURNS uuid LANGUAGE sql STABLE SET search_path = pg_catalog, pg_temp
+AS $$ SELECT app.setting_uuid('app.user_id') $$;
+
+CREATE OR REPLACE FUNCTION app.current_business_id()
+RETURNS uuid LANGUAGE sql STABLE SET search_path = pg_catalog, pg_temp
+AS $$ SELECT app.setting_uuid('app.business_id') $$;
+
+CREATE OR REPLACE FUNCTION app.current_branch_id()
+RETURNS uuid LANGUAGE sql STABLE SET search_path = pg_catalog, pg_temp
+AS $$ SELECT app.setting_uuid('app.branch_id') $$;
+
+CREATE OR REPLACE FUNCTION app.current_platform_user_id()
+RETURNS uuid LANGUAGE sql STABLE SET search_path = pg_catalog, pg_temp
+AS $$ SELECT app.setting_uuid('app.platform_user_id') $$;
+
+-- Legacy helpers (public.app_*). Current policies still call them; the policy
+-- rewrite replaces them with the app.* functions and drops these.
+
 -- 1. Get the current active Business ID for the session
 CREATE OR REPLACE FUNCTION public.app_business_id()
 RETURNS UUID AS $$
