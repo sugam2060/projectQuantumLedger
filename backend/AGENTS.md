@@ -12,6 +12,7 @@ Update this file (and `CLAUDE.md`) in the same change whenever folder layout, co
 npm run start:dev | start:prod
 npm run db:generate | db:migrate
 npm run test | test:e2e | test:cov
+npm run test:db:up && npm run test:db    # real Postgres + Redis (docker-compose.test.yml)
 ```
 
 ## SQL functions, roles and grants
@@ -72,6 +73,10 @@ Tests:
   (also `src/common/test/`, `src/config/test/`). Subfolders such as `guards/` do not get their own `test/`.
 - E2E specs go in `test/<area>/*.e2e-spec.ts` (`authentication`, `authorization`, `businesses`, `platform`,
   `database`, `common`, `app`). Shared e2e helpers go in `test/<area>/helpers/`.
+- Database tests (`*.db-spec.ts`, `npm run test:db`) run against the throwaway Postgres + Redis from
+  `docker-compose.test.yml`. Global setup recreates the database and runs `script/migrate.ts`, so RLS,
+  roles and SQL functions are the real ones. Use `test/database/helpers/` (pools as owner / fortis_app,
+  `truncateAll`, factories) and `test/common/helpers/create-test-app.ts` for full-stack tests.
 - `test/common/route-baseline.e2e-spec.ts` records every route (method + path + public flag). A route change
   must be intentional: regenerate with `UPDATE_ROUTE_BASELINE=1` and note it in the change.
 

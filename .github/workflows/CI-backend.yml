@@ -123,15 +123,29 @@ jobs:
         env:
           NODE_OPTIONS: --experimental-vm-modules
 
-  # Integration tests with databases
+  # Database tests: real Postgres (migrated with script/migrate.ts) + Redis.
+  # Runs RLS and SQL-function tests as the fortis_app runtime role.
   integration-tests:
-    name: 🔗 Integration Tests
+    name: 🔗 Database Tests
     runs-on: ubuntu-latest
     services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fortis_owner
+          POSTGRES_PASSWORD: fortis_owner_test_password
+          POSTGRES_DB: fortis_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U fortis_owner -d fortis_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
       redis:
         image: redis:7
         ports:
-          - 6379:6379
+          - 56379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -153,15 +167,12 @@ jobs:
           cd backend
           npm ci
 
-      - name: Run integration tests
+      - name: Run database tests
         run: |
           cd backend
-          npm run test
+          npm run test:db
         env:
           NODE_OPTIONS: --experimental-vm-modules
-          DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
-          REDIS_URL: redis://localhost:6379
-          JWT_SECRET: test_secret_at_least_32_characters_long_for_testing_purposes_only
 
   # E2E tests
   e2e-tests:
@@ -202,7 +213,6 @@ jobs:
           DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: test_secret_at_least_32_characters_long_for_testing_purposes_only
-          RABBITMQ_URL: ${{ secrets.RABBITMQ_URL }}
 
   # Matrix testing across Node.js versions
   matrix-testing:
@@ -210,7 +220,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # Jest needs Node.js 24.9+ to load the RabbitMQ adapter's NestJS ESM dependency.
+        # Jest needs Node.js 24.9+ to load the ESM-only NestJS 12 packages.
         node-version: [24]
     steps:
       - name: Checkout code
