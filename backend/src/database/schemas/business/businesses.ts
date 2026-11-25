@@ -66,19 +66,19 @@ export const business = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-            (id = app_business_id() AND app_is_owner() = true)
-            OR app_is_platform() = true
-            OR EXISTS (
-              SELECT 1
-              FROM owner_redemptions r
-              WHERE r.business_id = business.id
-                AND r.email_normalized = NULLIF(current_setting('app.registration_email', true), '')
-                AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
-                AND r.consumed_at IS NULL
-                AND r.revoked_at IS NULL
-                AND r.expires_at > now()
-            )
-        `,
+        app.is_business_member(id)
+        OR app.is_platform_user()
+        OR EXISTS (
+          SELECT 1
+          FROM owner_redemptions r
+          WHERE r.business_id = business.id
+            AND r.email_normalized = NULLIF(current_setting('app.registration_email', true), '')
+            AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
+            AND r.consumed_at IS NULL
+            AND r.revoked_at IS NULL
+            AND r.expires_at > now()
+        )
+      `,
     }),
 
     // RLS Policy: Only the business owner or platform admins can update business info
@@ -86,13 +86,11 @@ export const business = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-            (id = app_business_id() AND app_is_owner() = true)
-            OR app_is_platform() = true
-        `,
+        app.is_business_owner(id) OR app.is_platform_user()
+      `,
       withCheck: sql`
-            (id = app_business_id() AND app_is_owner() = true)
-            OR app_is_platform() = true
-        `,
+        app.is_business_owner(id) OR app.is_platform_user()
+      `,
     }),
 
     // RLS Policy: Only platform managers can insert/create new businesses
@@ -100,8 +98,8 @@ export const business = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-            app_is_platform() = true
-        `,
+        app.is_platform_user()
+      `,
     }),
   ],
 ).enableRLS();

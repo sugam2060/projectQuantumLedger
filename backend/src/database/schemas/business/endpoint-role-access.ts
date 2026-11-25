@@ -41,30 +41,29 @@ export const endpointRoleAccess = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-        business_id = app_business_id()
-        OR app_is_platform() = true
+        app.is_business_member(business_id) OR app.is_platform_user()
       `,
     }),
     pgPolicy('endpoint_role_access_insert', {
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-        (business_id = app_business_id() AND app_is_owner() = true)
-        AND EXISTS (
-          SELECT 1
-          FROM roles
-          WHERE roles.id = endpoint_role_access.role_id
-            AND (roles.business_id = endpoint_role_access.business_id OR roles.business_id IS NULL)
+        (
+          app.is_business_owner(business_id)
+          AND EXISTS (
+            SELECT 1 FROM roles
+            WHERE roles.id = endpoint_role_access.role_id
+              AND (roles.business_id = endpoint_role_access.business_id OR roles.business_id IS NULL)
+          )
         )
-        OR app_is_platform() = true
+        OR app.is_platform_user()
       `,
     }),
     pgPolicy('endpoint_role_access_delete', {
       for: 'delete',
       to: 'fortis_app',
       using: sql`
-        (business_id = app_business_id() AND app_is_owner() = true)
-        OR app_is_platform() = true
+        app.is_business_owner(business_id) OR app.is_platform_user()
       `,
     }),
   ],

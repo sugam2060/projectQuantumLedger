@@ -4,7 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { and, eq, inArray, isNull, or } from 'drizzle-orm';
-import { RequestSession } from '../database/request_context.service';
+import { RequestSession } from '../database/database.types';
 import { DatabaseService } from '../database/database.service';
 import {
   businessMemberships,

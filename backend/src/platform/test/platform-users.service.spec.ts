@@ -82,10 +82,7 @@ describe('PlatformUsersService', () => {
     ).resolves.toEqual({ message: 'Invite sent to Jane Manager' });
 
     expect(database.transactionWithSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        isPlatform: true,
-        platformUserId: 'platform-user-id',
-      }),
+      { platformUserId: 'platform-user-id' },
       expect.any(Function),
     );
     expect(inserted).toHaveLength(1);

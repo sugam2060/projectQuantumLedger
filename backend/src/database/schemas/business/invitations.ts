@@ -82,10 +82,8 @@ export const invitations = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-            app_is_platform() = true
-            OR (business_id = app_business_id() AND app_is_owner() = true)
-            OR (business_id = app_business_id() AND (app_branch_id() IS NULL OR branch_id = app_branch_id()))
-        `,
+        app.is_platform_user() OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+      `,
     }),
 
     // 2. INSERT Policy: Platform admins can insert anywhere; owners can insert anywhere in their business; branch managers only for their specific branch
@@ -93,10 +91,8 @@ export const invitations = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-            app_is_platform() = true
-            OR (business_id = app_business_id() AND app_is_owner() = true)
-            OR (business_id = app_business_id() AND app_branch_id() IS NOT NULL AND branch_id = app_branch_id())
-        `,
+        app.is_platform_user() OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+      `,
     }),
 
     // 3. UPDATE Policy: Allow modifying/revoking invitations within owner/branch-manager scoping or platform admin
@@ -104,15 +100,11 @@ export const invitations = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-            app_is_platform() = true
-            OR (business_id = app_business_id() AND app_is_owner() = true)
-            OR (business_id = app_business_id() AND (app_branch_id() IS NULL OR branch_id = app_branch_id()))
-        `,
+        app.is_platform_user() OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+      `,
       withCheck: sql`
-            app_is_platform() = true
-            OR (business_id = app_business_id() AND app_is_owner() = true)
-            OR (business_id = app_business_id() AND (app_branch_id() IS NULL OR branch_id = app_branch_id()))
-        `,
+        app.is_platform_user() OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+      `,
     }),
 
     // 4. DELETE Policy: Allow cleanup or deletion matching the same administrative tiers
@@ -120,10 +112,8 @@ export const invitations = pgTable(
       for: 'delete',
       to: 'fortis_app',
       using: sql`
-            app_is_platform() = true
-            OR (business_id = app_business_id() AND app_is_owner() = true)
-            OR (business_id = app_business_id() AND (app_branch_id() IS NULL OR branch_id = app_branch_id()))
-        `,
+        app.is_platform_user() OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+      `,
     }),
   ],
 ).enableRLS();

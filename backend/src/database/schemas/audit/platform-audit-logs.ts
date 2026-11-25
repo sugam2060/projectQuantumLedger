@@ -46,12 +46,16 @@ export const platformAuditLogs = pgTable(
     pgPolicy('platform_audit_logs_select', {
       for: 'select',
       to: 'fortis_app',
-      using: sql`app_is_platform() = true`,
+      using: sql`
+        app.is_platform_user()
+      `,
     }),
     pgPolicy('platform_audit_logs_insert', {
       for: 'insert',
       to: 'fortis_app',
-      withCheck: sql`app_is_platform() = true`,
+      withCheck: sql`
+        app.is_platform_user()
+      `,
     }),
   ],
 ).enableRLS();

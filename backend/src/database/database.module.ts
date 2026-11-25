@@ -1,13 +1,11 @@
 import { Global, Module } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
-import { databaseConfig } from '../config';
 import { DrizzleModule } from '@nestjs/drizzle';
+import { databaseConfig } from '../config';
 import { createDatabaseOptions } from './database.provider';
 import { DatabaseService } from './database.service';
-import { RequestContextService } from './request_context.service';
-import { RlsContextInterceptor } from './rls_context.interceptor';
 
+/** Pool + Drizzle client and DatabaseService. Global: repositories inject it. */
 @Global()
 @Module({
   imports: [
@@ -17,14 +15,7 @@ import { RlsContextInterceptor } from './rls_context.interceptor';
       useFactory: createDatabaseOptions,
     }),
   ],
-  providers: [
-    RequestContextService,
-    DatabaseService,
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: RlsContextInterceptor,
-    },
-  ],
+  providers: [DatabaseService],
   exports: [DatabaseService, DrizzleModule],
 })
 export class DatabaseModule {}

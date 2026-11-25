@@ -43,10 +43,8 @@ export const roles = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-            business_id = app_business_id()
-            OR business_id IS NULL
-            OR app_is_platform() = true
-        `,
+        business_id IS NULL OR app.is_business_member(business_id) OR app.is_platform_user()
+      `,
     }),
 
     // RLS Policy: Business-wide roles can be inserted by the business owner or branch managers
@@ -54,9 +52,8 @@ export const roles = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-            (business_id = app_business_id() AND (app_is_owner() = true OR app_branch_id() IS NOT NULL))
-            OR app_is_platform() = true
-        `,
+        (business_id IS NOT NULL AND app.is_business_owner(business_id)) OR app.is_platform_user()
+      `,
     }),
 
     // RLS Policy: Allow updates for business-wide roles by owners, managers, or platform admins
@@ -64,13 +61,11 @@ export const roles = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-            (business_id = app_business_id() AND (app_is_owner() = true OR app_branch_id() IS NOT NULL))
-            OR app_is_platform() = true
-        `,
+        (business_id IS NOT NULL AND app.is_business_owner(business_id)) OR app.is_platform_user()
+      `,
       withCheck: sql`
-            (business_id = app_business_id() AND (app_is_owner() = true OR app_branch_id() IS NOT NULL))
-            OR app_is_platform() = true
-        `,
+        (business_id IS NOT NULL AND app.is_business_owner(business_id)) OR app.is_platform_user()
+      `,
     }),
   ],
 ).enableRLS();

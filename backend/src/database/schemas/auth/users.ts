@@ -40,23 +40,16 @@ export const users = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-            EXISTS (
-                SELECT 1 FROM invitations 
-                WHERE email_normalized = ${table.emailNormalized}
-                AND invitation_type = 'business_user'
-                AND consumed_at IS NULL
-                AND revoked_at IS NULL
-            )
-            OR EXISTS (
-                SELECT 1 FROM owner_redemptions r
-                WHERE r.email_normalized = users.email_normalized
-                  AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
-                  AND r.consumed_at IS NULL
-                  AND r.revoked_at IS NULL
-                  AND r.expires_at > now()
-            )
-            OR public.app_is_platform() = true
-        `,
+        EXISTS (
+          SELECT 1 FROM owner_redemptions r
+          WHERE r.email_normalized = users.email_normalized
+            AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
+            AND r.consumed_at IS NULL
+            AND r.revoked_at IS NULL
+            AND r.expires_at > now()
+        )
+        OR app.is_platform_user()
+      `,
     }),
 
     // RLS Policy for viewing users:
@@ -67,29 +60,25 @@ export const users = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-            id = public.app_user_id()
-            OR (
-              email_normalized = NULLIF(current_setting('app.registration_email', true), '')
-              AND EXISTS (
-                SELECT 1 FROM owner_redemptions r
-                WHERE r.email_normalized = users.email_normalized
-                  AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
-                  AND r.consumed_at IS NULL
-                  AND r.revoked_at IS NULL
-                  AND r.expires_at > now()
-              )
-            )
-            OR EXISTS (
-                SELECT 1 FROM business_memberships m1
-                JOIN business_memberships m2 ON m1.business_id = m2.business_id
-                WHERE m1.user_id = public.app_user_id() 
-                  AND m2.user_id = users.id 
-                  AND m1.business_id = public.app_business_id()
-                  AND m1.is_active = true
-                  AND m2.is_active = true
-            )
-            OR public.app_is_platform() = true
-        `,
+        id = app.current_user_id()
+        OR (
+          email_normalized = NULLIF(current_setting('app.registration_email', true), '')
+          AND EXISTS (
+          SELECT 1 FROM owner_redemptions r
+          WHERE r.email_normalized = users.email_normalized
+            AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
+            AND r.consumed_at IS NULL
+            AND r.revoked_at IS NULL
+            AND r.expires_at > now()
+        )
+        )
+        OR EXISTS (
+          SELECT 1 FROM business_memberships m
+          WHERE m.user_id = users.id
+            AND app.is_business_member(m.business_id)
+        )
+        OR app.is_platform_user()
+      `,
     }),
 
     // RLS Policy for updating users:
@@ -99,13 +88,11 @@ export const users = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-            id = public.app_user_id()
-            OR public.app_is_platform() = true
-        `,
+        id = app.current_user_id() OR app.is_platform_user()
+      `,
       withCheck: sql`
-            id = public.app_user_id()
-            OR public.app_is_platform() = true
-        `,
+        id = app.current_user_id() OR app.is_platform_user()
+      `,
     }),
   ],
 ).enableRLS();

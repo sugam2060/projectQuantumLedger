@@ -51,9 +51,8 @@ export const terminals = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-            (business_id = app_business_id() AND (app_is_owner() = true OR app_branch_id() IS NULL OR branch_id = app_branch_id()))
-            OR app_is_platform() = true
-        `,
+        app.can_access_branch(business_id, branch_id) OR app.is_platform_user()
+      `,
     }),
 
     // RLS Policy: ONLY platform managers can create terminals
@@ -61,8 +60,8 @@ export const terminals = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-            app_is_platform() = true
-        `,
+        app.is_platform_user()
+      `,
     }),
 
     // RLS Policy: ONLY platform managers can update terminals
@@ -70,11 +69,11 @@ export const terminals = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-            app_is_platform() = true
-        `,
+        app.is_platform_user()
+      `,
       withCheck: sql`
-            app_is_platform() = true
-        `,
+        app.is_platform_user()
+      `,
     }),
 
     pgPolicy('terminals_owner_registration_activate', {
@@ -104,20 +103,18 @@ export const terminals = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-        business_id = app_business_id()
+        app.is_business_owner(business_id)
         AND business_id = NULLIF(current_setting('app.terminal_activation_business_id', true), '')::uuid
         AND branch_id = NULLIF(current_setting('app.terminal_activation_branch_id', true), '')::uuid
         AND terminal_code = NULLIF(current_setting('app.terminal_activation_code', true), '')
         AND status = 'inactive'
-        AND app_is_owner() = true
       `,
       withCheck: sql`
-        business_id = app_business_id()
+        app.is_business_owner(business_id)
         AND business_id = NULLIF(current_setting('app.terminal_activation_business_id', true), '')::uuid
         AND branch_id = NULLIF(current_setting('app.terminal_activation_branch_id', true), '')::uuid
         AND terminal_code = NULLIF(current_setting('app.terminal_activation_code', true), '')
         AND status = 'active'
-        AND app_is_owner() = true
       `,
     }),
   ],

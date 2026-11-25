@@ -6,7 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { AuditLogsService, type AuditRequestContext } from '../audit-logs';
-import type { RequestSession } from '../database/request_context.service';
+import type { RequestSession } from '../database/database.types';
 import type { business, BusinessDocuments } from '../database/schemas';
 import { ObjectStoreService } from '../storage';
 import { BusinessUpdateIdempotencyService } from './business-update-idempotency.service';

@@ -11,20 +11,13 @@ type NewInvitation = typeof invitations.$inferInsert;
 export class PlatformUsersRepository {
   constructor(private readonly database: DatabaseService) {}
 
-  /**
-   * Runs `work` in one transaction as the inviting platform user. The invitee email
-   * is part of the session because the platform_users select policy matches on it.
-   */
+  /** Runs `work` in one transaction as the inviting platform user. */
   inInvitationTransaction<T>(
     input: { platformUserId: string; inviteeEmail: string },
     work: (tx: PlatformTransaction) => Promise<T>,
   ): Promise<T> {
     return this.database.transactionWithSession(
-      {
-        isPlatform: true,
-        platformUserId: input.platformUserId,
-        platformAuthEmail: input.inviteeEmail,
-      },
+      { platformUserId: input.platformUserId },
       work,
     );
   }

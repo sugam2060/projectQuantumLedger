@@ -31,6 +31,24 @@ BEGIN
 END;
 $$;
 
+-- The current request belongs to an active bootstrap platform user (may manage
+-- other platform users).
+CREATE OR REPLACE FUNCTION app.is_bootstrap_platform_user()
+RETURNS boolean
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+      FROM public.platform_users p
+     WHERE p.id = app.current_platform_user_id()
+       AND p.status = 'active'
+       AND p.is_bootstrap
+  );
+END;
+$$;
+
 -- The current user has an active membership in the business.
 CREATE OR REPLACE FUNCTION app.is_business_member(p_business_id uuid)
 RETURNS boolean

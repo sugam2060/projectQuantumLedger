@@ -48,7 +48,10 @@ REVOKE ALL ON FUNCTION
   public.app_is_bootstrap_platform()
 FROM PUBLIC;
 
-GRANT EXECUTE ON FUNCTION
+-- Legacy helpers: still defined because historical migrations (0000-0017)
+-- create policies that call them, but no live policy does any more. The runtime
+-- role may not call them, so any leftover dependency fails loudly.
+REVOKE EXECUTE ON FUNCTION
   public.app_business_id(),
   public.app_branch_id(),
   public.app_user_id(),
@@ -56,7 +59,7 @@ GRANT EXECUTE ON FUNCTION
   public.app_is_owner(),
   public.app_platform_user_id(),
   public.app_is_bootstrap_platform()
-TO fortis_app;
+FROM fortis_app;
 
 -- Applies to future objects created by the migration connection's role.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public

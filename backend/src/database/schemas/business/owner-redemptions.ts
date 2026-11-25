@@ -56,25 +56,24 @@ export const ownerRedemptions = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-        app_is_platform() = true
-        OR token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
+        app.is_platform_user() OR token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
       `,
     }),
     pgPolicy('owner_redemptions_insert', {
       for: 'insert',
       to: 'fortis_app',
-      withCheck: sql`app_is_platform() = true`,
+      withCheck: sql`
+        app.is_platform_user()
+      `,
     }),
     pgPolicy('owner_redemptions_update', {
       for: 'update',
       to: 'fortis_app',
       using: sql`
-        app_is_platform() = true
-        OR token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
+        app.is_platform_user() OR token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
       `,
       withCheck: sql`
-        app_is_platform() = true
-        OR token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
+        app.is_platform_user() OR token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
       `,
     }),
   ],

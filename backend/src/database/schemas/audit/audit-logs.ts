@@ -46,10 +46,8 @@ export const auditLogs = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-            business_id = app_business_id()
-            AND (app_branch_id() IS NULL OR branch_id = app_branch_id())
-            OR app_is_platform() = true
-        `,
+        app.is_business_owner(business_id) OR app.is_platform_user()
+      `,
     }),
 
     // RLS Policy: Insertions restricted to the active business context or platform admin
@@ -57,9 +55,8 @@ export const auditLogs = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-            business_id = app_business_id()
-            OR app_is_platform() = true
-        `,
+        app.is_business_member(business_id) OR app.is_platform_user()
+      `,
     }),
   ],
 ).enableRLS();

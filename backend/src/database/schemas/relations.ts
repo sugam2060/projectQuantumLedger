@@ -41,7 +41,7 @@ export const platformUsersRelations = relations(platformUsers, ({ many }) => ({
 
 export const businessProvisioningRequestRelations = relations(
   businessProvisioningRequests,
-  ({ one, many }) => ({
+  ({ one }) => ({
     reviewer: one(platformUsers, {
       fields: [businessProvisioningRequests.reviewedBy],
       references: [platformUsers.id],

@@ -7,7 +7,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import type { RequestSession } from '../database/request_context.service';
+import type { RequestSession } from '../database/database.types';
 import { BranchesRepository } from './branches.repository';
 import type { ListBranchesQueryDto } from './dto/list-branches-query.dto';
 import type { BranchCursorContext } from './types';

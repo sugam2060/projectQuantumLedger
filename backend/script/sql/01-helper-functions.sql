@@ -42,8 +42,9 @@ CREATE OR REPLACE FUNCTION app.current_platform_user_id()
 RETURNS uuid LANGUAGE sql STABLE SET search_path = pg_catalog, pg_temp
 AS $$ SELECT app.setting_uuid('app.platform_user_id') $$;
 
--- Legacy helpers (public.app_*). Current policies still call them; the policy
--- rewrite replaces them with the app.* functions and drops these.
+-- Legacy helpers (public.app_*). Live policies use the app.* functions (migration
+-- 0018); these stay only because migrations 0000-0017 create policies that call
+-- them on a fresh database. fortis_app has no EXECUTE on them (see 03).
 
 -- 1. Get the current active Business ID for the session
 CREATE OR REPLACE FUNCTION public.app_business_id()

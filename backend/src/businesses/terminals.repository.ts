@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
-import type { RequestSession } from '../database/request_context.service';
+import type { RequestSession } from '../database/database.types';
 import { terminals } from '../database/schemas';
 import type { BusinessTransaction } from './types';
 

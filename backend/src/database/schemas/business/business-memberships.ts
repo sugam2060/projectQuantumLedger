@@ -59,10 +59,8 @@ export const businessMemberships = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-            business_id = app_business_id()
-            OR user_id = app_user_id()
-            OR app_is_platform() = true
-        `,
+        user_id = app.current_user_id() OR app.is_business_member(business_id) OR app.is_platform_user()
+      `,
     }),
 
     // RLS Policy: Insertions are managed via SECURITY DEFINER functions (like invitation redemption) or platform admins
@@ -70,26 +68,26 @@ export const businessMemberships = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-            (business_id = app_business_id() AND app_is_owner() = true)
-            OR app_is_platform() = true
-            OR (
-              is_owner = true
-              AND role_id IS NULL
-              AND branch_id IS NULL
-              AND user_id = app_user_id()
-              AND business_id = app_business_id()
-              AND EXISTS (
-                SELECT 1
-                FROM owner_redemptions r
-                WHERE r.business_id = business_memberships.business_id
-                  AND r.email_normalized = NULLIF(current_setting('app.registration_email', true), '')
-                  AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
-                  AND r.consumed_at IS NULL
-                  AND r.revoked_at IS NULL
-                  AND r.expires_at > now()
-              )
-            )
-        `,
+        app.is_business_owner(business_id)
+        OR app.is_platform_user()
+        OR (
+          is_owner = true
+          AND role_id IS NULL
+          AND branch_id IS NULL
+          AND user_id = app.current_user_id()
+          AND business_id = app.current_business_id()
+          AND EXISTS (
+            SELECT 1
+            FROM owner_redemptions r
+            WHERE r.business_id = business_memberships.business_id
+              AND r.email_normalized = NULLIF(current_setting('app.registration_email', true), '')
+              AND r.token_hash = NULLIF(current_setting('app.owner_redemption_hash', true), '')
+              AND r.consumed_at IS NULL
+              AND r.revoked_at IS NULL
+              AND r.expires_at > now()
+          )
+        )
+      `,
     }),
 
     // RLS Policy: Updates for memberships within the active business or platform admins
@@ -97,13 +95,22 @@ export const businessMemberships = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-            business_id = app_business_id()
-            OR app_is_platform() = true
-        `,
+        app.is_business_owner(business_id) OR app.is_platform_user()
+      `,
       withCheck: sql`
-            business_id = app_business_id()
-            OR app_is_platform() = true
-        `,
+        app.is_business_owner(business_id) OR app.is_platform_user()
+      `,
+    }),
+    pgPolicy('business_memberships_owner_row_immutable', {
+      as: 'restrictive',
+      for: 'update',
+      to: 'fortis_app',
+      using: sql`
+        is_owner = false
+      `,
+      withCheck: sql`
+        is_owner = false
+      `,
     }),
   ],
 ).enableRLS();

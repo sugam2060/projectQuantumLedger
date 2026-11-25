@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { RequestSession } from '../database/request_context.service';
+import type { RequestSession } from '../database/database.types';
 import { AuditLogsRepository } from './audit-logs.repository';
 import type {
   AuditTransaction,

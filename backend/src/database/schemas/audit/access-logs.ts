@@ -46,10 +46,10 @@ export const accessLogs = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-            business_id = app_business_id()
-            OR user_id = app_user_id()
-            OR app_is_platform() = true
-        `,
+        user_id = app.current_user_id()
+        OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+        OR app.is_platform_user()
+      `,
     }),
 
     // RLS Policy: Allow insertion from application runtime or security definer flows
@@ -57,10 +57,8 @@ export const accessLogs = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-            business_id = app_business_id()
-            OR business_id IS NULL
-            OR app_is_platform() = true
-        `,
+        business_id IS NULL OR app.is_business_member(business_id) OR app.is_platform_user()
+      `,
     }),
   ],
 ).enableRLS();

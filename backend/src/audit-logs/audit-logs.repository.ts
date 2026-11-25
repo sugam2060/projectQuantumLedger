@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import type { RequestSession } from '../database/request_context.service';
+import type { RequestSession } from '../database/database.types';
 import { accessLogs } from '../database/schemas/audit/access-logs';
 import { platformAuditLogs } from '../database/schemas/audit/platform-audit-logs';
 import type {

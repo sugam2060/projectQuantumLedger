@@ -47,9 +47,8 @@ export const platformUsers = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-            id = app_platform_user_id()
-            OR email_normalized = NULLIF(current_setting('app.platform_auth_email', true), '')
-        `,
+        id = app.current_platform_user_id() OR app.is_platform_user()
+      `,
     }),
 
     // RLS Policy (INSERT): Only the bootstrap platform manager can create new platform managers
@@ -57,8 +56,8 @@ export const platformUsers = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-            app_is_bootstrap_platform() = true
-        `,
+        app.is_bootstrap_platform_user()
+      `,
     }),
 
     // RLS Policy (UPDATE): Users can update their own profile, or bootstrap PM can manage accounts
@@ -66,13 +65,11 @@ export const platformUsers = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-            id = app_platform_user_id() 
-            OR app_is_bootstrap_platform() = true
-        `,
+        id = app.current_platform_user_id() OR app.is_bootstrap_platform_user()
+      `,
       withCheck: sql`
-            id = app_platform_user_id() 
-            OR app_is_bootstrap_platform() = true
-        `,
+        id = app.current_platform_user_id() OR app.is_bootstrap_platform_user()
+      `,
     }),
 
     // RLS Policy (DELETE): Only bootstrap platform managers can delete accounts
@@ -80,8 +77,8 @@ export const platformUsers = pgTable(
       for: 'delete',
       to: 'fortis_app',
       using: sql`
-            app_is_bootstrap_platform() = true
-        `,
+        app.is_bootstrap_platform_user()
+      `,
     }),
   ],
 ).enableRLS();

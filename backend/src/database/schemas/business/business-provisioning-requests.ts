@@ -77,13 +77,19 @@ export const businessProvisioningRequests = pgTable(
     pgPolicy('business_provisioning_requests_platform_select', {
       for: 'select',
       to: 'fortis_app',
-      using: sql`app_is_platform() = true`,
+      using: sql`
+        app.is_platform_user()
+      `,
     }),
     pgPolicy('business_provisioning_requests_platform_update', {
       for: 'update',
       to: 'fortis_app',
-      using: sql`app_is_platform() = true`,
-      withCheck: sql`app_is_platform() = true`,
+      using: sql`
+        app.is_platform_user()
+      `,
+      withCheck: sql`
+        app.is_platform_user()
+      `,
     }),
   ],
 ).enableRLS();

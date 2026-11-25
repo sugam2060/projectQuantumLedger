@@ -48,9 +48,8 @@ export const branches = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-            business_id = app_business_id()
-            OR app_is_platform() = true
-        `,
+        app.can_access_branch(business_id, id) OR app.is_platform_user()
+      `,
     }),
 
     // RLS Policy: ONLY platform admins can insert/create new branches
@@ -58,8 +57,8 @@ export const branches = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-            app_is_platform() = true
-        `,
+        app.is_platform_user()
+      `,
     }),
 
     // RLS Policy: Allow updates for branches belonging to the active business owner or platform admins
@@ -67,13 +66,11 @@ export const branches = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-            (business_id = app_business_id() AND app_is_owner() = true)
-            OR app_is_platform() = true
-        `,
+        app.is_business_owner(business_id) OR app.is_platform_user()
+      `,
       withCheck: sql`
-            (business_id = app_business_id() AND app_is_owner() = true)
-            OR app_is_platform() = true
-        `,
+        app.is_business_owner(business_id) OR app.is_platform_user()
+      `,
     }),
   ],
 ).enableRLS();
