@@ -5,6 +5,7 @@ import { RolesPermissionsController } from './roles-permissions.controller';
 import { EndpointAccessService } from './endpoint-access.service';
 import { EndpointAccessCatalogService } from './endpoint-access-catalog.service';
 import { EffectivePermissionsCacheService } from './effective-permissions-cache.service';
+import { EffectivePermissionsService } from './effective-permissions.service';
 
 @Module({
   imports: [AuditLogsModule, DiscoveryModule],
@@ -13,11 +14,13 @@ import { EffectivePermissionsCacheService } from './effective-permissions-cache.
     EndpointAccessService,
     EndpointAccessCatalogService,
     EffectivePermissionsCacheService,
+    EffectivePermissionsService,
   ],
   exports: [
     EndpointAccessService,
     EndpointAccessCatalogService,
     EffectivePermissionsCacheService,
+    EffectivePermissionsService,
   ],
 })
 export class RolesPermissionsModule {}

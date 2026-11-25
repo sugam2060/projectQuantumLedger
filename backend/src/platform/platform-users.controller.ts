@@ -1,6 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { Throttle } from '../common/decorators/strict-throttle.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PlatformRoute } from '../common/decorators/platform-route.decorator';
 import type { AuthenticatedUser } from '../common/types';
 import { InvitePlatformUserHeaders } from './decorators/invite-platform-user-headers.decorator';
 import { InvitePlatformUserDto } from './dto/invite-platform-user.dto';
@@ -10,6 +11,7 @@ import { requirePlatformUserId } from './utils/platform-user-id.util';
 
 /** Fortis-staff management of other platform users. */
 @Controller('platform/users')
+@PlatformRoute()
 export class PlatformUsersController {
   constructor(private readonly platformUsers: PlatformUsersService) {}
 

@@ -16,6 +16,30 @@ describe('validateEnv', () => {
     expect(result.MAIL_HOST).toBe('smtp.local');
   });
 
+  it('accepts JWT_ACCESS_SECRET instead of the old JWT_SECRET', () => {
+    const env = validEnv();
+    delete env.JWT_SECRET;
+    expect(() =>
+      validateEnv({ ...env, JWT_ACCESS_SECRET: 'a'.repeat(32) }),
+    ).not.toThrow();
+  });
+
+  it('rejects an access TTL that is not a duration', () => {
+    expect(() =>
+      validateEnv({ ...validEnv(), JWT_ACCESS_TTL: 'fifteen minutes' }),
+    ).toThrow('JWT_ACCESS_TTL');
+  });
+
+  it('rejects identical user and platform audiences', () => {
+    expect(() =>
+      validateEnv({
+        ...validEnv(),
+        JWT_AUDIENCE: 'same',
+        JWT_PLATFORM_AUDIENCE: 'same',
+      }),
+    ).toThrow('JWT_PLATFORM_AUDIENCE');
+  });
+
   it.each(['DATABASE_URL', 'REDIS_URL', 'JWT_SECRET'])(
     'fails when %s is missing',
     (key) => {

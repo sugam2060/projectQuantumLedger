@@ -4,14 +4,14 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
 import { configureApp } from '../../src/app.setup';
-import { JwtService } from '@nestjs/jwt';
+import { TokenService } from '../../src/authentication/token.service';
 import { REDIS_CLIENT } from '../../src/redis/redis.constants';
 import { getQueueToken } from '@nestjs/bullmq';
 import { EMAIL_QUEUE } from '../../src/jobs/email/types';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
-  let jwtService: JwtService;
+  let tokens: TokenService;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -24,7 +24,7 @@ describe('AppController (e2e)', () => {
       .compile();
 
     app = configureApp(moduleFixture.createNestApplication());
-    jwtService = app.get(JwtService);
+    tokens = app.get(TokenService);
     await app.init();
   });
 
@@ -42,9 +42,13 @@ describe('AppController (e2e)', () => {
       .expect(401);
   });
 
-  it('accepts a valid JWT on protected routes', () => {
-    const token = jwtService.sign({
+  it('accepts a valid JWT on protected routes', async () => {
+    const { token } = await tokens.signUserToken({
       sub: 'c1f5a8b2-391d-4c72-9bf1-15f3f48a0091',
+      email: 'user@fortis.test',
+      name: 'User',
+      businessId: 'c1f5a8b2-391d-4c72-9bf1-15f3f48a0092',
+      isOwner: false,
     });
 
     return request(app.getHttpServer())

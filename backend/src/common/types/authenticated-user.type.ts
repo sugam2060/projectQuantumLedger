@@ -1,15 +1,17 @@
 /**
- * `request.user` after a JWT has been validated. Platform users and business users
- * share this shape for now; `isPlatform` tells them apart.
+ * `request.user` after an access token has been validated. Business users come
+ * from the `jwt` strategy (isPlatform false), Fortis staff from `platform-jwt`
+ * (isPlatform true); the two token kinds have different audiences.
  */
 export type AuthenticatedUser = {
   subjectId: string;
   sub?: string;
   businessId?: string;
   userId?: string;
+  email?: string;
+  terminalId?: string;
   branchId?: string;
   platformUserId?: string;
-  platformAuthEmail?: string;
   isPlatform?: boolean;
   isOwner?: boolean;
   permissions: string[];

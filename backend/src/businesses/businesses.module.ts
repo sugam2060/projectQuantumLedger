@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuditLogsModule } from '../audit-logs';
 import { StorageModule } from '../storage';
-import { UtilsModule } from '../utils/utils.module';
 import { BranchesController } from './branches.controller';
 import { BranchesRepository } from './branches.repository';
 import { BranchesService } from './branches.service';
@@ -15,7 +14,7 @@ import { TerminalsService } from './terminals.service';
 
 /** Tenant side of a business: profile, branches, terminals. */
 @Module({
-  imports: [AuditLogsModule, StorageModule, UtilsModule],
+  imports: [AuditLogsModule, StorageModule],
   controllers: [BusinessesController, BranchesController, TerminalsController],
   providers: [
     BusinessesRepository,

@@ -17,12 +17,7 @@ import {
   THROTTLER_SETTINGS,
   type ThrottlerSettings,
 } from './common/throttling/throttling.constants';
-import {
-  appConfig,
-  mailConfig,
-  throttleConfig,
-  validateEnv,
-} from './config';
+import { appConfig, mailConfig, throttleConfig, validateEnv } from './config';
 import { DatabaseModule } from './database/database.module';
 import { QueueModule } from './jobs';
 import { PlatformModule } from './platform/platform.module';

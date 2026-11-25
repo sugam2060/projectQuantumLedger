@@ -64,9 +64,49 @@ class EnvironmentVariables {
   })
   REDIS_URL!: string;
 
+  /** Preferred name. JWT_SECRET (old name) is accepted when this is unset. */
+  @IsOptional()
   @IsString()
   @MinLength(32)
-  JWT_SECRET!: string;
+  JWT_ACCESS_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  JWT_SECRET?: string;
+
+  @IsOptional()
+  @Matches(/^\d+[smhd]?$/, {
+    message: 'JWT_ACCESS_TTL must look like 900, 15m, 1h or 1d',
+  })
+  JWT_ACCESS_TTL?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  JWT_ISSUER?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  JWT_AUDIENCE?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  JWT_PLATFORM_AUDIENCE?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  REFRESH_TOKEN_TTL_DAYS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(720)
+  REFRESH_TOKEN_SESSION_TTL_HOURS?: number;
 
   @IsOptional()
   @IsUrl({
@@ -135,6 +175,8 @@ const NUMERIC_KEYS = [
   'THROTTLE_LIMIT',
   'AUTH_THROTTLE_LIMIT',
   'MAIL_PORT',
+  'REFRESH_TOKEN_TTL_DAYS',
+  'REFRESH_TOKEN_SESSION_TTL_HOURS',
 ] as const;
 
 /**
@@ -172,6 +214,18 @@ export function validateEnv(
   const poolMax = numericOverrides.DB_POOL_MAX ?? 10;
   if (poolMin > poolMax) {
     messages.push('DB_POOL_MIN: must not exceed DB_POOL_MAX');
+  }
+
+  if (!present.JWT_ACCESS_SECRET && !present.JWT_SECRET) {
+    messages.push(
+      'JWT_ACCESS_SECRET: is required (JWT_SECRET is accepted as the old name)',
+    );
+  }
+  if (
+    typeof present.JWT_AUDIENCE === 'string' &&
+    present.JWT_AUDIENCE === present.JWT_PLATFORM_AUDIENCE
+  ) {
+    messages.push('JWT_PLATFORM_AUDIENCE: must differ from JWT_AUDIENCE');
   }
 
   try {

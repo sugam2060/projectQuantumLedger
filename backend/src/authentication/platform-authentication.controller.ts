@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Headers,
@@ -8,26 +7,34 @@ import {
   Post,
   Req,
   Res,
-  UnauthorizedException,
 } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { AuditContext, type AuditRequestContext } from '../audit-logs';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PlatformRoute } from '../common/decorators/platform-route.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import {
   StrictThrottle,
   Throttle,
 } from '../common/decorators/strict-throttle.decorator';
-import type { Request, Response } from 'express';
-import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
-import { Public } from '../common/decorators/public.decorator';
-import { ClientType } from './dto/client-login.dto';
-import { PlatformRefreshHeadersDto } from './dto/platform-refresh-headers.dto';
+import type { AuthenticatedUser } from '../common/types';
+import { AuthCookieService } from './auth-cookie.service';
+import { ClientTypeHeaders } from './decorators/client-type-headers.decorator';
+import { AuthenticationLogoutHeadersDto } from './dto/authentication-logout-headers.dto';
+import { isBrowserClient } from './dto/client-login.dto';
+import { OptionalClientTypeHeadersDto } from './dto/optional-client-type-headers.dto';
 import { PlatformUserLoginDto } from './dto/platform-user-login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { PlatformAuthenticationService } from './platform-authentication.service';
-import type { PlatformAuthResult } from './platform-authentication.service';
+import { authMetadata, deliverTokens } from './utils/auth-response.util';
 
+/** Fortis-staff sign-in, refresh and sign-out. */
 @Controller('platform/user')
+@PlatformRoute()
 export class PlatformAuthenticationController {
   constructor(
     private readonly platformAuthService: PlatformAuthenticationService,
+    private readonly cookies: AuthCookieService,
   ) {}
 
   @Post('login')
@@ -37,49 +44,23 @@ export class PlatformAuthenticationController {
   @Throttle({ limit: 20, ttlMs: 60_000 })
   async login(
     @Body() dto: PlatformUserLoginDto,
-    @Req() request: Request,
+    @ClientTypeHeaders() headers: OptionalClientTypeHeadersDto,
+    @AuditContext() audit: AuditRequestContext,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const headerClientType = request.headers['x-client-type'];
-    if (
-      Array.isArray(headerClientType) ||
-      (headerClientType !== undefined &&
-        !Object.values(ClientType).some(
-          (clientType) => clientType === headerClientType,
-        ))
-    ) {
-      throw new BadRequestException('A valid x-client-type header is required');
-    }
-    const clientType = headerClientType ?? dto.client_type;
-
-    const result = await this.platformAuthService.login(dto, {
-      method: request.method,
-      endpointPath: request.route?.path,
-      responseStatus: 200,
-      requestId: request.header('x-request-id'),
-      clientType: typeof clientType === 'string' ? clientType : undefined,
-      ipAddress: request.ip,
-      userAgent: request.header('user-agent'),
-    });
-    if (clientType === ClientType.WEB || !clientType) {
-      const cookieOptions = {
-        httpOnly: true,
-        secure:
-          request.secure || request.headers['x-forwarded-proto'] === 'https',
-        maxAge: 15 * 60 * 1000,
-        sameSite: 'strict' as const,
-        path: '/',
-      };
-      response.cookie('access_token', result.accessToken, cookieOptions);
-      response.cookie('refresh_token', result.refreshToken, {
-        ...cookieOptions,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
-
-      return this.withoutTokens(result);
-    }
-
-    return result;
+    // The header wins over the body field; both are optional (default: web).
+    const clientType = headers.clientType ?? dto.client_type;
+    const result = await this.platformAuthService.login(
+      dto,
+      authMetadata(clientType, undefined, audit),
+    );
+    return deliverTokens(
+      result,
+      clientType,
+      response,
+      this.cookies,
+      'platform',
+    );
   }
 
   @Post('refresh')
@@ -88,68 +69,63 @@ export class PlatformAuthenticationController {
   @Public()
   @Throttle({ limit: 60, ttlMs: 60_000 })
   async refresh(
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Body() dto: RefreshTokenDto,
+    @ClientTypeHeaders() headers: AuthenticationLogoutHeadersDto,
+    @Headers('refresh-token') legacyHeaderToken: string | undefined,
+    @AuditContext() audit: AuditRequestContext,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const refreshHeaders = plainToInstance(PlatformRefreshHeadersDto, {
-      refreshToken: headers['refresh-token'],
-      clientType: headers['x-client-type'],
-    });
-    const validationErrors = await validate(refreshHeaders);
-    if (validationErrors.length > 0) {
-      throw new BadRequestException(
-        'A refresh-token and valid x-client-type header are required',
+    const browser = isBrowserClient(headers.clientType);
+    // `refresh-token` header: deprecated, still accepted for older clients.
+    const token =
+      dto.refreshToken ??
+      legacyHeaderToken ??
+      (browser ? this.cookies.readRefreshCookie(request) : undefined);
+    try {
+      const result = await this.platformAuthService.refresh(
+        token,
+        authMetadata(headers.clientType, undefined, audit),
       );
+      return deliverTokens(
+        result,
+        headers.clientType,
+        response,
+        this.cookies,
+        'platform',
+      );
+    } catch (error) {
+      if (browser) this.cookies.clearRefreshCookie(response, 'platform');
+      throw error;
     }
-
-    let refreshToken = refreshHeaders.refreshToken;
-    if (refreshHeaders.clientType === ClientType.WEB && !refreshToken) {
-      refreshToken = request.cookies?.refresh_token;
-    }
-    if (!refreshToken) {
-      throw new UnauthorizedException('A refresh token is required');
-    }
-
-    const result = await this.platformAuthService.refresh(refreshToken, {
-      method: request.method,
-      endpointPath: request.route?.path,
-      responseStatus: 200,
-      requestId: request.header('x-request-id'),
-      clientType: refreshHeaders.clientType,
-      ipAddress: request.ip,
-      userAgent: request.header('user-agent'),
-    });
-    if (refreshHeaders.clientType === ClientType.WEB) {
-      const cookieOptions = {
-        httpOnly: true,
-        secure:
-          request.secure || request.headers['x-forwarded-proto'] === 'https',
-        maxAge: 15 * 60 * 1000,
-        sameSite: 'strict' as const,
-        path: '/',
-      };
-      response.cookie('access_token', result.accessToken, cookieOptions);
-      response.cookie('refresh_token', result.refreshToken, {
-        ...cookieOptions,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
-
-      return this.withoutTokens(result);
-    }
-
-    return result;
   }
 
-  private withoutTokens(
-    result: PlatformAuthResult,
-  ): Omit<PlatformAuthResult, 'accessToken' | 'refreshToken'> {
-    return {
-      tokenType: result.tokenType,
-      expiresIn: result.expiresIn,
-      user: result.user,
-      isPlatform: result.isPlatform,
-      isBootstrap: result.isBootstrap,
-    };
+  @Post('logout')
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logout(
+    @Body() dto: RefreshTokenDto,
+    @ClientTypeHeaders() headers: AuthenticationLogoutHeadersDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    const browser = isBrowserClient(headers.clientType);
+    await this.platformAuthService.logout(
+      dto.refreshToken ??
+        (browser ? this.cookies.readRefreshCookie(request) : undefined),
+    );
+    if (browser) this.cookies.clearRefreshCookie(response, 'platform');
+  }
+
+  @Post('logout-all')
+  @StrictThrottle()
+  @HttpCode(HttpStatus.OK)
+  async logoutAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.platformAuthService.logoutAll(user);
+    this.cookies.clearRefreshCookie(response, 'platform');
+    return result;
   }
 }

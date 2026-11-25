@@ -54,7 +54,7 @@ export const businessProvisioningRequestRelations = relations(
       fields: [businessProvisioningRequests.id],
       references: [ownerRedemptions.requestId],
     }),
-    }),
+  }),
 );
 
 export const branchesRelations = relations(branches, ({ one, many }) => ({

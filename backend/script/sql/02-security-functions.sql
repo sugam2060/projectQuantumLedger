@@ -244,3 +244,201 @@ $$;
 
 -- The unused invitation/registration function from the old setup.
 DROP FUNCTION IF EXISTS public.redeem_invitation_and_register(text, text, text);
+
+-- ---------------------------------------------------------------------------
+-- Refresh-token sessions. public.sessions has no write policies: these
+-- functions are the only way to create, rotate or revoke a session. Tokens are
+-- passed as their SHA-256 hex digest, never in plain text.
+-- ---------------------------------------------------------------------------
+
+-- Starts a session for the actor in the current request context (sign-in sets
+-- app.user_id / app.platform_user_id after verifying the password).
+CREATE OR REPLACE FUNCTION app.auth_create_session(
+  p_user_id uuid,
+  p_platform_user_id uuid,
+  p_token_hash text,
+  p_client_type text,
+  p_terminal_id uuid,
+  p_persistent boolean,
+  p_user_agent text,
+  p_ip text,
+  p_expires_at timestamptz
+)
+RETURNS uuid
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  IF pg_catalog.num_nonnulls(p_user_id, p_platform_user_id) <> 1
+     OR (p_user_id IS NOT NULL AND p_user_id IS DISTINCT FROM app.current_user_id())
+     OR (p_platform_user_id IS NOT NULL
+         AND p_platform_user_id IS DISTINCT FROM app.current_platform_user_id())
+  THEN
+    RAISE EXCEPTION 'session actor does not match the request context'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  INSERT INTO public.sessions (
+    user_id, platform_user_id, refresh_token_hash, client_type, terminal_id,
+    persistent, user_agent, ip, expires_at
+  ) VALUES (
+    p_user_id, p_platform_user_id, p_token_hash, p_client_type, p_terminal_id,
+    p_persistent, p_user_agent, p_ip, p_expires_at
+  )
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$;
+
+-- Atomically swaps a refresh token for a new one. Outcomes:
+--   rotated  old session revoked + rotated_at set; a new session returned
+--   reuse    the token was already rotated (a stale copy was replayed): every
+--            session of that actor is revoked
+--   invalid  unknown, expired, revoked (logout / password change) or the account
+--            is no longer active; nothing else is touched
+CREATE OR REPLACE FUNCTION app.auth_rotate_session(
+  p_old_hash text,
+  p_new_hash text,
+  p_user_agent text,
+  p_ip text,
+  p_persistent_ttl interval,
+  p_session_ttl interval
+)
+RETURNS TABLE (
+  outcome text,
+  session_id uuid,
+  user_id uuid,
+  platform_user_id uuid,
+  client_type text,
+  terminal_id uuid,
+  persistent boolean,
+  expires_at timestamptz
+)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_old record;
+  v_active boolean;
+  v_new_id uuid;
+  v_expires timestamptz;
+BEGIN
+  SELECT * INTO v_old
+    FROM public.sessions s
+   WHERE s.refresh_token_hash = p_old_hash
+   FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT 'invalid'::text, NULL::uuid, NULL::uuid, NULL::uuid,
+                        NULL::text, NULL::uuid, NULL::boolean, NULL::timestamptz;
+    RETURN;
+  END IF;
+
+  IF v_old.rotated_at IS NOT NULL THEN
+    UPDATE public.sessions s
+       SET revoked_at = pg_catalog.now()
+     WHERE s.revoked_at IS NULL
+       AND ((v_old.user_id IS NOT NULL AND s.user_id = v_old.user_id)
+         OR (v_old.platform_user_id IS NOT NULL
+             AND s.platform_user_id = v_old.platform_user_id));
+    RETURN QUERY SELECT 'reuse'::text, NULL::uuid, v_old.user_id,
+                        v_old.platform_user_id, v_old.client_type,
+                        v_old.terminal_id, v_old.persistent, NULL::timestamptz;
+    RETURN;
+  END IF;
+
+  IF v_old.revoked_at IS NOT NULL OR v_old.expires_at <= pg_catalog.now() THEN
+    RETURN QUERY SELECT 'invalid'::text, NULL::uuid, v_old.user_id,
+                        v_old.platform_user_id, v_old.client_type,
+                        v_old.terminal_id, v_old.persistent, NULL::timestamptz;
+    RETURN;
+  END IF;
+
+  IF v_old.user_id IS NOT NULL THEN
+    SELECT u.status = 'active' INTO v_active
+      FROM public.users u WHERE u.id = v_old.user_id;
+  ELSE
+    SELECT p.status = 'active' INTO v_active
+      FROM public.platform_users p WHERE p.id = v_old.platform_user_id;
+  END IF;
+
+  IF v_active IS NOT TRUE THEN
+    UPDATE public.sessions s SET revoked_at = pg_catalog.now()
+     WHERE s.id = v_old.id;
+    RETURN QUERY SELECT 'invalid'::text, NULL::uuid, v_old.user_id,
+                        v_old.platform_user_id, v_old.client_type,
+                        v_old.terminal_id, v_old.persistent, NULL::timestamptz;
+    RETURN;
+  END IF;
+
+  UPDATE public.sessions s
+     SET revoked_at = pg_catalog.now(), rotated_at = pg_catalog.now()
+   WHERE s.id = v_old.id;
+
+  v_expires := pg_catalog.now()
+    + CASE WHEN v_old.persistent THEN p_persistent_ttl ELSE p_session_ttl END;
+
+  INSERT INTO public.sessions (
+    user_id, platform_user_id, refresh_token_hash, client_type, terminal_id,
+    persistent, user_agent, ip, expires_at
+  ) VALUES (
+    v_old.user_id, v_old.platform_user_id, p_new_hash, v_old.client_type,
+    v_old.terminal_id, v_old.persistent, p_user_agent, p_ip, v_expires
+  )
+  RETURNING id INTO v_new_id;
+
+  RETURN QUERY SELECT 'rotated'::text, v_new_id, v_old.user_id,
+                      v_old.platform_user_id, v_old.client_type,
+                      v_old.terminal_id, v_old.persistent, v_expires;
+END;
+$$;
+
+-- Ends one session (logout). Possession of the refresh token is the proof, so no
+-- request context is needed. Returns false when there was nothing to revoke.
+CREATE OR REPLACE FUNCTION app.auth_revoke_session(p_token_hash text)
+RETURNS boolean
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  UPDATE public.sessions s
+     SET revoked_at = pg_catalog.now()
+   WHERE s.refresh_token_hash = p_token_hash
+     AND s.revoked_at IS NULL;
+  RETURN FOUND;
+END;
+$$;
+
+-- Ends every session of the actor in the current request context (logout-all,
+-- password change, ended membership). Returns how many were revoked.
+CREATE OR REPLACE FUNCTION app.auth_revoke_all_sessions(
+  p_user_id uuid,
+  p_platform_user_id uuid
+)
+RETURNS integer
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  IF pg_catalog.num_nonnulls(p_user_id, p_platform_user_id) <> 1
+     OR (p_user_id IS NOT NULL AND p_user_id IS DISTINCT FROM app.current_user_id())
+     OR (p_platform_user_id IS NOT NULL
+         AND p_platform_user_id IS DISTINCT FROM app.current_platform_user_id())
+  THEN
+    RAISE EXCEPTION 'session actor does not match the request context'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  UPDATE public.sessions s
+     SET revoked_at = pg_catalog.now()
+   WHERE s.revoked_at IS NULL
+     AND ((p_user_id IS NOT NULL AND s.user_id = p_user_id)
+       OR (p_platform_user_id IS NOT NULL AND s.platform_user_id = p_platform_user_id));
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;

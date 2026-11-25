@@ -1,298 +1,223 @@
 import {
-  BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { and, eq, gt, isNull, sql } from 'drizzle-orm';
+import type { ConfigType } from '@nestjs/config';
 import { createHash } from 'node:crypto';
-import { DatabaseService } from '../database/database.service';
-import {
-  businessMemberships,
-  business,
-  branches,
-  endpointRoleAccess,
-  roles,
-  terminals,
-  users,
-  ownerRedemptions,
-} from '../database/schemas';
-import type { AuthenticatedUser } from './strategies/jwt.strategy';
-import { ClientLoginDto, ClientType } from './dto/client-login.dto';
-import { UtilsService } from '../utils/utils.service';
-import { RedisService } from '../redis/redis.service';
-import { EndpointAccessCatalogService } from '../roles-permissions/endpoint-access-catalog.service';
-import { EffectivePermissionsCacheService } from '../roles-permissions/effective-permissions-cache.service';
-import bcrypt from 'bcryptjs';
-import type { OwnerRegistrationDto } from './dto/owner-registration.dto';
 import { AuditLogsService, type AuditRequestContext } from '../audit-logs';
+import type { AuthenticatedUser } from '../common/types';
+import {
+  generateOpaqueToken,
+  hashOpaqueToken,
+  isOpaqueTokenShape,
+} from '../common/utils/opaque-token.util';
+import { authConfig } from '../config';
+import { EffectivePermissionsService } from '../roles-permissions/effective-permissions.service';
+import {
+  AuthenticationRepository,
+  type AuthTransaction,
+} from './authentication.repository';
+import type { ClientLoginDto, ClientType } from './dto/client-login.dto';
+import type { OwnerRegistrationDto } from './dto/owner-registration.dto';
+import { PasswordService } from './password.service';
+import { SessionsRepository } from './sessions.repository';
+import { TokenService } from './token.service';
+import type {
+  ActiveMembership,
+  ActiveTerminal,
+  AuthMetadata,
+  UserAccount,
+  UserAuthResult,
+} from './types';
 
-type UserAuthTransaction = Parameters<
-  Parameters<DatabaseService['transaction']>[0]
->[0];
+const INVALID_CREDENTIALS = 'Invalid email or password';
+const INVALID_REFRESH = 'Invalid refresh token';
 
-interface UserRefreshSession {
-  accessToken: string;
-  effectivePermissions: string[];
-  user: { id: string; email: string; name: string };
-}
-
+/**
+ * Business-user authentication: password sign-in bound to a terminal, refresh
+ * with rotation and reuse detection (Postgres sessions), logout, logout-all,
+ * /me, and owner registration.
+ */
 @Injectable()
 export class AuthenticationService {
+  private readonly logger = new Logger(AuthenticationService.name);
+
   constructor(
-    private readonly db: DatabaseService,
-    private readonly jwtService: JwtService,
-    private readonly utilsService: UtilsService,
-    private readonly redisService: RedisService,
-    private readonly endpointCatalog: EndpointAccessCatalogService,
-    private readonly permissionsCache: EffectivePermissionsCacheService,
+    private readonly repository: AuthenticationRepository,
+    private readonly sessions: SessionsRepository,
+    private readonly passwords: PasswordService,
+    private readonly tokens: TokenService,
+    private readonly effectivePermissions: EffectivePermissionsService,
     private readonly auditLogs: AuditLogsService,
+    @Inject(authConfig.KEY)
+    private readonly config: ConfigType<typeof authConfig>,
   ) {}
 
-  async userLogin(
+  async login(
     dto: ClientLoginDto,
-    requestedTerminalId?: string,
-    auditContext: AuditRequestContext = {},
-  ) {
-    // Ensure email exists and is a string before processing
-    if (!dto.email || typeof dto.email !== 'string') {
-      throw new BadRequestException('Valid email is required');
-    }
-
-    // Ensure password exists and is a string before processing
-    if (!dto.password || typeof dto.password !== 'string') {
-      throw new BadRequestException('Valid password is required');
-    }
-
+    meta: AuthMetadata,
+  ): Promise<UserAuthResult> {
     const email = dto.email.trim().toLowerCase();
-    const expiresIn = dto.remember ? '7d' : '15m';
-    let identifiedUserId: string | undefined;
-    let identifiedBusinessId: string | undefined;
-
-    try {
-      return await this.db.transaction(async (tx) => {
-        // Login has no authenticated user context yet, so enable the platform
-        // read policy for the user lookup and optional terminal validation.
-        await tx.execute(sql`
-        SELECT set_config('app.is_platform_user', 'true', true)
-      `);
-
-        // Single optimized query to fetch user, memberships, and roles using JOINs
-        const userData = await tx
-          .select({
-            userId: users.id,
-            userEmail: users.emailNormalized,
-            userName: users.name,
-            userPasswordHash: users.passwordHash,
-            userStatus: users.status,
-            businessId: businessMemberships.businessId,
-            branchId: businessMemberships.branchId,
-            isOwner: businessMemberships.isOwner,
-            roleId: businessMemberships.roleId,
-            roleName: roles.name,
-            roleVersion: roles.version,
-            rolePermissions: roles.permissions,
-          })
-          .from(users)
-          .leftJoin(
-            businessMemberships,
-            and(
-              eq(users.id, businessMemberships.userId),
-              eq(businessMemberships.isActive, true),
-            ),
-          )
-          .leftJoin(roles, eq(businessMemberships.roleId, roles.id))
-          .where(
-            and(eq(users.emailNormalized, email), eq(users.status, 'active')),
-          );
-
-        // Check if user exists
-        if (userData.length === 0 || !userData[0].userId) {
-          throw new UnauthorizedException('Invalid email or password');
-        }
-
-        // Verify password using the first record
-        const firstRecord = userData[0];
-        identifiedUserId = firstRecord.userId;
-        identifiedBusinessId =
-          userData.find((record) => record.businessId)?.businessId ?? undefined;
-        if (
-          !(await bcrypt.compare(dto.password, firstRecord.userPasswordHash))
-        ) {
-          throw new UnauthorizedException('Invalid email or password');
-        }
-
-        let terminal:
-          | { terminalId: string; businessId: string; branchId: string }
-          | undefined;
-        if (requestedTerminalId) {
-          [terminal] = await tx
-            .select({
-              terminalId: terminals.id,
-              businessId: terminals.businessId,
-              branchId: terminals.branchId,
-            })
-            .from(terminals)
-            .innerJoin(
-              branches,
-              and(
-                eq(branches.id, terminals.branchId),
-                eq(branches.businessId, terminals.businessId),
-              ),
-            )
-            .where(
-              and(
-                eq(terminals.id, requestedTerminalId),
-                eq(terminals.status, 'active'),
-              ),
-            );
-        }
-
-        const selectedMembership = userData.find((record) =>
-          terminal
-            ? record.businessId === terminal.businessId &&
-              (record.branchId === null ||
-                record.branchId === terminal.branchId)
-            : record.businessId !== null,
-        );
-        if (!selectedMembership?.businessId) {
-          throw new UnauthorizedException('No active business membership');
-        }
-        if (requestedTerminalId && !terminal) {
-          throw new UnauthorizedException('Terminal is not active');
-        }
-
-        // Process the joined results to separate user data from memberships
-        const user = {
-          id: firstRecord.userId,
-          email: firstRecord.userEmail,
-          name: firstRecord.userName,
-        };
-
-        // Group membership data by businessId to avoid duplicates
-        const membershipMap = new Map();
-        userData.forEach((record) => {
-          if (record.businessId) {
-            const key = `${record.businessId}-${record.roleId}`;
-            if (!membershipMap.has(key)) {
-              membershipMap.set(key, {
-                businessId: record.businessId,
-                branchId: record.branchId,
-                isOwner: record.isOwner,
-                roleId: record.roleId,
-                role: record.roleName,
-                roleVersion: record.roleVersion,
-                permissions: this.readPermissions(record.rolePermissions),
-              });
-            }
-          }
-        });
-
-        const membershipsWithRoles = Array.from(membershipMap.values());
-
-        const activeMembership = {
-          ...membershipsWithRoles.find(
-            (membership) =>
-              membership.businessId === selectedMembership.businessId &&
-              (terminal === undefined ||
-                membership.branchId === null ||
-                membership.branchId === terminal.branchId),
-          ),
-          branchId: terminal?.branchId ?? selectedMembership.branchId,
-        };
-        const effectivePermissions = activeMembership.roleId
-          ? await this.getEffectivePermissions(
-              tx,
-              activeMembership.businessId,
-              activeMembership.roleId,
-              activeMembership.permissions,
-            )
-          : [];
-        if (activeMembership.roleId) {
-          await this.permissionsCache.set(
-            activeMembership.businessId,
-            activeMembership.roleId,
-            {
-              permissions: effectivePermissions,
-              roleVersion: activeMembership.roleVersion ?? null,
-            },
-          );
-        }
-        await tx.execute(sql`
-        SELECT
-          set_config('app.is_platform_user', 'false', true),
-          set_config('app.user_id', ${firstRecord.userId}, true),
-          set_config('app.business_id', ${activeMembership.businessId}, true),
-          set_config('app.branch_id', ${activeMembership.branchId ?? ''}, true)
-      `);
-        await this.auditLogs.insertUserEvent(tx, {
-          ...auditContext,
-          userId: user.id,
-          businessId: activeMembership.businessId,
-          terminalId: requestedTerminalId,
-          eventType: 'USER_LOGIN_SUCCESS',
-          responseStatus: 200,
-        });
-        const accessToken = await this.jwtService.signAsync(
-          {
-            sub: user.id,
-            name: user.name,
-            isPlatform: false,
-            businessId: activeMembership.businessId,
-            branchId: activeMembership.branchId ?? undefined,
-            isOwner: activeMembership.isOwner,
-            ...(activeMembership.roleId
-              ? {
-                  role_id: activeMembership.roleId,
-                  role_version: activeMembership.roleVersion ?? undefined,
-                }
-              : {}),
-          },
-          { expiresIn },
-        );
-
-        // Generate refresh token if remember is true
-        let refreshToken: string | undefined;
-        if (dto.remember) {
-          refreshToken = this.utilsService.generateRefreshToken();
-          // Store refresh token in Redis with 7-day expiration
-          await this.redisService.set(
-            `refresh_token:${refreshToken}`,
-            user.id,
-            7 * 24 * 60 * 60,
-          );
-        }
-
-        return {
-          accessToken,
-          ...(refreshToken && { refreshToken }),
-          tokenType: 'Bearer',
-          expiresIn,
-          user,
-          memberships: membershipsWithRoles.map(
-            ({ permissions: _permissions, ...membership }) => membership,
-          ),
-          effectivePermissions,
-        };
-      });
-    } catch (error) {
-      if (identifiedUserId) {
-        await this.auditLogs.logUserEvent(
-          { userId: identifiedUserId, businessId: identifiedBusinessId },
-          {
-            ...auditContext,
-            userId: identifiedUserId,
-            businessId: identifiedBusinessId,
-            terminalId: requestedTerminalId,
-            eventType: 'USER_LOGIN_FAILED',
-            responseStatus: 401,
-          },
-        );
-      }
-      throw error;
+    const credential = await this.repository.findCredentialByEmail(email);
+    if (!credential) {
+      await this.passwords.verifyAgainstDummy(dto.password);
+      throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
+
+    const check = await this.passwords.verify(
+      credential.passwordHash,
+      dto.password,
+    );
+    if (!check.valid || credential.status !== 'active') {
+      await this.auditFailure(
+        credential.id,
+        undefined,
+        meta,
+        'USER_LOGIN_FAILED',
+      );
+      throw new UnauthorizedException(INVALID_CREDENTIALS);
+    }
+    if (check.needsRehash) {
+      await this.rehash(credential.id, dto.password);
+    }
+
+    const account: UserAccount = {
+      id: credential.id,
+      email: credential.email,
+      name: credential.name,
+      status: credential.status,
+    };
+    const binding = await this.bindMembership(account.id, meta.terminalId);
+    if (!binding.ok) {
+      await this.auditFailure(account.id, undefined, meta, 'USER_LOGIN_FAILED');
+      throw new UnauthorizedException(binding.reason);
+    }
+
+    const persistent = dto.remember === true;
+    const refreshToken = generateOpaqueToken();
+    await this.sessions.create(
+      { userId: account.id },
+      {
+        tokenHash: hashOpaqueToken(refreshToken),
+        clientType: meta.clientType,
+        terminalId: binding.terminal?.id ?? null,
+        persistent,
+        userAgent: meta.userAgent ?? null,
+        ip: meta.ip ?? null,
+        expiresAt: new Date(Date.now() + this.refreshTtlMs(persistent)),
+      },
+    );
+
+    const result = await this.issue(account, binding, refreshToken, persistent);
+    await this.auditLogs.logUserEvent(
+      { userId: account.id, businessId: binding.membership.businessId },
+      {
+        ...meta.audit,
+        userId: account.id,
+        businessId: binding.membership.businessId,
+        terminalId: binding.terminal?.id,
+        eventType: 'USER_LOGIN_SUCCESS',
+        responseStatus: 200,
+      },
+    );
+    return result;
+  }
+
+  /**
+   * Swaps a refresh token for a new pair. A replayed (already rotated) token
+   * revokes every session of the user; any failure is a plain 401.
+   */
+  async refresh(
+    refreshToken: string | undefined,
+    meta: AuthMetadata,
+  ): Promise<UserAuthResult> {
+    if (!isOpaqueTokenShape(refreshToken)) {
+      throw new UnauthorizedException(INVALID_REFRESH);
+    }
+
+    const nextToken = generateOpaqueToken();
+    const nextHash = hashOpaqueToken(nextToken);
+    const rotation = await this.sessions.rotate({
+      oldHash: hashOpaqueToken(refreshToken),
+      newHash: nextHash,
+      userAgent: meta.userAgent ?? null,
+      ip: meta.ip ?? null,
+      persistentTtlSeconds: this.config.refreshPersistentTtlSeconds,
+      sessionTtlSeconds: this.config.refreshSessionTtlSeconds,
+    });
+
+    if (rotation.outcome === 'reuse' && rotation.userId) {
+      await this.auditFailure(
+        rotation.userId,
+        undefined,
+        meta,
+        'USER_REFRESH_TOKEN_REUSE_DETECTED',
+      );
+    }
+    if (rotation.outcome !== 'rotated' || !rotation.userId) {
+      if (rotation.outcome === 'rotated') await this.sessions.revoke(nextHash);
+      throw new UnauthorizedException(INVALID_REFRESH);
+    }
+
+    const userId = rotation.userId;
+    const fail = async (reason: string): Promise<never> => {
+      await this.sessions.revoke(nextHash);
+      await this.auditFailure(
+        userId,
+        undefined,
+        meta,
+        'USER_TOKEN_REFRESH_FAILED',
+      );
+      throw new UnauthorizedException(reason);
+    };
+
+    if (meta.terminalId && meta.terminalId !== rotation.terminalId) {
+      return fail(INVALID_REFRESH);
+    }
+    const account = await this.repository.findAccount(userId);
+    if (!account || account.status !== 'active') return fail(INVALID_REFRESH);
+
+    const binding = await this.bindMembership(
+      userId,
+      rotation.terminalId ?? undefined,
+    );
+    if (!binding.ok) return fail(binding.reason);
+
+    const result = await this.issue(
+      account,
+      binding,
+      nextToken,
+      rotation.persistent,
+    );
+    await this.auditLogs.logUserEvent(
+      { userId, businessId: binding.membership.businessId },
+      {
+        ...meta.audit,
+        userId,
+        businessId: binding.membership.businessId,
+        terminalId: binding.terminal?.id,
+        eventType: 'USER_TOKEN_REFRESHED',
+        responseStatus: 200,
+      },
+    );
+    return result;
+  }
+
+  /** Ends the session of this refresh token. Unknown tokens are ignored. */
+  async logout(refreshToken: string | undefined): Promise<void> {
+    if (!isOpaqueTokenShape(refreshToken)) return;
+    await this.sessions.revoke(hashOpaqueToken(refreshToken));
+  }
+
+  /** Ends every session of the signed-in user. */
+  async logoutAll(user: AuthenticatedUser): Promise<{ revoked: number }> {
+    if (!user.userId) throw new UnauthorizedException();
+    const revoked = await this.sessions.revokeAll({ userId: user.userId });
+    return { revoked };
   }
 
   async getCurrentUser(
@@ -301,47 +226,36 @@ export class AuthenticationService {
     requestedTerminalId?: string,
     initialLoad = true,
   ) {
-    const { userId, businessId, branchId, name, roleId, roleVersion } =
+    const { userId, businessId, branchId, roleId, roleVersion } =
       authenticatedUser;
-    if (!userId || authenticatedUser.isPlatform || name === undefined) {
+    if (!userId || authenticatedUser.isPlatform) {
       throw new UnauthorizedException('A user access token is required');
     }
+
+    // The access token is stateless: re-check that the account and the
+    // membership it was issued for are still active.
+    const account = await this.repository.findAccount(userId);
+    if (!account || account.status !== 'active') {
+      throw new UnauthorizedException('Account is not active');
+    }
+    const memberships = await this.repository.listActiveMemberships(userId);
+    if (
+      businessId &&
+      !memberships.some((membership) => membership.businessId === businessId)
+    ) {
+      throw new UnauthorizedException('Business membership is not active');
+    }
+
     let effectivePermissions: string[] | undefined;
     let currentRoleVersion = roleVersion;
     if (initialLoad) {
       effectivePermissions = [];
       if (businessId && roleId) {
-        let snapshot = await this.permissionsCache.get(businessId, roleId);
-        if (!snapshot) {
-          snapshot = await this.db.transactionWithSession(
-            authenticatedUser,
-            async (tx) => {
-              const [role] = await tx
-                .select({
-                  permissions: roles.permissions,
-                  version: roles.version,
-                })
-                .from(roles)
-                .where(eq(roles.id, roleId))
-                .limit(1);
-              if (!role) return null;
-
-              const permissions = await this.getEffectivePermissions(
-                tx,
-                businessId,
-                roleId,
-                this.readPermissions(role.permissions),
-              );
-              return {
-                permissions,
-                roleVersion: role.version,
-              };
-            },
-          );
-          if (snapshot) {
-            await this.permissionsCache.set(businessId, roleId, snapshot);
-          }
-        }
+        const snapshot = await this.effectivePermissions.resolve({
+          userId,
+          businessId,
+          roleId,
+        });
         if (snapshot) {
           effectivePermissions = snapshot.permissions;
           currentRoleVersion = snapshot.roleVersion ?? roleVersion;
@@ -354,21 +268,20 @@ export class AuthenticationService {
     const issuedAt = authenticatedUser.tokenIssuedAt;
 
     return {
-      user: {
-        id: userId,
-        name,
-      },
+      user: { id: userId, email: account.email, name: account.name },
       activeContext: businessId
         ? { businessId, branchId: branchId ?? null }
         : null,
       is_owner: authenticatedUser.isOwner === true,
       role_template: roleId ?? null,
       role_template_version:
-        currentRoleVersion === undefined ? null : String(currentRoleVersion),
+        currentRoleVersion === undefined || currentRoleVersion === null
+          ? null
+          : String(currentRoleVersion),
       ...(effectivePermissions && { effectivePermissions }),
       session: {
         clientType,
-        terminalId: requestedTerminalId ?? null,
+        terminalId: authenticatedUser.terminalId ?? requestedTerminalId ?? null,
         issuedAt: issuedAt ? new Date(issuedAt * 1000).toISOString() : null,
         expiresAt: tokenExpiresAt
           ? new Date(tokenExpiresAt * 1000).toISOString()
@@ -381,6 +294,11 @@ export class AuthenticationService {
     };
   }
 
+  /**
+   * First owner of a provisioned business: redeems the emailed code, creates (or
+   * re-authenticates) the account, adds the owner membership, activates the
+   * business and its first terminal, all in one transaction. Issues no tokens.
+   */
   async registerOwner(
     dto: OwnerRegistrationDto,
     auditContext: AuditRequestContext = {},
@@ -389,32 +307,15 @@ export class AuthenticationService {
     const tokenHash = createHash('sha256')
       .update(dto.redeemCode.trim())
       .digest('hex');
+    const terminalCode = dto.terminalCode.trim().toUpperCase();
 
     try {
-      return await this.db.transactionWithSession({}, async (tx) => {
-        await tx.execute(sql`
-          SELECT
-            set_config('app.owner_redemption_hash', ${tokenHash}, true),
-            set_config('app.registration_email', ${email}, true)
-        `);
-
-        const [redemption] = await tx
-          .select({
-            id: ownerRedemptions.id,
-            businessId: ownerRedemptions.businessId,
-            email: ownerRedemptions.emailNormalized,
-          })
-          .from(ownerRedemptions)
-          .where(
-            and(
-              eq(ownerRedemptions.tokenHash, tokenHash),
-              isNull(ownerRedemptions.consumedAt),
-              isNull(ownerRedemptions.revokedAt),
-              gt(ownerRedemptions.expiresAt, new Date()),
-            ),
-          )
-          .limit(1)
-          .for('update');
+      return await this.repository.inRegistrationTransaction(async (tx) => {
+        await this.repository.setRedemptionContext(tx, { tokenHash, email });
+        const redemption = await this.repository.lockOpenRedemption(
+          tx,
+          tokenHash,
+        );
         if (!redemption || redemption.email !== email) {
           throw new UnauthorizedException('Invalid or expired redemption code');
         }
@@ -424,109 +325,46 @@ export class AuthenticationService {
           );
         }
 
-        await tx.execute(sql`
-          SELECT
-            set_config('app.business_id', ${redemption.businessId}, true),
-            set_config('app.is_owner', 'true', true)
-        `);
-        const [businessRecord] = await tx
-          .select({ id: business.id, isActive: business.isActive })
-          .from(business)
-          .where(eq(business.id, redemption.businessId))
-          .limit(1);
-        if (!businessRecord)
+        await this.repository.setBusinessContext(tx, redemption.businessId);
+        const businessState = await this.repository.findBusinessState(
+          tx,
+          redemption.businessId,
+        );
+        if (!businessState)
           throw new NotFoundException('Business was not found');
-        if (businessRecord.isActive) {
+        if (businessState.isActive) {
           throw new ConflictException('Business has already been activated');
         }
 
-        const [existingUser] = await tx
-          .select({
-            id: users.id,
-            passwordHash: users.passwordHash,
-            status: users.status,
-          })
-          .from(users)
-          .where(eq(users.emailNormalized, email))
-          .limit(1);
+        const userId = await this.resolveOwnerAccount(tx, email, dto);
 
-        let userId: string;
-        if (existingUser) {
-          if (
-            existingUser.status !== 'active' ||
-            !(await bcrypt.compare(dto.password, existingUser.passwordHash))
-          ) {
-            throw new UnauthorizedException('Invalid email or password');
-          }
-          userId = existingUser.id;
-        } else {
-          const passwordHash = await bcrypt.hash(dto.password, 10);
-          const [createdUser] = await tx
-            .insert(users)
-            .values({
-              emailNormalized: email,
-              passwordHash,
-              name: dto.name.trim(),
-              status: 'active',
-            })
-            .returning({ id: users.id });
-          if (!createdUser) throw new Error('Owner user could not be created');
-          userId = createdUser.id;
-        }
-
-        await tx.execute(sql`
-          SELECT
-            set_config('app.user_id', ${userId}, true),
-            set_config('app.is_platform_user', 'false', true),
-            set_config('app.branch_id', '', true)
-        `);
-        await tx.insert(businessMemberships).values({
+        await this.repository.setUserContext(tx, userId);
+        await this.repository.insertOwnerMembership(tx, {
           businessId: redemption.businessId,
           userId,
-          roleId: null,
-          branchId: null,
-          isOwner: true,
-          isActive: true,
         });
-        await tx
-          .update(business)
-          .set({ isActive: true, updatedAt: new Date() })
-          .where(eq(business.id, redemption.businessId));
-        await tx.execute(sql`
-          SELECT
-            set_config('app.terminal_activation_business_id', ${dto.businessId}, true),
-            set_config('app.terminal_activation_branch_id', ${dto.branchId}, true),
-            set_config('app.terminal_activation_code', ${dto.terminalCode.trim().toUpperCase()}, true),
-            set_config('app.owner_redemption_hash', ${tokenHash}, true)
-        `);
-        const [initialTerminal] = await tx
-          .select({
-            terminalId: terminals.id,
-            branchId: terminals.branchId,
-          })
-          .from(terminals)
-          .where(
-            and(
-              eq(terminals.businessId, redemption.businessId),
-              eq(terminals.branchId, dto.branchId),
-              eq(terminals.terminalCode, dto.terminalCode.trim().toUpperCase()),
-              eq(terminals.status, 'inactive'),
-            ),
-          )
-          .limit(1);
+        await this.repository.activateBusiness(tx, redemption.businessId);
+        await this.repository.setTerminalActivationContext(tx, {
+          businessId: dto.businessId,
+          branchId: dto.branchId,
+          terminalCode,
+          tokenHash,
+        });
+        const initialTerminal = await this.repository.findInactiveTerminal(tx, {
+          businessId: redemption.businessId,
+          branchId: dto.branchId,
+          terminalCode,
+        });
         if (!initialTerminal) {
           throw new ConflictException(
             'Terminal activation details are invalid or the terminal is already active',
           );
         }
-        await tx
-          .update(terminals)
-          .set({ status: 'active', updatedAt: new Date() })
-          .where(eq(terminals.id, initialTerminal.terminalId));
-        await tx
-          .update(ownerRedemptions)
-          .set({ consumedAt: new Date(), consumedByUserId: userId })
-          .where(eq(ownerRedemptions.id, redemption.id));
+        await this.repository.activateTerminal(tx, initialTerminal.terminalId);
+        await this.repository.consumeRedemption(tx, {
+          redemptionId: redemption.id,
+          userId,
+        });
         await this.auditLogs.insertUserEvent(tx, {
           ...auditContext,
           userId,
@@ -563,278 +401,165 @@ export class AuthenticationService {
     }
   }
 
-  private readPermissions(value: unknown): string[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    return value.filter(
-      (permission): permission is string => typeof permission === 'string',
+  private async resolveOwnerAccount(
+    tx: AuthTransaction,
+    email: string,
+    dto: OwnerRegistrationDto,
+  ): Promise<string> {
+    const existing = await this.repository.findUserByEmailForRegistration(
+      tx,
+      email,
     );
-  }
-
-  private async getEffectivePermissions(
-    tx: UserAuthTransaction,
-    businessId: string,
-    roleId: string,
-    rolePermissions: string[],
-  ): Promise<string[]> {
-    const configurations = await tx
-      .select({
-        endpointKey: endpointRoleAccess.endpointKey,
-        roleId: endpointRoleAccess.roleId,
-      })
-      .from(endpointRoleAccess)
-      .where(eq(endpointRoleAccess.businessId, businessId));
-
-    const configuredRolesByEndpoint = new Map<string, Set<string>>();
-    for (const configuration of configurations) {
-      const roleIds =
-        configuredRolesByEndpoint.get(configuration.endpointKey) ??
-        new Set<string>();
-      roleIds.add(configuration.roleId);
-      configuredRolesByEndpoint.set(configuration.endpointKey, roleIds);
-    }
-
-    const effectivePermissions = new Set<string>();
-    const catalog = this.endpointCatalog.list();
-    const catalogKeys = new Set(catalog.map((entry) => entry.endpointKey));
-    for (const permission of rolePermissions) {
-      const allowedRoleIds = configuredRolesByEndpoint.get(permission);
-      if (
-        !catalogKeys.has(permission) ||
-        !allowedRoleIds ||
-        allowedRoleIds.has(roleId)
-      ) {
-        effectivePermissions.add(permission);
-      }
-    }
-    for (const endpoint of catalog) {
-      const allowedRoleIds = configuredRolesByEndpoint.get(
-        endpoint.endpointKey,
+    if (existing) {
+      const check = await this.passwords.verify(
+        existing.passwordHash,
+        dto.password,
       );
-      if (!allowedRoleIds || allowedRoleIds.has(roleId)) {
-        effectivePermissions.add(endpoint.endpointKey);
+      if (existing.status !== 'active' || !check.valid) {
+        throw new UnauthorizedException(INVALID_CREDENTIALS);
       }
+      return existing.id;
     }
-
-    return [...effectivePermissions].sort();
+    const created = await this.repository.insertUser(tx, {
+      email,
+      passwordHash: await this.passwords.hash(dto.password),
+      name: dto.name.trim(),
+    });
+    if (!created) throw new Error('Owner user could not be created');
+    return created;
   }
 
   /**
-   * Invalidates a refresh token
-   * @param refreshToken Refresh token to invalidate
+   * Picks the membership a session works under. With a terminal, the membership
+   * must belong to the terminal's business and cover its branch.
    */
-  async invalidateRefreshToken(refreshToken: string): Promise<void> {
-    await this.redisService.delete(`refresh_token:${refreshToken}`);
-  }
-
-  async invalidateRefreshTokenForSession(
-    refreshToken: string,
+  private async bindMembership(
     userId: string,
-  ): Promise<void> {
-    await this.redisService.compareAndDelete(
-      `refresh_token:${refreshToken}`,
-      userId,
+    terminalId: string | undefined,
+  ): Promise<
+    | {
+        ok: true;
+        membership: ActiveMembership;
+        memberships: ActiveMembership[];
+        terminal: ActiveTerminal | null;
+      }
+    | { ok: false; reason: string }
+  > {
+    const memberships = await this.repository.listActiveMemberships(userId);
+    const terminal = terminalId
+      ? await this.repository.findActiveTerminal(terminalId)
+      : null;
+    if (terminalId && !terminal) {
+      return { ok: false, reason: 'Terminal is not active' };
+    }
+    const membership = memberships.find((candidate) =>
+      terminal
+        ? candidate.businessId === terminal.businessId &&
+          (candidate.isOwner ||
+            candidate.branchId === null ||
+            candidate.branchId === terminal.branchId)
+        : true,
     );
+    if (!membership) {
+      return { ok: false, reason: 'No active business membership' };
+    }
+    return { ok: true, membership, memberships, terminal };
   }
 
-  /**
-   * Refreshes the access token using a valid refresh token
-   * @param refreshToken Refresh token
-   * @returns New access token and optional new refresh token
-   */
-  async refreshAccessToken(
+  private async issue(
+    account: UserAccount,
+    binding: {
+      membership: ActiveMembership;
+      memberships: ActiveMembership[];
+      terminal: ActiveTerminal | null;
+    },
     refreshToken: string,
-    requestedTerminalId?: string,
-    auditContext: AuditRequestContext = {},
-  ): Promise<{
-    accessToken: string;
-    refreshToken: string;
-    tokenType: 'Bearer';
-    expiresIn: '15m';
-    user: { id: string; email: string; name: string };
-    effectivePermissions: string[];
-  }> {
-    // Check if refresh token exists in Redis
-    const userId = await this.redisService.get(`refresh_token:${refreshToken}`);
-    if (!userId) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    let session: UserRefreshSession;
-    try {
-      session = await this.db.transaction(async (tx) => {
-        await tx.execute(sql`
-        SELECT set_config('app.is_platform_user', 'true', true)
-      `);
-
-        const userRows = await tx
-          .select({
-            userId: users.id,
-            email: users.emailNormalized,
-            name: users.name,
-            status: users.status,
-            businessId: businessMemberships.businessId,
-            branchId: businessMemberships.branchId,
-            isOwner: businessMemberships.isOwner,
-            roleId: roles.id,
-            roleVersion: roles.version,
-            permissions: roles.permissions,
-          })
-          .from(users)
-          .leftJoin(
-            businessMemberships,
-            and(
-              eq(businessMemberships.userId, users.id),
-              eq(businessMemberships.isActive, true),
-            ),
-          )
-          .leftJoin(roles, eq(roles.id, businessMemberships.roleId))
-          .where(and(eq(users.id, userId), eq(users.status, 'active')));
-
-        const user = userRows[0];
-        if (!user) {
-          throw new UnauthorizedException('User not found');
-        }
-
-        let terminal:
-          | { terminalId: string; businessId: string; branchId: string }
-          | undefined;
-        if (requestedTerminalId) {
-          [terminal] = await tx
-            .select({
-              terminalId: terminals.id,
-              businessId: terminals.businessId,
-              branchId: terminals.branchId,
-            })
-            .from(terminals)
-            .innerJoin(
-              branches,
-              and(
-                eq(branches.id, terminals.branchId),
-                eq(branches.businessId, terminals.businessId),
-              ),
-            )
-            .where(
-              and(
-                eq(terminals.id, requestedTerminalId),
-                eq(terminals.status, 'active'),
-              ),
-            );
-        }
-
-        const membership = userRows.find((row) =>
-          terminal
-            ? row.businessId === terminal.businessId &&
-              (row.branchId === null || row.branchId === terminal.branchId)
-            : row.businessId !== null,
-        );
-        if (!membership?.businessId) {
-          throw new UnauthorizedException('No active business membership');
-        }
-        if (requestedTerminalId && !terminal) {
-          throw new UnauthorizedException('Terminal is not active');
-        }
-        const activeBranchId = terminal?.branchId ?? membership.branchId;
-
-        const effectivePermissions = membership.roleId
-          ? await this.getEffectivePermissions(
-              tx,
-              membership.businessId!,
-              membership.roleId,
-              this.readPermissions(membership.permissions),
-            )
-          : [];
-        if (membership.roleId) {
-          await this.permissionsCache.set(
-            membership.businessId!,
-            membership.roleId,
-            {
-              permissions: effectivePermissions,
-              roleVersion: membership.roleVersion ?? null,
-            },
-          );
-        }
-
-        await tx.execute(sql`
-        SELECT
-          set_config('app.is_platform_user', 'false', true),
-          set_config('app.user_id', ${user.userId}, true),
-          set_config('app.business_id', ${membership.businessId!}, true),
-          set_config('app.branch_id', ${activeBranchId ?? ''}, true)
-      `);
-        await this.auditLogs.insertUserEvent(tx, {
-          ...auditContext,
-          userId: user.userId,
+    persistent: boolean,
+  ): Promise<UserAuthResult> {
+    const { membership, terminal } = binding;
+    const snapshot = membership.roleId
+      ? await this.effectivePermissions.resolve({
+          userId: account.id,
           businessId: membership.businessId,
-          terminalId: requestedTerminalId,
-          eventType: 'USER_TOKEN_REFRESHED',
-          responseStatus: 200,
-        });
+          roleId: membership.roleId,
+        })
+      : null;
+    const branchId = terminal?.branchId ?? membership.branchId ?? undefined;
+    const roleVersion = snapshot?.roleVersion ?? membership.roleVersion;
 
-        const accessToken = await this.jwtService.signAsync(
-          {
-            sub: user.userId,
-            name: user.name,
-            isPlatform: false,
-            businessId: membership.businessId,
-            branchId: activeBranchId ?? undefined,
-            isOwner: membership.isOwner,
-            ...(membership.roleId
-              ? {
-                  role_id: membership.roleId,
-                  role_version: membership.roleVersion ?? undefined,
-                }
-              : {}),
-          },
-          { expiresIn: '15m' },
-        );
-
-        return {
-          accessToken,
-          effectivePermissions,
-          user: {
-            id: user.userId,
-            email: user.email,
-            name: user.name,
-          },
-        };
-      });
-    } catch (error) {
-      await this.auditLogs.logUserEvent(
-        { userId },
-        {
-          ...auditContext,
-          userId,
-          terminalId: requestedTerminalId,
-          eventType: 'USER_TOKEN_REFRESH_FAILED',
-          responseStatus: error instanceof UnauthorizedException ? 401 : 500,
-        },
-      );
-      throw error;
-    }
-
-    // Optionally generate a new refresh token (refresh token rotation)
-    // This adds an extra layer of security by rotating refresh tokens
-    const newRefreshToken = this.utilsService.generateRefreshToken();
-    await this.redisService.set(
-      `refresh_token:${newRefreshToken}`,
-      userId,
-      7 * 24 * 60 * 60,
-    );
-
-    // Invalidate the old refresh token
-    await this.invalidateRefreshToken(refreshToken);
+    const access = await this.tokens.signUserToken({
+      sub: account.id,
+      email: account.email,
+      name: account.name,
+      businessId: membership.businessId,
+      branchId,
+      terminalId: terminal?.id,
+      isOwner: membership.isOwner,
+      ...(membership.roleId
+        ? {
+            role_id: membership.roleId,
+            role_version: roleVersion ?? undefined,
+          }
+        : {}),
+    });
 
     return {
-      accessToken: session.accessToken,
-      refreshToken: newRefreshToken,
+      accessToken: access.token,
+      refreshToken,
+      refreshMaxAgeMs: persistent ? this.refreshTtlMs(true) : undefined,
       tokenType: 'Bearer',
-      expiresIn: '15m',
-      user: session.user,
-      effectivePermissions: session.effectivePermissions,
+      expiresIn: access.expiresIn,
+      user: { id: account.id, email: account.email, name: account.name },
+      memberships: binding.memberships.map((item) => ({
+        businessId: item.businessId,
+        branchId: item.branchId,
+        isOwner: item.isOwner,
+        roleId: item.roleId,
+        role: item.roleName,
+        roleVersion: item.roleVersion,
+      })),
+      effectivePermissions: snapshot?.permissions ?? [],
     };
+  }
+
+  private refreshTtlMs(persistent: boolean): number {
+    return (
+      (persistent
+        ? this.config.refreshPersistentTtlSeconds
+        : this.config.refreshSessionTtlSeconds) * 1000
+    );
+  }
+
+  private async rehash(userId: string, password: string): Promise<void> {
+    try {
+      await this.repository.updatePasswordHash(
+        userId,
+        await this.passwords.hash(password),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not upgrade the password hash of user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private auditFailure(
+    userId: string,
+    businessId: string | undefined,
+    meta: AuthMetadata,
+    eventType: string,
+  ): Promise<void> {
+    return this.auditLogs.logUserEvent(
+      { userId, businessId },
+      {
+        ...meta.audit,
+        userId,
+        businessId,
+        terminalId: meta.terminalId,
+        eventType,
+        responseStatus: 401,
+      },
+    );
   }
 }
 

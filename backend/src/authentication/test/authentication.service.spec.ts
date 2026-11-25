@@ -1,1221 +1,288 @@
 import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
-import { Test, TestingModule } from '@nestjs/testing';
+import { UnauthorizedException } from '@nestjs/common';
+import type { AuthConfig } from '../../config';
 import { AuthenticationService } from '../authentication.service';
-import { DatabaseService } from '../../database/database.service';
-import { JwtService } from '@nestjs/jwt';
-import { UtilsService } from '../../utils/utils.service';
-import { RedisService } from '../../redis/redis.service';
-import { ClientLoginDto, ClientType } from '../dto/client-login.dto';
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
-import bcrypt from 'bcryptjs';
-import { EndpointAccessCatalogService } from '../../roles-permissions/endpoint-access-catalog.service';
-import { EffectivePermissionsCacheService } from '../../roles-permissions/effective-permissions-cache.service';
-import { AuditLogsService } from '../../audit-logs';
+import { ClientType } from '../dto/client-login.dto';
+import type { AuthMetadata } from '../types';
 
-describe('AuthenticationService', () => {
-  let service: AuthenticationService;
-  let dbMock: any;
-  let jwtServiceMock: any;
-  let utilsServiceMock: any;
-  let redisServiceMock: any;
-  let endpointCatalogMock: { list: jest.Mock };
-  let permissionsCacheMock: {
-    get: jest.Mock;
-    set: jest.Mock;
-    invalidate: jest.Mock;
+const USER = '00000000-0000-4000-8000-000000000001';
+const BUSINESS = '00000000-0000-4000-8000-000000000002';
+const BRANCH = '00000000-0000-4000-8000-000000000003';
+const TERMINAL = '00000000-0000-4000-8000-000000000004';
+const TOKEN = 'a'.repeat(43);
+
+const config: AuthConfig = {
+  jwtSecret: 'x'.repeat(32),
+  accessTtl: '15m',
+  accessTtlSeconds: 900,
+  issuer: 'i',
+  audience: 'a',
+  platformAudience: 'p',
+  refreshPersistentTtlSeconds: 1000,
+  refreshSessionTtlSeconds: 100,
+};
+
+const meta = (overrides: Partial<AuthMetadata> = {}): AuthMetadata => ({
+  clientType: ClientType.DESKTOP,
+  terminalId: TERMINAL,
+  audit: {},
+  ...overrides,
+});
+
+const membership = {
+  membershipId: 'm1',
+  businessId: BUSINESS,
+  branchId: null,
+  isOwner: true,
+  roleId: null,
+  roleName: null,
+  roleVersion: null,
+};
+
+function setup() {
+  const repository = {
+    findCredentialByEmail: jest.fn().mockResolvedValue({
+      id: USER,
+      email: 'owner@fortis.test',
+      name: 'Owner',
+      passwordHash: 'stored',
+      status: 'active',
+    }),
+    findAccount: jest.fn().mockResolvedValue({
+      id: USER,
+      email: 'owner@fortis.test',
+      name: 'Owner',
+      status: 'active',
+    }),
+    listActiveMemberships: jest.fn().mockResolvedValue([membership]),
+    findActiveTerminal: jest.fn().mockResolvedValue({
+      id: TERMINAL,
+      businessId: BUSINESS,
+      branchId: BRANCH,
+    }),
+    updatePasswordHash: jest.fn().mockResolvedValue(undefined),
   };
-  const auditLogsMock = {
-    insertUserEvent: jest.fn().mockResolvedValue(undefined),
+  const sessions = {
+    create: jest.fn().mockResolvedValue('session-1'),
+    rotate: jest.fn(),
+    revoke: jest.fn().mockResolvedValue(true),
+    revokeAll: jest.fn().mockResolvedValue(3),
+  };
+  const passwords = {
+    verify: jest.fn().mockResolvedValue({ valid: true, needsRehash: false }),
+    verifyAgainstDummy: jest.fn().mockResolvedValue(false),
+    hash: jest.fn().mockResolvedValue('new-hash'),
+  };
+  const tokens = {
+    signUserToken: jest.fn().mockResolvedValue({
+      token: 'jwt',
+      expiresIn: '15m',
+      expiresInSeconds: 900,
+    }),
+  };
+  const effective = { resolve: jest.fn().mockResolvedValue(null) };
+  const audit = {
     logUserEvent: jest.fn().mockResolvedValue(undefined),
+    insertUserEvent: jest.fn(),
   };
+  const service = new AuthenticationService(
+    repository as never,
+    sessions as never,
+    passwords as never,
+    tokens as never,
+    effective as never,
+    audit as never,
+    config,
+  );
+  return { service, repository, sessions, passwords, tokens, audit };
+}
 
-  beforeEach(async () => {
-    // Mock dependencies
-    dbMock = {
-      transaction: jest.fn(),
-      transactionWithSession: jest.fn(),
-      execute: jest.fn(),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          leftJoin: jest.fn().mockReturnValue({
-            leftJoin: jest.fn().mockReturnValue({
-              where: jest.fn().mockReturnValue([]),
-            }),
-          }),
-        }),
+describe('AuthenticationService.login', () => {
+  it('signs in, binds the terminal branch and stores only the token hash', async () => {
+    const { service, sessions, tokens } = setup();
+    const result = await service.login(
+      { email: ' Owner@Fortis.Test ', password: 'pw', remember: true },
+      meta(),
+    );
+
+    expect(tokens.signUserToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: USER,
+        businessId: BUSINESS,
+        branchId: BRANCH,
+        terminalId: TERMINAL,
+        isOwner: true,
       }),
-    };
-
-    jwtServiceMock = {
-      signAsync: jest.fn(),
-    };
-
-    utilsServiceMock = {
-      generateRefreshToken: jest.fn(),
-    };
-
-    redisServiceMock = {
-      set: jest.fn(),
-      get: jest.fn(),
-      delete: jest.fn(),
-    };
-    endpointCatalogMock = {
-      list: jest
-        .fn()
-        .mockReturnValue([
-          { endpointKey: 'inventory.create' },
-          { endpointKey: 'inventory.delete' },
-          { endpointKey: 'catalog.view' },
-        ]),
-    };
-    permissionsCacheMock = {
-      get: jest.fn().mockResolvedValue(null),
-      set: jest.fn().mockResolvedValue(undefined),
-      invalidate: jest.fn().mockResolvedValue(undefined),
-    };
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuthenticationService,
-        {
-          provide: DatabaseService,
-          useValue: dbMock,
-        },
-        {
-          provide: JwtService,
-          useValue: jwtServiceMock,
-        },
-        {
-          provide: UtilsService,
-          useValue: utilsServiceMock,
-        },
-        {
-          provide: RedisService,
-          useValue: redisServiceMock,
-        },
-        {
-          provide: EndpointAccessCatalogService,
-          useValue: endpointCatalogMock,
-        },
-        {
-          provide: EffectivePermissionsCacheService,
-          useValue: permissionsCacheMock,
-        },
-        { provide: AuditLogsService, useValue: auditLogsMock },
-      ],
-    }).compile();
-
-    service = module.get<AuthenticationService>(AuthenticationService);
-
-    // Clear all mocks before each test
-    jest.clearAllMocks();
-    auditLogsMock.insertUserEvent.mockResolvedValue(undefined);
+    );
+    const [actor, session] = sessions.create.mock.calls[0];
+    expect(actor).toEqual({ userId: USER });
+    expect(session).toMatchObject({ persistent: true, terminalId: TERMINAL });
+    expect(session.tokenHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(session.tokenHash).not.toBe(result.refreshToken);
+    expect(result.refreshMaxAgeMs).toBe(1_000_000);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  it('uses a browser-session cookie lifetime when not remembered', async () => {
+    const { service } = setup();
+    const result = await service.login(
+      { email: 'o@f.t', password: 'pw', remember: false },
+      meta({ clientType: ClientType.WEB, terminalId: undefined }),
+    );
+    expect(result.refreshMaxAgeMs).toBeUndefined();
   });
 
-  describe('getCurrentUser', () => {
-    const authenticatedUser = {
-      subjectId: '00000000-0000-4000-8000-000000000001',
-      userId: '00000000-0000-4000-8000-000000000001',
-      businessId: '00000000-0000-4000-8000-000000000002',
-      branchId: '00000000-0000-4000-8000-000000000003',
-      name: 'Cashier One',
-      roleId: '00000000-0000-4000-8000-000000000004',
-      roleVersion: 3,
-      isOwner: false,
-      isPlatform: false,
-      permissions: [],
-      tokenIssuedAt: 1_800_000_000,
-      tokenExpiresAt: 1_800_000_900,
-    };
-
-    it('returns permissions from cache on initial load and profile from JWT claims', async () => {
-      permissionsCacheMock.get.mockResolvedValue({
-        permissions: ['products.read'],
-        roleVersion: 3,
-      });
-      await expect(
-        service.getCurrentUser(
-          authenticatedUser,
-          ClientType.WEB,
-          '00000000-0000-4000-8000-000000000005',
-        ),
-      ).resolves.toEqual({
-        user: {
-          id: authenticatedUser.userId,
-          name: authenticatedUser.name,
-        },
-        activeContext: {
-          businessId: authenticatedUser.businessId,
-          branchId: authenticatedUser.branchId,
-        },
-        is_owner: false,
-        role_template: authenticatedUser.roleId,
-        role_template_version: '3',
-        effectivePermissions: ['products.read'],
-        session: {
-          clientType: ClientType.WEB,
-          terminalId: '00000000-0000-4000-8000-000000000005',
-          issuedAt: new Date(1_800_000_000_000).toISOString(),
-          expiresAt: new Date(1_800_000_900_000).toISOString(),
-          expiresInSeconds: expect.any(Number),
-        },
-      });
-      expect(permissionsCacheMock.get).toHaveBeenCalledWith(
-        authenticatedUser.businessId,
-        authenticatedUser.roleId,
-      );
-      expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
-    });
-
-    it('omits permissions and avoids cache and database when initial load is false', async () => {
-      const result = await service.getCurrentUser(
-        authenticatedUser,
-        ClientType.WEB,
-        '00000000-0000-4000-8000-000000000005',
-        false,
-      );
-      expect(result).not.toHaveProperty('effectivePermissions');
-      expect(result).toMatchObject({
-        user: {
-          id: authenticatedUser.userId,
-          name: authenticatedUser.name,
-        },
-      });
-      expect(permissionsCacheMock.get).not.toHaveBeenCalled();
-      expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
-    });
-
-    it('loads permissions from the database and populates cache on cache miss', async () => {
-      const roleQuery = {
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest
-          .fn()
-          .mockResolvedValue([{ permissions: ['products.read'], version: 4 }]),
-      };
-      const endpointQuery = {
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([]),
-      };
-      const tx = {
-        select: jest
-          .fn()
-          .mockReturnValueOnce(roleQuery)
-          .mockReturnValueOnce(endpointQuery),
-      };
-      dbMock.transactionWithSession.mockImplementation(
-        async (_session: unknown, callback: (tx: unknown) => unknown) =>
-          callback(tx),
-      );
-
-      const result = await service.getCurrentUser(
-        authenticatedUser,
-        ClientType.WEB,
-        '00000000-0000-4000-8000-000000000005',
-      );
-
-      expect(result.effectivePermissions).toEqual([
-        'catalog.view',
-        'inventory.create',
-        'inventory.delete',
-        'products.read',
-      ]);
-      expect(result.role_template_version).toBe('4');
-      expect(dbMock.transactionWithSession).toHaveBeenCalledWith(
-        authenticatedUser,
-        expect.any(Function),
-      );
-      expect(permissionsCacheMock.set).toHaveBeenCalledWith(
-        authenticatedUser.businessId,
-        authenticatedUser.roleId,
-        {
-          permissions: [
-            'catalog.view',
-            'inventory.create',
-            'inventory.delete',
-            'products.read',
-          ],
-          roleVersion: 4,
-        },
-      );
-    });
-
-    it('uses the supplied terminal header as session metadata without querying the database', async () => {
-      const result = await service.getCurrentUser(
-        authenticatedUser,
-        ClientType.WEB,
-        '00000000-0000-4000-8000-000000000099',
-        false,
-      );
-
-      expect(result.session.terminalId).toBe(
-        '00000000-0000-4000-8000-000000000099',
-      );
-      expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
-    });
-
-    it('returns a null terminal ID for a web session without the header', async () => {
-      const result = await service.getCurrentUser(
-        authenticatedUser,
-        ClientType.WEB,
-        undefined,
-        false,
-      );
-
-      expect(result.session.terminalId).toBeNull();
-      expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
-    });
-
-    it('rejects platform tokens on the user profile endpoint', async () => {
-      await expect(
-        service.getCurrentUser(
-          {
-            subjectId: '00000000-0000-4000-8000-000000000006',
-            isPlatform: true,
-            permissions: [],
-          },
-          ClientType.MOBILE,
-          '00000000-0000-4000-8000-000000000005',
-        ),
-      ).rejects.toThrow(UnauthorizedException);
-      expect(dbMock.transactionWithSession).not.toHaveBeenCalled();
-    });
+  it('spends a dummy verification and returns the generic 401 for unknown email', async () => {
+    const { service, repository, passwords, sessions } = setup();
+    repository.findCredentialByEmail.mockResolvedValue(null);
+    await expect(
+      service.login(
+        { email: 'x@y.z', password: 'pw', remember: false },
+        meta(),
+      ),
+    ).rejects.toThrow('Invalid email or password');
+    expect(passwords.verifyAgainstDummy).toHaveBeenCalled();
+    expect(sessions.create).not.toHaveBeenCalled();
   });
 
-  describe('userLogin', () => {
-    const mockDto: ClientLoginDto = {
-      email: 'test@example.com',
-      password: 'password123',
-      remember: true,
-    };
-
-    beforeEach(() => {
-      // Reset mocks
-      jest.clearAllMocks();
+  it.each([
+    ['wrong password', { valid: false, needsRehash: false }, 'active'],
+    ['disabled account', { valid: true, needsRehash: false }, 'disabled'],
+  ])('returns the same 401 for a %s', async (_case, check, status) => {
+    const { service, repository, passwords, audit } = setup();
+    passwords.verify.mockResolvedValue(check);
+    repository.findCredentialByEmail.mockResolvedValue({
+      id: USER,
+      email: 'o@f.t',
+      name: 'O',
+      passwordHash: 'h',
+      status,
     });
-
-    it('should throw BadRequestException if email is missing', async () => {
-      const invalidDto: any = { ...mockDto, email: undefined };
-
-      await expect(
-        service.userLogin(invalidDto, 'terminal123'),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.userLogin(invalidDto, 'terminal123'),
-      ).rejects.toThrow('Valid email is required');
-    });
-
-    it('should throw BadRequestException if password is missing', async () => {
-      const invalidDto: any = { ...mockDto, password: undefined };
-
-      await expect(
-        service.userLogin(invalidDto, 'terminal123'),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.userLogin(invalidDto, 'terminal123'),
-      ).rejects.toThrow('Valid password is required');
-    });
-
-    it('should throw BadRequestException if email is not a string', async () => {
-      const invalidDto = { ...mockDto, email: 123 as any };
-
-      await expect(
-        service.userLogin(invalidDto, 'terminal123'),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.userLogin(invalidDto, 'terminal123'),
-      ).rejects.toThrow('Valid email is required');
-    });
-
-    it('should throw BadRequestException if password is not a string', async () => {
-      const invalidDto = { ...mockDto, password: 123 as any };
-
-      await expect(
-        service.userLogin(invalidDto, 'terminal123'),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.userLogin(invalidDto, 'terminal123'),
-      ).rejects.toThrow('Valid password is required');
-    });
-
-    it('should throw UnauthorizedException for invalid credentials when no user found', async () => {
-      // Mock the transaction to return empty results
-      dbMock.transaction.mockImplementation(async (callback: any) => {
-        const tx = {
-          execute: jest.fn().mockResolvedValue(undefined),
-          select: jest.fn().mockReturnValue({
-            from: jest.fn().mockReturnValue({
-              leftJoin: jest.fn().mockReturnValue({
-                leftJoin: jest.fn().mockReturnValue({
-                  where: jest.fn().mockReturnValue([]),
-                }),
-              }),
-            }),
-          }),
-        };
-        return callback(tx);
-      });
-
-      await expect(service.userLogin(mockDto, 'terminal123')).rejects.toThrow(
-        UnauthorizedException,
-      );
-      await expect(service.userLogin(mockDto, 'terminal123')).rejects.toThrow(
-        'Invalid email or password',
-      );
-    });
-
-    it('should authenticate only when an active terminal matches a membership business and branch', async () => {
-      // Mock user data that would be returned from the database
-      const mockUserData = [
-        {
-          userId: 'user123',
-          userEmail: 'test@example.com',
-          userName: 'Test User',
-          userPasswordHash: '$2a$10$hashedPassword',
-          userStatus: 'active',
-          businessId: 'business123',
-          branchId: null,
-          roleId: 'role123',
-          roleVersion: 4,
-          isOwner: false,
-          roleName: 'admin',
-          rolePermissions: ['read', 'write'],
-        },
-      ];
-
-      // Mock the transaction to return user data
-      dbMock.transaction.mockImplementation(async (callback: any) => {
-        const userQuery = {
-          from: jest.fn().mockReturnThis(),
-          leftJoin: jest.fn().mockReturnThis(),
-          where: jest.fn().mockResolvedValue(mockUserData),
-        };
-        const terminalQuery = {
-          from: jest.fn().mockReturnThis(),
-          innerJoin: jest.fn().mockReturnThis(),
-          where: jest.fn().mockResolvedValue([
-            {
-              terminalId: 'terminal123',
-              businessId: 'business123',
-              branchId: 'branch123',
-            },
-          ]),
-        };
-        const configurationsQuery = {
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockResolvedValue([]),
-        };
-        const tx = {
-          execute: jest.fn().mockResolvedValue(undefined),
-          select: jest
-            .fn()
-            .mockReturnValueOnce(userQuery)
-            .mockReturnValueOnce(terminalQuery)
-            .mockReturnValueOnce(configurationsQuery),
-        };
-        return callback(tx);
-      });
-
-      // Mock bcrypt.compare to return true (valid password)
-      jest.spyOn(bcrypt, 'compare').mockImplementation(async () => true);
-
-      // Mock JWT service
-      jwtServiceMock.signAsync.mockResolvedValue('mock-jwt-token');
-
-      // Mock utils service
-      utilsServiceMock.generateRefreshToken.mockReturnValue(
-        'mock-refresh-token',
-      );
-
-      // Mock Redis service
-      redisServiceMock.set.mockResolvedValue(undefined);
-
-      const result = await service.userLogin(mockDto, 'terminal123');
-
-      expect(auditLogsMock.insertUserEvent).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          userId: 'user123',
-          businessId: 'business123',
-          terminalId: 'terminal123',
-          eventType: 'USER_LOGIN_SUCCESS',
-          responseStatus: 200,
-        }),
-      );
-
-      expect(result).toEqual({
-        accessToken: 'mock-jwt-token',
-        refreshToken: 'mock-refresh-token',
-        tokenType: 'Bearer',
-        expiresIn: '7d',
-        user: {
-          id: 'user123',
-          email: 'test@example.com',
-          name: 'Test User',
-        },
-        memberships: expect.any(Array),
-        effectivePermissions: expect.arrayContaining([
-          'catalog.view',
-          'inventory.create',
-          'inventory.delete',
-          'read',
-          'write',
-        ]),
-      });
-
-      expect(jwtServiceMock.signAsync).toHaveBeenCalled();
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
-        name: 'Test User',
-        businessId: 'business123',
-        branchId: 'branch123',
-        role_id: 'role123',
-        role_version: 4,
-      });
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
-        'userId',
-      );
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
-        'email',
-      );
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
-        'permissions',
-      );
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
-        'role',
-      );
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
-        'terminalId',
-      );
-      expect(utilsServiceMock.generateRefreshToken).toHaveBeenCalled();
-      expect(redisServiceMock.set).toHaveBeenCalledWith(
-        `refresh_token:mock-refresh-token`,
-        'user123',
-        7 * 24 * 60 * 60,
-      );
-    });
-
-    it('authenticates an owner with a null membership branch and no role claims', async () => {
-      const ownerDto: ClientLoginDto = {
-        email: 'owner@example.com',
-        password: 'password123',
-        remember: false,
-      };
-      const userQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            userId: 'owner-user',
-            userEmail: 'owner@example.com',
-            userName: 'Business Owner',
-            userPasswordHash: '$2a$10$hashedPassword',
-            userStatus: 'active',
-            businessId: 'business123',
-            branchId: null,
-            isOwner: true,
-            roleId: null,
-            roleName: null,
-            roleVersion: null,
-            rolePermissions: null,
-          },
-        ]),
-      };
-      dbMock.transaction.mockImplementation(async (callback: any) =>
-        callback({
-          execute: jest.fn().mockResolvedValue(undefined),
-          select: jest.fn().mockReturnValueOnce(userQuery),
-        }),
-      );
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
-      jwtServiceMock.signAsync.mockResolvedValue('owner-access-token');
-
-      const result = await service.userLogin(ownerDto);
-
-      expect(result).toMatchObject({
-        accessToken: 'owner-access-token',
-        effectivePermissions: [],
-        memberships: [
-          expect.objectContaining({
-            businessId: 'business123',
-            branchId: null,
-            isOwner: true,
-            roleId: null,
-          }),
-        ],
-      });
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
-        isOwner: true,
-        businessId: 'business123',
-        branchId: undefined,
-      });
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
-        'role_id',
-      );
-      expect(permissionsCacheMock.set).not.toHaveBeenCalled();
-    });
-
-    it('uses a branch-scoped membership for web login without a terminal ID', async () => {
-      const userQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            userId: 'cashier-user',
-            userEmail: 'cashier@example.com',
-            userName: 'Cashier',
-            userPasswordHash: '$2a$10$hashedPassword',
-            userStatus: 'active',
-            businessId: 'business123',
-            branchId: 'cashier-branch',
-            isOwner: false,
-            roleId: null,
-            roleName: null,
-            roleVersion: null,
-            rolePermissions: null,
-          },
-        ]),
-      };
-      const tx = {
-        execute: jest.fn().mockResolvedValue(undefined),
-        select: jest.fn().mockReturnValueOnce(userQuery),
-      };
-      dbMock.transaction.mockImplementation(async (callback: any) =>
-        callback(tx),
-      );
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
-      jwtServiceMock.signAsync.mockResolvedValue('cashier-access-token');
-
-      await service.userLogin({ ...mockDto, remember: false });
-
-      expect(tx.select).toHaveBeenCalledTimes(1);
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
-        businessId: 'business123',
-        branchId: 'cashier-branch',
-      });
-      expect(auditLogsMock.insertUserEvent).toHaveBeenCalledWith(
-        tx,
-        expect.objectContaining({ terminalId: undefined }),
-      );
-    });
-
-    it('rejects web login when the user has no active business membership', async () => {
-      const userQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            userId: 'unassigned-user',
-            userEmail: 'test@example.com',
-            userName: 'Unassigned User',
-            userPasswordHash: '$2a$10$hashedPassword',
-            userStatus: 'active',
-            businessId: null,
-            branchId: null,
-            isOwner: null,
-            roleId: null,
-            roleName: null,
-            roleVersion: null,
-            rolePermissions: null,
-          },
-        ]),
-      };
-      dbMock.transaction.mockImplementation(async (callback: any) =>
-        callback({
-          execute: jest.fn().mockResolvedValue(undefined),
-          select: jest.fn().mockReturnValueOnce(userQuery),
-        }),
-      );
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
-
-      await expect(service.userLogin(mockDto)).rejects.toThrow(
-        'No active business membership',
-      );
-      expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
-    });
-
-    it('rejects login when terminal is not active for a matching membership', async () => {
-      const mockUserData = [
-        {
-          userId: 'user123',
-          userEmail: 'test@example.com',
-          userPasswordHash: '$2a$10$hashedPassword',
-          userStatus: 'active',
-          businessId: 'business123',
-          branchId: 'branch123',
-          roleId: 'role123',
-          roleName: 'admin',
-          rolePermissions: ['read'],
-        },
-      ];
-      const userQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue(mockUserData),
-      };
-      const terminalQuery = {
-        from: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([]),
-      };
-      const configurationsQuery = {
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([]),
-      };
-      dbMock.transaction.mockImplementation(async (callback: any) =>
-        callback({
-          execute: jest.fn().mockResolvedValue(undefined),
-          select: jest
-            .fn()
-            .mockReturnValueOnce(userQuery)
-            .mockReturnValueOnce(terminalQuery)
-            .mockReturnValueOnce(configurationsQuery),
-        }),
-      );
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
-
-      await expect(service.userLogin(mockDto, 'terminal123')).rejects.toThrow(
-        UnauthorizedException,
-      );
-      expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
-    });
-
-    it('rejects login when an active terminal belongs to another business or branch', async () => {
-      const mockUserData = [
-        {
-          userId: 'user123',
-          userEmail: 'test@example.com',
-          userPasswordHash: '$2a$10$hashedPassword',
-          userStatus: 'active',
-          businessId: 'business123',
-          branchId: 'branch123',
-          roleId: 'role123',
-          roleName: 'admin',
-          rolePermissions: ['read'],
-        },
-      ];
-      const userQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue(mockUserData),
-      };
-      const terminalQuery = {
-        from: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            terminalId: 'terminal123',
-            businessId: 'different-business',
-            branchId: 'different-branch',
-          },
-        ]),
-      };
-      const configurationsQuery = {
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([]),
-      };
-      dbMock.transaction.mockImplementation(async (callback: any) =>
-        callback({
-          execute: jest.fn().mockResolvedValue(undefined),
-          select: jest
-            .fn()
-            .mockReturnValueOnce(userQuery)
-            .mockReturnValueOnce(terminalQuery)
-            .mockReturnValueOnce(configurationsQuery),
-        }),
-      );
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
-
-      await expect(service.userLogin(mockDto, 'terminal123')).rejects.toThrow(
-        UnauthorizedException,
-      );
-      expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
-    });
+    await expect(
+      service.login(
+        { email: 'o@f.t', password: 'pw', remember: false },
+        meta(),
+      ),
+    ).rejects.toThrow('Invalid email or password');
+    expect(audit.logUserEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ eventType: 'USER_LOGIN_FAILED' }),
+    );
   });
 
-  describe('registerOwner', () => {
-    it('creates a business-wide owner membership, activates business, and consumes the code', async () => {
-      const makeQuery = (rows: object[], lockable = false) => {
-        const query = {
-          from: jest.fn(),
-          where: jest.fn(),
-          limit: jest.fn(),
-          for: jest.fn().mockResolvedValue(rows),
-        };
-        query.from.mockReturnValue(query);
-        query.where.mockReturnValue(query);
-        query.limit.mockReturnValue(lockable ? query : Promise.resolve(rows));
-        return query;
-      };
-      const insertedValues: unknown[] = [];
-      const tx = {
-        execute: jest.fn().mockResolvedValue(undefined),
-        select: jest
-          .fn()
-          .mockReturnValueOnce(
-            makeQuery(
-              [
-                {
-                  id: 'redemption-id',
-                  businessId: 'business-id',
-                  email: 'owner@example.com',
-                },
-              ],
-              true,
-            ),
-          )
-          .mockReturnValueOnce(
-            makeQuery([{ id: 'business-id', isActive: false }]),
-          )
-          .mockReturnValueOnce(makeQuery([]))
-          .mockReturnValueOnce(
-            makeQuery([{ terminalId: 'terminal-id', branchId: 'branch-id' }]),
-          ),
-        insert: jest
-          .fn()
-          .mockImplementationOnce(() => ({
-            values: () => ({
-              returning: jest
-                .fn()
-                .mockResolvedValue([{ id: 'created-owner-id' }]),
-            }),
-          }))
-          .mockImplementationOnce(() => ({
-            values: (value: unknown) => {
-              insertedValues.push(value);
-              return Promise.resolve([]);
-            },
-          })),
-        update: jest.fn().mockImplementation(() => ({
-          set: jest.fn().mockReturnValue({
-            where: jest.fn().mockResolvedValue([]),
-          }),
-        })),
-      };
-      dbMock.transactionWithSession.mockImplementation(
-        async (
-          _session: unknown,
-          callback: (transaction: unknown) => unknown,
-        ) => callback(tx),
-      );
-
-      const result = await service.registerOwner({
-        email: ' OWNER@example.com ',
-        name: 'Business Owner',
-        password: 'secure-password',
-        redeemCode: 'AABBCCDDEEFF001122334455',
-        businessId: 'business-id',
-        branchId: 'branch-id',
-        terminalCode: 'POS-A1B2C3D4E5F60718',
-      });
-
-      expect(result).toMatchObject({
-        userId: 'created-owner-id',
-        businessId: 'business-id',
-        isOwner: true,
-        roleId: null,
-        branchId: null,
-        initialTerminalId: 'terminal-id',
-        initialBranchId: 'branch-id',
-      });
-      expect(insertedValues[0]).toMatchObject({
-        businessId: 'business-id',
-        userId: 'created-owner-id',
-        roleId: null,
-        branchId: null,
-        isOwner: true,
-        isActive: true,
-      });
-      expect(tx.update).toHaveBeenCalledTimes(3);
-      expect(tx.execute).toHaveBeenCalledTimes(4);
-    });
-
-    it('rejects a redemption code that is not visible or no longer redeemable', async () => {
-      const query = {
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        for: jest.fn().mockResolvedValue([]),
-      };
-      const tx = {
-        execute: jest.fn().mockResolvedValue(undefined),
-        select: jest.fn().mockReturnValue(query),
-        insert: jest.fn(),
-      };
-      dbMock.transactionWithSession.mockImplementation(
-        async (
-          _session: unknown,
-          callback: (transaction: unknown) => unknown,
-        ) => callback(tx),
-      );
-
-      await expect(
-        service.registerOwner({
-          email: 'owner@example.com',
-          name: 'Business Owner',
-          password: 'secure-password',
-          redeemCode: 'INVALID',
-          businessId: 'business-id',
-          branchId: 'branch-id',
-          terminalCode: 'POS-A1B2C3D4E5F60718',
-        }),
-      ).rejects.toThrow(UnauthorizedException);
-      expect(tx.insert).not.toHaveBeenCalled();
-    });
-
-    it('requires the password to attach an existing global account', async () => {
-      const makeQuery = (rows: object[], lockable = false) => {
-        const query = {
-          from: jest.fn(),
-          where: jest.fn(),
-          limit: jest.fn(),
-          for: jest.fn().mockResolvedValue(rows),
-        };
-        query.from.mockReturnValue(query);
-        query.where.mockReturnValue(query);
-        query.limit.mockReturnValue(lockable ? query : Promise.resolve(rows));
-        return query;
-      };
-      const tx = {
-        execute: jest.fn().mockResolvedValue(undefined),
-        select: jest
-          .fn()
-          .mockReturnValueOnce(
-            makeQuery(
-              [
-                {
-                  id: 'redemption-id',
-                  businessId: 'business-id',
-                  email: 'owner@example.com',
-                },
-              ],
-              true,
-            ),
-          )
-          .mockReturnValueOnce(
-            makeQuery([{ id: 'business-id', isActive: false }]),
-          )
-          .mockReturnValueOnce(
-            makeQuery([
-              {
-                id: 'existing-user-id',
-                passwordHash: 'stored-password-hash',
-                status: 'active',
-              },
-            ]),
-          )
-          .mockReturnValueOnce(
-            makeQuery([{ terminalId: 'terminal-id', branchId: 'branch-id' }]),
-          ),
-        insert: jest.fn(() => ({ values: jest.fn().mockResolvedValue([]) })),
-        update: jest.fn(() => ({
-          set: jest.fn().mockReturnValue({
-            where: jest.fn().mockResolvedValue([]),
-          }),
-        })),
-      };
-      dbMock.transactionWithSession.mockImplementation(
-        async (
-          _session: unknown,
-          callback: (transaction: unknown) => unknown,
-        ) => callback(tx),
-      );
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
-
-      const result = await service.registerOwner({
-        email: 'owner@example.com',
-        name: 'Owner Name',
-        password: 'existing-password',
-        redeemCode: 'AABBCCDDEEFF001122334455',
-        businessId: 'business-id',
-        branchId: 'branch-id',
-        terminalCode: 'POS-A1B2C3D4E5F60718',
-      });
-
-      expect(bcrypt.compare).toHaveBeenCalledWith(
-        'existing-password',
-        'stored-password-hash',
-      );
-      expect(tx.insert).toHaveBeenCalledTimes(1);
-      expect(result).toMatchObject({
-        userId: 'existing-user-id',
-        isOwner: true,
-        roleId: null,
-        branchId: null,
-      });
-    });
+  it('upgrades a legacy hash after a successful sign-in', async () => {
+    const { service, passwords, repository } = setup();
+    passwords.verify.mockResolvedValue({ valid: true, needsRehash: true });
+    await service.login(
+      { email: 'o@f.t', password: 'pw', remember: false },
+      meta(),
+    );
+    expect(repository.updatePasswordHash).toHaveBeenCalledWith(
+      USER,
+      'new-hash',
+    );
   });
 
-  describe('refreshAccessToken', () => {
-    const mockRefreshToken = 'valid-refresh-token';
-
-    beforeEach(() => {
-      jest.clearAllMocks();
+  it('rejects a terminal outside the membership business', async () => {
+    const { service, repository } = setup();
+    repository.findActiveTerminal.mockResolvedValue({
+      id: TERMINAL,
+      businessId: '00000000-0000-4000-8000-0000000000ff',
+      branchId: BRANCH,
     });
+    await expect(
+      service.login(
+        { email: 'o@f.t', password: 'pw', remember: false },
+        meta(),
+      ),
+    ).rejects.toThrow('No active business membership');
+  });
+});
 
-    it('should throw UnauthorizedException for invalid refresh token', async () => {
-      redisServiceMock.get.mockResolvedValue(null);
-
-      await expect(
-        service.refreshAccessToken(mockRefreshToken, 'terminal123'),
-      ).rejects.toThrow(UnauthorizedException);
-    });
-
-    it('should successfully refresh access token', async () => {
-      // Mock Redis response
-      redisServiceMock.get.mockResolvedValue('user123');
-
-      const userQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        leftJoinAgain: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            userId: 'user123',
-            email: 'test@example.com',
-            name: 'Test User',
-            status: 'active',
-            businessId: 'business123',
-            branchId: 'branch123',
-            isOwner: false,
-            roleId: 'role123',
-            roleVersion: 4,
-            permissions: ['products.read'],
-          },
-        ]),
-      };
-      userQuery.leftJoin.mockReturnValue(userQuery);
-      const terminalQuery = {
-        from: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            terminalId: 'terminal123',
-            businessId: 'business123',
-            branchId: 'branch123',
-          },
-        ]),
-      };
-      const configurationsQuery = {
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([]),
-      };
-      dbMock.transaction.mockImplementation(async (callback: any) =>
-        callback({
-          execute: jest.fn().mockResolvedValue(undefined),
-          select: jest
-            .fn()
-            .mockReturnValueOnce(userQuery)
-            .mockReturnValueOnce(terminalQuery)
-            .mockReturnValueOnce(configurationsQuery),
-        }),
-      );
-
-      // Mock JWT and token generation
-      jwtServiceMock.signAsync.mockResolvedValue('new-access-token');
-      utilsServiceMock.generateRefreshToken.mockReturnValue(
-        'new-refresh-token',
-      );
-      redisServiceMock.set.mockResolvedValue(undefined);
-      redisServiceMock.delete.mockResolvedValue(undefined);
-
-      const result = await service.refreshAccessToken(
-        mockRefreshToken,
-        'terminal123',
-      );
-
-      expect(result).toEqual({
-        accessToken: 'new-access-token',
-        refreshToken: 'new-refresh-token',
-        tokenType: 'Bearer',
-        expiresIn: '15m',
-        user: {
-          id: 'user123',
-          email: 'test@example.com',
-          name: 'Test User',
-        },
-        effectivePermissions: expect.arrayContaining([
-          'catalog.view',
-          'inventory.create',
-          'inventory.delete',
-          'products.read',
-        ]),
-      });
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
-        name: 'Test User',
-        businessId: 'business123',
-        branchId: 'branch123',
-        role_id: 'role123',
-        role_version: 4,
-      });
-
-      expect(redisServiceMock.delete).toHaveBeenCalledWith(
-        `refresh_token:${mockRefreshToken}`,
-      );
-      expect(redisServiceMock.set).toHaveBeenCalledWith(
-        `refresh_token:new-refresh-token`,
-        'user123',
-        7 * 24 * 60 * 60,
-      );
-    });
-
-    it('refreshes a roleless owner without adding a branch assignment or role claim', async () => {
-      redisServiceMock.get.mockResolvedValue('owner-user');
-      const userQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            userId: 'owner-user',
-            email: 'owner@example.com',
-            name: 'Business Owner',
-            status: 'active',
-            businessId: 'business123',
-            branchId: null,
-            isOwner: true,
-            roleId: null,
-            roleVersion: null,
-            permissions: null,
-          },
-        ]),
-      };
-      dbMock.transaction.mockImplementation(async (callback: any) =>
-        callback({
-          execute: jest.fn().mockResolvedValue(undefined),
-          select: jest.fn().mockReturnValueOnce(userQuery),
-        }),
-      );
-      jwtServiceMock.signAsync.mockResolvedValue('owner-access-token');
-      utilsServiceMock.generateRefreshToken.mockReturnValue(
-        'owner-new-refresh',
-      );
-      redisServiceMock.set.mockResolvedValue(undefined);
-      redisServiceMock.delete.mockResolvedValue(undefined);
-
-      await expect(
-        service.refreshAccessToken(mockRefreshToken),
-      ).resolves.toMatchObject({
-        accessToken: 'owner-access-token',
-        effectivePermissions: [],
-        user: { id: 'owner-user', email: 'owner@example.com' },
-      });
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
-        isOwner: true,
-        businessId: 'business123',
-        branchId: undefined,
-      });
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).not.toHaveProperty(
-        'role_id',
-      );
-      expect(permissionsCacheMock.set).not.toHaveBeenCalled();
-    });
-
-    it('refreshes a branch-scoped membership without a web terminal ID', async () => {
-      redisServiceMock.get.mockResolvedValue('cashier-user');
-      const userQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            userId: 'cashier-user',
-            email: 'cashier@example.com',
-            name: 'Cashier',
-            status: 'active',
-            businessId: 'business123',
-            branchId: 'cashier-branch',
-            isOwner: false,
-            roleId: null,
-            roleVersion: null,
-            permissions: null,
-          },
-        ]),
-      };
-      const tx = {
-        execute: jest.fn().mockResolvedValue(undefined),
-        select: jest.fn().mockReturnValueOnce(userQuery),
-      };
-      dbMock.transaction.mockImplementation(async (callback: any) =>
-        callback(tx),
-      );
-      jwtServiceMock.signAsync.mockResolvedValue('cashier-access-token');
-      utilsServiceMock.generateRefreshToken.mockReturnValue(
-        'cashier-new-refresh',
-      );
-      redisServiceMock.set.mockResolvedValue(undefined);
-      redisServiceMock.delete.mockResolvedValue(undefined);
-
-      await service.refreshAccessToken(mockRefreshToken);
-
-      expect(tx.select).toHaveBeenCalledTimes(1);
-      expect(jwtServiceMock.signAsync.mock.calls[0][0]).toMatchObject({
-        businessId: 'business123',
-        branchId: 'cashier-branch',
-      });
-    });
-
-    it('rejects refresh when the user has no active business membership', async () => {
-      redisServiceMock.get.mockResolvedValue('unassigned-user');
-      const userQuery = {
-        from: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue([
-          {
-            userId: 'unassigned-user',
-            email: 'unassigned@example.com',
-            name: 'Unassigned User',
-            status: 'active',
-            businessId: null,
-            branchId: null,
-            isOwner: null,
-            roleId: null,
-            roleVersion: null,
-            permissions: null,
-          },
-        ]),
-      };
-      dbMock.transaction.mockImplementation(async (callback: any) =>
-        callback({
-          execute: jest.fn().mockResolvedValue(undefined),
-          select: jest.fn().mockReturnValueOnce(userQuery),
-        }),
-      );
-
-      await expect(
-        service.refreshAccessToken(mockRefreshToken),
-      ).rejects.toThrow('No active business membership');
-      expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
-      expect(utilsServiceMock.generateRefreshToken).not.toHaveBeenCalled();
-    });
+describe('AuthenticationService.refresh', () => {
+  it('rejects malformed tokens without touching the database', async () => {
+    const { service, sessions } = setup();
+    await expect(service.refresh('nope', meta())).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(sessions.rotate).not.toHaveBeenCalled();
   });
 
-  describe('invalidateRefreshToken', () => {
-    const mockRefreshToken = 'valid-refresh-token';
+  it('audits reuse and answers 401', async () => {
+    const { service, sessions, audit } = setup();
+    sessions.rotate.mockResolvedValue({ outcome: 'reuse', userId: USER });
+    await expect(service.refresh(TOKEN, meta())).rejects.toThrow(
+      'Invalid refresh token',
+    );
+    expect(audit.logUserEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'USER_REFRESH_TOKEN_REUSE_DETECTED',
+      }),
+    );
+  });
 
-    it('should invalidate refresh token', async () => {
-      redisServiceMock.delete.mockResolvedValue(1);
-
-      await service.invalidateRefreshToken(mockRefreshToken);
-
-      expect(redisServiceMock.delete).toHaveBeenCalledWith(
-        `refresh_token:${mockRefreshToken}`,
-      );
+  it('revokes the freshly rotated session when the terminal does not match', async () => {
+    const { service, sessions } = setup();
+    sessions.rotate.mockResolvedValue({
+      outcome: 'rotated',
+      userId: USER,
+      terminalId: '00000000-0000-4000-8000-0000000000aa',
+      persistent: false,
     });
+    await expect(service.refresh(TOKEN, meta())).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(sessions.revoke).toHaveBeenCalledWith(
+      expect.stringMatching(/^[0-9a-f]{64}$/),
+    );
+  });
 
-    it('only invalidates a refresh token owned by the authenticated user', async () => {
-      redisServiceMock.compareAndDelete = jest.fn().mockResolvedValue(true);
-
-      await service.invalidateRefreshTokenForSession(
-        mockRefreshToken,
-        'user-id',
-      );
-
-      expect(redisServiceMock.compareAndDelete).toHaveBeenCalledWith(
-        `refresh_token:${mockRefreshToken}`,
-        'user-id',
-      );
+  it('revokes the new session when a platform session is replayed here', async () => {
+    const { service, sessions } = setup();
+    sessions.rotate.mockResolvedValue({
+      outcome: 'rotated',
+      userId: null,
+      platformUserId: USER,
     });
+    await expect(service.refresh(TOKEN, meta())).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(sessions.revoke).toHaveBeenCalled();
+  });
+
+  it('issues a new pair for a valid rotation', async () => {
+    const { service, sessions } = setup();
+    sessions.rotate.mockResolvedValue({
+      outcome: 'rotated',
+      userId: USER,
+      terminalId: TERMINAL,
+      persistent: true,
+    });
+    const result = await service.refresh(TOKEN, meta());
+    expect(result.refreshToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(result.refreshToken).not.toBe(TOKEN);
+    expect(result.refreshMaxAgeMs).toBe(1_000_000);
+  });
+});
+
+describe('AuthenticationService logout', () => {
+  it('ignores malformed tokens and revokes well-formed ones by hash', async () => {
+    const { service, sessions } = setup();
+    await service.logout(undefined);
+    await service.logout('short');
+    expect(sessions.revoke).not.toHaveBeenCalled();
+    await service.logout(TOKEN);
+    expect(sessions.revoke).toHaveBeenCalledWith(
+      expect.stringMatching(/^[0-9a-f]{64}$/),
+    );
+  });
+
+  it('revokes all sessions of the signed-in user', async () => {
+    const { service, sessions } = setup();
+    await expect(
+      service.logoutAll({ subjectId: USER, userId: USER, permissions: [] }),
+    ).resolves.toEqual({ revoked: 3 });
+    expect(sessions.revokeAll).toHaveBeenCalledWith({ userId: USER });
   });
 });

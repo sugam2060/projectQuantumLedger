@@ -1,210 +1,213 @@
 import {
-  BadRequestException,
+  Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { eq } from 'drizzle-orm';
-import bcrypt from 'bcryptjs';
-import { DatabaseService } from '../database/database.service';
-import { platformUsers } from '../database/schemas';
-import { RedisService } from '../redis/redis.service';
-import { UtilsService } from '../utils/utils.service';
-import { PlatformUserLoginDto } from './dto/platform-user-login.dto';
-import { AuditLogsService, type AuditRequestContext } from '../audit-logs';
+import type { ConfigType } from '@nestjs/config';
+import { AuditLogsService } from '../audit-logs';
+import type { AuthenticatedUser } from '../common/types';
+import {
+  generateOpaqueToken,
+  hashOpaqueToken,
+  isOpaqueTokenShape,
+} from '../common/utils/opaque-token.util';
+import { authConfig } from '../config';
+import type { PlatformUserLoginDto } from './dto/platform-user-login.dto';
+import { PasswordService } from './password.service';
+import { PlatformAuthenticationRepository } from './platform-authentication.repository';
+import { SessionsRepository } from './sessions.repository';
+import { TokenService } from './token.service';
+import type {
+  AuthMetadata,
+  PlatformAccount,
+  PlatformAuthResult,
+} from './types';
 
-const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
-const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
-const REFRESH_TOKEN_PREFIX = 'platform_refresh_token:';
+const INVALID_CREDENTIALS = 'Invalid email or password';
+const INVALID_REFRESH = 'Invalid refresh token';
 
-interface PlatformUserIdentity {
-  id: string;
-  name: string;
-  isBootstrap: boolean;
-}
-
-export interface PlatformAuthResult {
-  accessToken: string;
-  refreshToken: string;
-  tokenType: 'Bearer';
-  expiresIn: number;
-  user: { id: string; displayName: string };
-  isPlatform: true;
-  isBootstrap: boolean;
-}
-
+/**
+ * Platform-user (Fortis staff) authentication. Same session model as business
+ * users (Postgres sessions, rotation, reuse detection) with platform-audience
+ * access tokens.
+ */
 @Injectable()
 export class PlatformAuthenticationService {
+  private readonly logger = new Logger(PlatformAuthenticationService.name);
+
   constructor(
-    private readonly database: DatabaseService,
-    private readonly jwtService: JwtService,
-    private readonly utilsService: UtilsService,
-    private readonly redisService: RedisService,
+    private readonly repository: PlatformAuthenticationRepository,
+    private readonly sessions: SessionsRepository,
+    private readonly passwords: PasswordService,
+    private readonly tokens: TokenService,
     private readonly auditLogs: AuditLogsService,
+    @Inject(authConfig.KEY)
+    private readonly config: ConfigType<typeof authConfig>,
   ) {}
 
   async login(
     dto: PlatformUserLoginDto,
-    auditContext: AuditRequestContext = {},
+    meta: AuthMetadata,
   ): Promise<PlatformAuthResult> {
-    if (typeof dto.email !== 'string' || !dto.email.trim()) {
-      throw new BadRequestException('Valid email is required');
-    }
-    if (typeof dto.password !== 'string' || !dto.password) {
-      throw new BadRequestException('Valid password is required');
-    }
-
     const email = dto.email.trim().toLowerCase();
-    const [credential] = await this.database.transactionWithSession(
-      { platformAuthEmail: email },
-      (transaction) =>
-        transaction
-          .select({
-            id: platformUsers.id,
-            passwordHash: platformUsers.passwordHash,
-            name: platformUsers.name,
-            status: platformUsers.status,
-            isBootstrap: platformUsers.isBootstrap,
-          })
-          .from(platformUsers)
-          .where(eq(platformUsers.emailNormalized, email))
-          .limit(1),
-    );
-    if (
-      !credential ||
-      credential.status !== 'active' ||
-      !(await bcrypt.compare(dto.password, credential.passwordHash))
-    ) {
-      if (credential) {
-        await this.auditLogs.logPlatformEvent({
-          ...auditContext,
-          platformUserId: credential.id,
-          action: 'platform.login.failed',
-          responseStatus: 401,
-          metadata: {
-            reason:
-              credential.status !== 'active'
-                ? 'inactive_account'
-                : 'invalid_credentials',
-          },
-        });
-      }
-      throw new UnauthorizedException('Invalid email or password');
+    const credential = await this.repository.findCredentialByEmail(email);
+    if (!credential) {
+      await this.passwords.verifyAgainstDummy(dto.password);
+      throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
 
-    const result = await this.createSession({
-      id: credential.id,
-      name: credential.name,
-      isBootstrap: credential.isBootstrap,
-    });
-    await this.auditLogs.logPlatformEvent({
-      ...auditContext,
-      platformUserId: credential.id,
-      action: 'platform.login.succeeded',
-      responseStatus: 200,
-    });
+    const check = await this.passwords.verify(
+      credential.passwordHash,
+      dto.password,
+    );
+    if (!check.valid || credential.status !== 'active') {
+      await this.audit(credential.id, meta, 'platform.login.failed', 401, {
+        reason: check.valid ? 'inactive_account' : 'invalid_credentials',
+      });
+      throw new UnauthorizedException(INVALID_CREDENTIALS);
+    }
+    if (check.needsRehash) {
+      await this.rehash(credential.id, dto.password);
+    }
+
+    const refreshToken = generateOpaqueToken();
+    await this.sessions.create(
+      { platformUserId: credential.id },
+      {
+        tokenHash: hashOpaqueToken(refreshToken),
+        clientType: meta.clientType,
+        terminalId: null,
+        persistent: true,
+        userAgent: meta.userAgent ?? null,
+        ip: meta.ip ?? null,
+        expiresAt: new Date(Date.now() + this.refreshTtlMs()),
+      },
+    );
+    const result = await this.issue(credential, refreshToken);
+    await this.audit(credential.id, meta, 'platform.login.succeeded', 200);
     return result;
   }
 
   async refresh(
-    refreshToken: string,
-    auditContext: AuditRequestContext = {},
+    refreshToken: string | undefined,
+    meta: AuthMetadata,
   ): Promise<PlatformAuthResult> {
-    if (!refreshToken?.trim()) {
-      throw new UnauthorizedException('Refresh token is required');
+    if (!isOpaqueTokenShape(refreshToken)) {
+      throw new UnauthorizedException(INVALID_REFRESH);
     }
-
-    const oldKey = `${REFRESH_TOKEN_PREFIX}${refreshToken}`;
-    const platformUserId = await this.redisService.get(oldKey);
-    if (!platformUserId) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    const [platformUser] = await this.database.transactionWithSession(
-      { isPlatform: true, platformUserId },
-      async (transaction) =>
-        transaction
-          .select({
-            id: platformUsers.id,
-            name: platformUsers.name,
-            status: platformUsers.status,
-            isBootstrap: platformUsers.isBootstrap,
-          })
-          .from(platformUsers)
-          .where(eq(platformUsers.id, platformUserId))
-          .limit(1),
-    );
-
-    if (!platformUser || platformUser.status !== 'active') {
-      await this.redisService.delete(oldKey);
-      if (platformUser) {
-        await this.auditLogs.logPlatformEvent({
-          ...auditContext,
-          platformUserId: platformUser.id,
-          action: 'platform.token.refresh_failed',
-          responseStatus: 401,
-          metadata: { reason: 'inactive_account' },
-        });
-      }
-      throw new UnauthorizedException('Platform user is not active');
-    }
-
-    const session = await this.createSession({
-      id: platformUser.id,
-      name: platformUser.name,
-      isBootstrap: platformUser.isBootstrap,
+    const nextToken = generateOpaqueToken();
+    const nextHash = hashOpaqueToken(nextToken);
+    const rotation = await this.sessions.rotate({
+      oldHash: hashOpaqueToken(refreshToken),
+      newHash: nextHash,
+      userAgent: meta.userAgent ?? null,
+      ip: meta.ip ?? null,
+      persistentTtlSeconds: this.config.refreshPersistentTtlSeconds,
+      sessionTtlSeconds: this.config.refreshSessionTtlSeconds,
     });
-    await this.redisService.delete(oldKey);
-    await this.auditLogs.logPlatformEvent({
-      ...auditContext,
-      platformUserId: platformUser.id,
-      action: 'platform.token.refreshed',
-      responseStatus: 200,
-    });
-    return session;
+
+    if (rotation.outcome === 'reuse' && rotation.platformUserId) {
+      await this.audit(
+        rotation.platformUserId,
+        meta,
+        'platform.token.reuse_detected',
+        401,
+      );
+    }
+    if (rotation.outcome !== 'rotated' || !rotation.platformUserId) {
+      if (rotation.outcome === 'rotated') await this.sessions.revoke(nextHash);
+      throw new UnauthorizedException(INVALID_REFRESH);
+    }
+
+    const account = await this.repository.findAccount(rotation.platformUserId);
+    if (!account || account.status !== 'active') {
+      await this.sessions.revoke(nextHash);
+      await this.audit(
+        rotation.platformUserId,
+        meta,
+        'platform.token.refresh_failed',
+        401,
+        { reason: 'inactive_account' },
+      );
+      throw new UnauthorizedException(INVALID_REFRESH);
+    }
+
+    const result = await this.issue(account, nextToken);
+    await this.audit(account.id, meta, 'platform.token.refreshed', 200);
+    return result;
   }
 
-  async invalidateRefreshToken(refreshToken: string): Promise<void> {
-    await this.redisService.delete(`${REFRESH_TOKEN_PREFIX}${refreshToken}`);
+  async logout(refreshToken: string | undefined): Promise<void> {
+    if (!isOpaqueTokenShape(refreshToken)) return;
+    await this.sessions.revoke(hashOpaqueToken(refreshToken));
   }
 
-  async invalidateRefreshTokenForSession(
+  async logoutAll(user: AuthenticatedUser): Promise<{ revoked: number }> {
+    if (!user.platformUserId) throw new UnauthorizedException();
+    const revoked = await this.sessions.revokeAll({
+      platformUserId: user.platformUserId,
+    });
+    return { revoked };
+  }
+
+  private async issue(
+    account: Pick<PlatformAccount, 'id' | 'email' | 'name' | 'isBootstrap'>,
     refreshToken: string,
-    platformUserId: string,
-  ): Promise<void> {
-    await this.redisService.compareAndDelete(
-      `${REFRESH_TOKEN_PREFIX}${refreshToken}`,
-      platformUserId,
-    );
-  }
-
-  private async createSession(
-    user: PlatformUserIdentity,
   ): Promise<PlatformAuthResult> {
-    const accessToken = await this.jwtService.signAsync(
-      {
-        sub: user.id,
-        platformUserId: user.id,
-        isPlatform: true,
-        isBootstrap: user.isBootstrap,
-      },
-      { expiresIn: ACCESS_TOKEN_TTL_SECONDS },
-    );
-    const refreshToken = this.utilsService.generateRefreshToken();
-    await this.redisService.set(
-      `${REFRESH_TOKEN_PREFIX}${refreshToken}`,
-      user.id,
-      REFRESH_TOKEN_TTL_SECONDS,
-    );
-
-    return {
-      accessToken,
-      refreshToken,
-      tokenType: 'Bearer',
-      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
-      user: { id: user.id, displayName: user.name },
+    const access = await this.tokens.signPlatformToken({
+      sub: account.id,
+      platformUserId: account.id,
+      email: account.email,
       isPlatform: true,
-      isBootstrap: user.isBootstrap,
+      isBootstrap: account.isBootstrap,
+    });
+    return {
+      accessToken: access.token,
+      refreshToken,
+      refreshMaxAgeMs: this.refreshTtlMs(),
+      tokenType: 'Bearer',
+      expiresIn: access.expiresInSeconds,
+      user: { id: account.id, displayName: account.name },
+      isPlatform: true,
+      isBootstrap: account.isBootstrap,
     };
+  }
+
+  /** Staff sessions always use the long lifetime (the website remembers them). */
+  private refreshTtlMs(): number {
+    return this.config.refreshPersistentTtlSeconds * 1000;
+  }
+
+  private async rehash(
+    platformUserId: string,
+    password: string,
+  ): Promise<void> {
+    try {
+      await this.repository.updatePasswordHash(
+        platformUserId,
+        await this.passwords.hash(password),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not upgrade the password hash of platform user ${platformUserId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private audit(
+    platformUserId: string,
+    meta: AuthMetadata,
+    action: string,
+    responseStatus: number,
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
+    return this.auditLogs.logPlatformEvent({
+      ...meta.audit,
+      platformUserId,
+      action,
+      responseStatus,
+      ...(metadata ? { metadata } : {}),
+    });
   }
 }

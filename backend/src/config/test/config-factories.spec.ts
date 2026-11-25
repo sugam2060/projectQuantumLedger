@@ -61,7 +61,16 @@ describe('config factories', () => {
       limit: 100,
       authLimit: 10,
     });
-    expect(authConfig()).toEqual({ jwtSecret: 's'.repeat(40) });
+    expect(authConfig()).toEqual({
+      jwtSecret: 's'.repeat(40),
+      accessTtl: '15m',
+      accessTtlSeconds: 900,
+      issuer: 'fortis-api',
+      audience: 'fortis-pos',
+      platformAudience: 'fortis-platform',
+      refreshPersistentTtlSeconds: 30 * 86_400,
+      refreshSessionTtlSeconds: 12 * 3600,
+    });
     expect(redisConfig()).toEqual({ url: 'rediss://cache:6380/1' });
     expect(storageConfig().cloudinary).toEqual({
       cloudName: 'cloud',

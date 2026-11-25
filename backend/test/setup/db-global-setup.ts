@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import Redis from 'ioredis';
 import { Client } from 'pg';
 import { TEST_DB } from './test-database.env';
 
@@ -18,6 +19,12 @@ export default async function globalSetup(): Promise<void> {
   } finally {
     await admin.end();
   }
+
+  // Throttle counters and caches from earlier runs must not leak into this one.
+  const redis = new Redis(TEST_DB.redisUrl, { lazyConnect: true });
+  await redis.connect();
+  await redis.flushdb();
+  await redis.quit();
 
   execSync('npx ts-node script/migrate.ts', {
     stdio: 'inherit',

@@ -1,69 +1,56 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
-import { authConfig } from '../../config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { USER_JWT_STRATEGY } from '../../common/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../../common/types';
+import { authConfig } from '../../config';
+import {
+  optionalStringClaim,
+  optionalUuidClaim,
+  requireExpiry,
+  requireUuidClaim,
+} from './token-claims.util';
 
 export type { AuthenticatedUser };
 
-interface JwtPayload {
+type UserJwtPayload = {
   sub?: unknown;
+  email?: unknown;
+  name?: unknown;
   businessId?: unknown;
   branchId?: unknown;
-  platformUserId?: unknown;
-  isPlatform?: unknown;
-  isBootstrap?: unknown;
+  terminalId?: unknown;
   isOwner?: unknown;
-  name?: unknown;
   role_id?: unknown;
   role_version?: unknown;
-  permissions?: unknown;
   exp?: unknown;
   iat?: unknown;
-}
+};
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
+/**
+ * Business-user access tokens: Bearer header only, HS256 only, expiry, issuer
+ * and the user audience enforced by passport-jwt before `validate` runs.
+ */
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy) {
+export class JwtStrategy extends PassportStrategy(Strategy, USER_JWT_STRATEGY) {
   constructor(@Inject(authConfig.KEY) config: ConfigType<typeof authConfig>) {
-    const secret = config.jwtSecret;
-    if (secret.length < 32) {
-      throw new Error('JWT_SECRET must be at least 32 characters long');
+    if (config.jwtSecret.length < 32) {
+      throw new Error('JWT_ACCESS_SECRET must be at least 32 characters long');
     }
-
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: secret,
+      secretOrKey: config.jwtSecret,
       algorithms: ['HS256'],
+      issuer: config.issuer,
+      audience: config.audience,
     });
   }
 
-  validate(payload: JwtPayload): AuthenticatedUser {
-    if (
-      typeof payload.exp !== 'number' ||
-      payload.exp <= Math.floor(Date.now() / 1000)
-    ) {
-      throw new UnauthorizedException('JWT must have a valid expiration');
-    }
-
-    const subject = this.requireUuid(payload.sub, 'sub');
-    const isPlatform = payload.isPlatform === true;
-
-    const userId = isPlatform ? undefined : subject;
-    const platformUserId = isPlatform
-      ? this.requireUuid(payload.platformUserId ?? subject, 'platformUserId')
-      : undefined;
-
-    if (!this.isStringArray(payload.permissions)) {
-      throw new UnauthorizedException('Invalid permissions claim');
-    }
-    if (payload.name !== undefined && typeof payload.name !== 'string') {
-      throw new UnauthorizedException('Invalid name claim');
-    }
+  validate(payload: UserJwtPayload): AuthenticatedUser {
+    const tokenExpiresAt = requireExpiry(payload.exp);
+    const userId = requireUuidClaim(payload.sub, 'sub');
     if (
       payload.role_version !== undefined &&
       (typeof payload.role_version !== 'number' ||
@@ -74,49 +61,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     return {
-      subjectId: subject,
+      subjectId: userId,
       userId,
-      businessId: this.optionalUuid(payload.businessId, 'businessId'),
-      branchId: this.optionalUuid(payload.branchId, 'branchId'),
-      name: typeof payload.name === 'string' ? payload.name : undefined,
-      roleId: this.optionalUuid(payload.role_id, 'role_id'),
+      email: optionalStringClaim(payload.email, 'email'),
+      name: optionalStringClaim(payload.name, 'name'),
+      businessId: optionalUuidClaim(payload.businessId, 'businessId'),
+      branchId: optionalUuidClaim(payload.branchId, 'branchId'),
+      terminalId: optionalUuidClaim(payload.terminalId, 'terminalId'),
+      roleId: optionalUuidClaim(payload.role_id, 'role_id'),
       roleVersion:
         typeof payload.role_version === 'number'
           ? payload.role_version
           : undefined,
-      platformUserId,
-      isPlatform,
+      isPlatform: false,
       isOwner: payload.isOwner === true,
-      isBootstrap: isPlatform && payload.isBootstrap === true,
-      permissions: payload.permissions ?? [],
+      permissions: [],
       tokenIssuedAt: typeof payload.iat === 'number' ? payload.iat : undefined,
-      tokenExpiresAt: payload.exp,
+      tokenExpiresAt,
     };
-  }
-
-  private requireUuid(value: unknown, claim: string): string {
-    const uuid = this.optionalUuid(value, claim);
-    if (!uuid) {
-      throw new UnauthorizedException(`Missing or invalid ${claim} claim`);
-    }
-    return uuid;
-  }
-
-  private optionalUuid(value: unknown, claim: string): string | undefined {
-    if (value === undefined || value === null || value === '') {
-      return undefined;
-    }
-    if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
-      throw new UnauthorizedException(`Invalid ${claim} claim`);
-    }
-    return value;
-  }
-
-  private isStringArray(value: unknown): value is string[] | undefined {
-    return (
-      value === undefined ||
-      (Array.isArray(value) &&
-        value.every((item): item is string => typeof item === 'string'))
-    );
   }
 }

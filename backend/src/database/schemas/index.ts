@@ -9,6 +9,7 @@ export * from './auth/platform-users';
 export * from './business/roles';
 export * from './business/terminals';
 export * from './auth/users';
+export * from './auth/sessions';
 export * from './audit/access-logs';
 export * from './audit/audit-logs';
 export * from './audit/platform-audit-logs';

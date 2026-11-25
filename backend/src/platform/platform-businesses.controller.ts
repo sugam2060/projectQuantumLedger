@@ -14,6 +14,7 @@ import {
 import { Throttle } from '../common/decorators/strict-throttle.decorator';
 import { AuditContext, type AuditRequestContext } from '../audit-logs';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PlatformRoute } from '../common/decorators/platform-route.decorator';
 import type { AuthenticatedUser } from '../common/types';
 import { BusinessListHeaders } from './decorators/business-list-headers.decorator';
 import { ProvisionBusinessHeaders } from './decorators/provision-business-headers.decorator';
@@ -31,6 +32,7 @@ const READ_CLIENT_TYPES = ['web', 'mobile', 'desktop'];
 
 /** Fortis-staff routes for reading, listing and provisioning businesses. */
 @Controller('platform')
+@PlatformRoute()
 export class PlatformBusinessesController {
   constructor(private readonly platformBusinesses: PlatformBusinessesService) {}
 

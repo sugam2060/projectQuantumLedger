@@ -12,6 +12,11 @@
   {
     "method": "POST",
     "path": "/authentication/logout",
+    "public": true
+  },
+  {
+    "method": "POST",
+    "path": "/authentication/logout-all",
     "public": false
   },
   {
@@ -113,6 +118,16 @@
     "method": "POST",
     "path": "/platform/user/login",
     "public": true
+  },
+  {
+    "method": "POST",
+    "path": "/platform/user/logout",
+    "public": true
+  },
+  {
+    "method": "POST",
+    "path": "/platform/user/logout-all",
+    "public": false
   },
   {
     "method": "POST",
