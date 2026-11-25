@@ -180,8 +180,9 @@ describe('app.* security functions', () => {
       ).toEqual([]);
     });
 
-    it('find a platform user by email and by id', async () => {
+    it('find a platform user by email, and by id only for that platform user', async () => {
       const staff = await createPlatformUser({ email: 'staff@fortis.test' });
+      const other = await createPlatformUser();
       expect(
         await call({}, 'auth_find_platform_user_by_email', [
           'STAFF@fortis.test',
@@ -189,12 +190,47 @@ describe('app.* security functions', () => {
       ).toEqual([
         expect.objectContaining({ id: staff.id, is_bootstrap: false }),
       ]);
+
+      const own = await call(
+        { 'app.platform_user_id': staff.id },
+        'auth_find_platform_user_by_id',
+        [staff.id],
+      );
+      expect(own).toEqual([
+        expect.objectContaining({
+          email: 'staff@fortis.test',
+          status: 'active',
+        }),
+      ]);
+      expect(own[0]).not.toHaveProperty('password_hash');
       expect(
-        await call({}, 'auth_find_platform_user_by_id', [staff.id]),
-      ).toEqual([expect.objectContaining({ email: 'staff@fortis.test' })]);
+        await call(
+          { 'app.platform_user_id': other.id },
+          'auth_find_platform_user_by_id',
+          [staff.id],
+        ),
+      ).toEqual([]);
     });
 
-    it('list only active memberships of active businesses', async () => {
+    it('return a user by id only to that user and without the hash', async () => {
+      const user = await createUser();
+      const other = await createUser();
+      const own = await call(
+        { 'app.user_id': user.id },
+        'auth_find_user_by_id',
+        [user.id],
+      );
+      expect(own).toEqual([expect.objectContaining({ id: user.id })]);
+      expect(own[0]).not.toHaveProperty('password_hash');
+      expect(
+        await call({ 'app.user_id': other.id }, 'auth_find_user_by_id', [
+          user.id,
+        ]),
+      ).toEqual([]);
+      expect(await call({}, 'auth_find_user_by_id', [user.id])).toEqual([]);
+    });
+
+    it('list only the caller own active memberships of active businesses', async () => {
       const { businessId, owner: ownerUser } = await createBusinessWithOwner();
       const inactiveBusiness = await createBusiness({ isActive: false });
       await createMembership({
@@ -203,12 +239,22 @@ describe('app.* security functions', () => {
         isOwner: true,
         isActive: false,
       });
-      const rows = await call({}, 'auth_list_active_memberships', [
-        ownerUser.id,
-      ]);
+      const rows = await call(
+        { 'app.user_id': ownerUser.id },
+        'auth_list_active_memberships',
+        [ownerUser.id],
+      );
       expect(rows).toEqual([
         expect.objectContaining({ business_id: businessId, is_owner: true }),
       ]);
+      const stranger = await createUser();
+      expect(
+        await call(
+          { 'app.user_id': stranger.id },
+          'auth_list_active_memberships',
+          [ownerUser.id],
+        ),
+      ).toEqual([]);
     });
 
     it('find only active terminals', async () => {

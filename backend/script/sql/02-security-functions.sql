@@ -99,8 +99,9 @@ $$;
 -- so RLS would hide these rows; these functions expose exactly one account.
 -- ---------------------------------------------------------------------------
 
--- Business user by email (case-insensitive). Includes the password hash so the
--- API can verify it; the runtime role cannot read users.password_hash otherwise.
+-- Business user by email (case-insensitive). Returns the password hash because
+-- sign-in verifies it in the API (argon2id). At most one exact-email row; only
+-- fortis_app may call it. Used only by the sign-in flow.
 CREATE OR REPLACE FUNCTION app.auth_find_user_by_email(p_email text)
 RETURNS TABLE (
   id uuid,
@@ -121,13 +122,14 @@ BEGIN
 END;
 $$;
 
--- Business user by id (refresh and /me re-check that the account is active).
+-- The current user's own account (refresh and /me re-check that it is still
+-- active). Answers only for app.current_user_id() and never returns the hash.
+DROP FUNCTION IF EXISTS app.auth_find_user_by_id(uuid);
 CREATE OR REPLACE FUNCTION app.auth_find_user_by_id(p_user_id uuid)
 RETURNS TABLE (
   id uuid,
   email text,
   name text,
-  password_hash text,
   status text
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -135,9 +137,10 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   RETURN QUERY
-    SELECT u.id, u.email_normalized, u.name, u.password_hash, u.status
+    SELECT u.id, u.email_normalized, u.name, u.status
       FROM public.users u
-     WHERE u.id = p_user_id;
+     WHERE u.id = p_user_id
+       AND u.id = app.current_user_id();
 END;
 $$;
 
@@ -164,13 +167,14 @@ BEGIN
 END;
 $$;
 
--- Platform user by id.
+-- The current platform user's own account. Answers only for
+-- app.current_platform_user_id() and never returns the hash.
+DROP FUNCTION IF EXISTS app.auth_find_platform_user_by_id(uuid);
 CREATE OR REPLACE FUNCTION app.auth_find_platform_user_by_id(p_platform_user_id uuid)
 RETURNS TABLE (
   id uuid,
   email text,
   name text,
-  password_hash text,
   status text,
   is_bootstrap boolean
 )
@@ -179,14 +183,16 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   RETURN QUERY
-    SELECT p.id, p.email_normalized, p.name, p.password_hash, p.status,
-           p.is_bootstrap
+    SELECT p.id, p.email_normalized, p.name, p.status, p.is_bootstrap
       FROM public.platform_users p
-     WHERE p.id = p_platform_user_id;
+     WHERE p.id = p_platform_user_id
+       AND p.id = app.current_platform_user_id();
 END;
 $$;
 
--- Active memberships of a user (at most one today) with the role summary.
+-- Active memberships of the current user (at most one today) with the role
+-- summary. Answers only for app.current_user_id(): sign-in sets the context to
+-- the account whose password was just verified.
 CREATE OR REPLACE FUNCTION app.auth_list_active_memberships(p_user_id uuid)
 RETURNS TABLE (
   membership_id uuid,
@@ -208,6 +214,7 @@ BEGIN
       JOIN public.business b ON b.id = m.business_id
       LEFT JOIN public.roles r ON r.id = m.role_id
      WHERE m.user_id = p_user_id
+       AND m.user_id = app.current_user_id()
        AND m.is_active
        AND b.is_active;
 END;
