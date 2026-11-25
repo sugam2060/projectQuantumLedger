@@ -9,7 +9,11 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
-import { ThrottleStorage } from '../throttling/throttle-storage';
+import { MemoryThrottleStorage } from '../throttling/memory-throttle.storage';
+import {
+  ThrottleStorage,
+  type ThrottleHit,
+} from '../throttling/throttle-storage';
 import {
   AUTH_THROTTLER,
   DEFAULT_THROTTLER,
@@ -32,11 +36,13 @@ type ThrottlerRule = { name: string; limit: number; ttlMs: number };
  * - `auth` throttler (AUTH_THROTTLE_LIMIT) added on `@StrictThrottle()` routes.
  *
  * The client IP is `request.ip`, so TRUST_PROXY must match the deployment. If the
- * counter store fails the guard lets the request through and logs a warning.
+ * shared counter store fails, the guard counts in process memory instead (limits
+ * then apply per instance) and logs a warning, so no route is ever unthrottled.
  */
 @Injectable()
 export class ThrottleGuard implements CanActivate {
   private readonly logger = new Logger(ThrottleGuard.name);
+  private readonly fallback = new MemoryThrottleStorage();
 
   constructor(
     private readonly reflector: Reflector,
@@ -78,15 +84,7 @@ export class ThrottleGuard implements CanActivate {
 
     for (const rule of rules) {
       const key = `throttle:${rule.name}:${routeKey}:${tracker}`;
-      let hit;
-      try {
-        hit = await this.storage.increment(key, rule.ttlMs);
-      } catch (error) {
-        this.logger.warn(
-          `Throttle store unavailable, allowing request: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        return true;
-      }
+      const hit = await this.count(key, rule.ttlMs);
 
       const suffix = rule.name === DEFAULT_THROTTLER ? '' : `-${rule.name}`;
       const resetSeconds = Math.max(1, Math.ceil(hit.msBeforeReset / 1000));
@@ -106,5 +104,16 @@ export class ThrottleGuard implements CanActivate {
       }
     }
     return true;
+  }
+
+  private async count(key: string, ttlMs: number): Promise<ThrottleHit> {
+    try {
+      return await this.storage.increment(key, ttlMs);
+    } catch (error) {
+      this.logger.warn(
+        `Throttle store unavailable, counting in memory: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return this.fallback.increment(key, ttlMs);
+    }
   }
 }

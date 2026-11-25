@@ -122,17 +122,19 @@ describe('ThrottleGuard', () => {
     expect(storage.counts.size).toBe(0);
   });
 
-  it('fails open when the storage is unavailable', async () => {
+  it('keeps limiting in memory when the shared store is unavailable', async () => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const failing = new ThrottleGuard(
       new Reflector(),
       {
         increment: () => Promise.reject(new Error('redis down')),
       } as ThrottleStorage,
-      { ttlMs: 60_000, limit: 1, authLimit: 1 },
+      { ttlMs: 60_000, limit: 5, authLimit: 1 },
     );
-    await expect(
-      failing.canActivate(contextFor('login').context),
-    ).resolves.toBe(true);
+    const { context } = contextFor('login');
+    await expect(failing.canActivate(context)).resolves.toBe(true);
+    await expect(failing.canActivate(context)).rejects.toMatchObject({
+      status: 429,
+    });
   });
 });
