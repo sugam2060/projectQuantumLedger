@@ -1,10 +1,10 @@
-﻿import { jest as jestGlobal } from '@jest/globals';
+import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
 import { ObjectStoreService } from '../../utils/objectStore.service';
-import { AuditLogService } from '../../database/audit-log.service';
+import { AuditLogsService } from '../../audit-logs';
 import { PlatformBusinessService } from '../platform-business.service';
 import { MailOutboxPublisher } from '../mail-outbox.publisher';
 
@@ -100,7 +100,7 @@ describe('PlatformBusinessService.createBranch', () => {
       database as unknown as DatabaseService,
       {} as unknown as ObjectStoreService,
       redis as unknown as RedisService,
-      auditLogs as unknown as AuditLogService,
+      auditLogs as unknown as AuditLogsService,
       { notifyOutboxAvailable: jest.fn() } as unknown as MailOutboxPublisher,
     );
   });

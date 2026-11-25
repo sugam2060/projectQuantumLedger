@@ -20,9 +20,9 @@ import {
 } from '../database/schemas';
 import type { RequestSession } from '../database/request_context.service';
 import {
-  AuditLogService,
+  AuditLogsService,
   type AuditRequestContext,
-} from '../database/audit-log.service';
+} from '../audit-logs';
 import { ObjectStoreService } from '../utils/objectStore.service';
 import type { UpdateBusinessDto } from './dto/update-business.dto';
 import type { ListBranchesQueryDto } from './dto/list-branches-query.dto';
@@ -42,7 +42,7 @@ export class BusinessService {
     private readonly database: DatabaseService,
     private readonly businessUtils: BusinessUtilsService,
     private readonly objectStore: ObjectStoreService,
-    private readonly auditLogs: AuditLogService,
+    private readonly auditLogs: AuditLogsService,
   ) {}
 
   async activateTerminal(

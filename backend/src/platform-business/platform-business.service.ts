@@ -31,9 +31,9 @@ import type { MailJob } from '../workers/mail/mail.types';
 import { RedisService } from '../redis/redis.service';
 import { MailOutboxPublisher } from './mail-outbox.publisher';
 import {
-  AuditLogService,
+  AuditLogsService,
   type AuditRequestContext,
-} from '../database/audit-log.service';
+} from '../audit-logs';
 
 const PROVISION_OPERATION = 'platform.businesses.create';
 const CREATE_BRANCH_OPERATION = 'platform.businesses.create_branch';
@@ -50,7 +50,7 @@ export class PlatformBusinessService {
     private readonly database: DatabaseService,
     private readonly objectStore: ObjectStoreService,
     private readonly redis: RedisService,
-    private readonly auditLogs: AuditLogService,
+    private readonly auditLogs: AuditLogsService,
     private readonly outboxPublisher: MailOutboxPublisher,
   ) {}
 

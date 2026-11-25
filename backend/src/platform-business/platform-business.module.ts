@@ -1,3 +1,4 @@
+import { AuditLogsModule } from '../audit-logs';
 import { ConfigModule } from '@nestjs/config';
 import { appConfig } from '../config';
 import { Module } from '@nestjs/common';
@@ -10,7 +11,12 @@ import { PlatformUsersController } from './platform-users.controller';
 import { PlatformUserInvitationsService } from './platform-user-invitations.service';
 
 @Module({
-  imports: [ConfigModule.forFeature(appConfig), UtilsModule, RedisModule],
+  imports: [
+    AuditLogsModule,
+    ConfigModule.forFeature(appConfig),
+    UtilsModule,
+    RedisModule,
+  ],
   controllers: [PlatformBusinessController, PlatformUsersController],
   providers: [
     PlatformBusinessService,

@@ -1,3 +1,4 @@
+import { AuditLogsModule } from '../audit-logs';
 import { Module } from '@nestjs/common';
 import { DiscoveryModule } from '@nestjs/core';
 import { RolesPermissionsController } from './roles-permissions.controller';
@@ -6,7 +7,7 @@ import { EndpointAccessCatalogService } from './endpoint-access-catalog.service'
 import { EffectivePermissionsCacheService } from './effective-permissions-cache.service';
 
 @Module({
-  imports: [DiscoveryModule],
+  imports: [AuditLogsModule, DiscoveryModule],
   controllers: [RolesPermissionsController],
   providers: [
     EndpointAccessService,

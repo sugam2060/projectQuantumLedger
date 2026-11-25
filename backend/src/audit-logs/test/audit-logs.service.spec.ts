@@ -1,11 +1,14 @@
 import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
-import { AuditLogService } from '../audit-log.service';
-import { DatabaseService } from '../database.service';
+import { AuditLogsRepository } from '../audit-logs.repository';
+import { AuditLogsService } from '../audit-logs.service';
+import { DatabaseService } from '../../database/database.service';
 
-describe('AuditLogService', () => {
+describe('AuditLogsService', () => {
   const database = { transactionWithSession: jest.fn() };
-  const service = new AuditLogService(database as unknown as DatabaseService);
+  const service = new AuditLogsService(
+    new AuditLogsRepository(database as unknown as DatabaseService),
+  );
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -58,5 +61,13 @@ describe('AuditLogService', () => {
       { isPlatform: true, platformUserId: 'platform-user-id' },
       expect.any(Function),
     );
+  });
+
+  it('never throws when a standalone audit write fails', async () => {
+    database.transactionWithSession.mockRejectedValue(new Error('db down'));
+
+    await expect(
+      service.logUserEvent({ userId: 'u' }, { eventType: 'USER_LOGIN_FAILED' }),
+    ).resolves.toBeUndefined();
   });
 });

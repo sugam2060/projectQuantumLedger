@@ -5,7 +5,7 @@ import { DatabaseService } from '../../database/database.service';
 import { ObjectStoreService } from '../../utils/objectStore.service';
 import { PlatformBusinessService } from '../platform-business.service';
 import { RedisService } from '../../redis/redis.service';
-import { AuditLogService } from '../../database/audit-log.service';
+import { AuditLogsService } from '../../audit-logs';
 import type { BusinessRequestDto } from '../dto/business-request.dto';
 import type { ProvisionBusinessDto } from '../dto/provision-business.dto';
 
@@ -77,7 +77,7 @@ describe('PlatformBusinessService', () => {
       database as unknown as DatabaseService,
       objectStore as unknown as ObjectStoreService,
       redis as unknown as RedisService,
-      auditLogs as unknown as AuditLogService,
+      auditLogs as unknown as AuditLogsService,
       outboxPublisher as never,
     );
   });

@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { AuditLogService } from '../../database/audit-log.service';
+import { AuditLogsService } from '../../audit-logs';
 import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
 import { ObjectStoreService } from '../../utils/objectStore.service';
@@ -113,7 +113,7 @@ describe('BusinessService.updateBusinessProfile', () => {
       database as unknown as DatabaseService,
       new BusinessUtilsService(redis as unknown as RedisService),
       objectStore as unknown as ObjectStoreService,
-      auditLogs as unknown as AuditLogService,
+      auditLogs as unknown as AuditLogsService,
     );
   });
 

@@ -8,7 +8,7 @@ import { UtilsService } from '../../utils/utils.service';
 import { PlatformAuthService } from '../authentication.service.platform';
 import { PlatformUserLoginDto } from '../dto/platform-user-login.dto';
 import bcrypt from 'bcryptjs';
-import { AuditLogService } from '../../database/audit-log.service';
+import { AuditLogsService } from '../../audit-logs';
 
 describe('PlatformAuthService', () => {
   const database = {
@@ -34,7 +34,7 @@ describe('PlatformAuthService', () => {
       jwt as unknown as JwtService,
       utils as unknown as UtilsService,
       redis as unknown as RedisService,
-      auditLogs as unknown as AuditLogService,
+      auditLogs as unknown as AuditLogsService,
     );
   });
 

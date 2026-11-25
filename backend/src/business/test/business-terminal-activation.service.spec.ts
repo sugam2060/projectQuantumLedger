@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { ForbiddenException } from '@nestjs/common';
-import { AuditLogService } from '../../database/audit-log.service';
+import { AuditLogsService } from '../../audit-logs';
 import { DatabaseService } from '../../database/database.service';
 import { ObjectStoreService } from '../../utils/objectStore.service';
 import { BusinessService } from '../business.service';
@@ -15,7 +15,7 @@ describe('BusinessService.activateTerminal', () => {
     database as unknown as DatabaseService,
     {} as BusinessUtilsService,
     {} as ObjectStoreService,
-    auditLogs as unknown as AuditLogService,
+    auditLogs as unknown as AuditLogsService,
   );
   const businessId = '00000000-0000-4000-8000-000000000001';
   const branchId = '00000000-0000-4000-8000-000000000002';

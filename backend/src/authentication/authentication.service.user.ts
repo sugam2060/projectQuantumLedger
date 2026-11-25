@@ -28,9 +28,9 @@ import { EffectivePermissionsCacheService } from '../roles-permissions/effective
 import bcrypt from 'bcryptjs';
 import type { OwnerRegistrationDto } from './dto/owner-registration.dto';
 import {
-  AuditLogService,
+  AuditLogsService,
   type AuditRequestContext,
-} from '../database/audit-log.service';
+} from '../audit-logs';
 
 type UserAuthTransaction = Parameters<
   Parameters<DatabaseService['transaction']>[0]
@@ -51,7 +51,7 @@ export class UserAuthService {
     private readonly redisService: RedisService,
     private readonly endpointCatalog: EndpointAccessCatalogService,
     private readonly permissionsCache: EffectivePermissionsCacheService,
-    private readonly auditLogs: AuditLogService,
+    private readonly auditLogs: AuditLogsService,
   ) {}
 
   async userLogin(

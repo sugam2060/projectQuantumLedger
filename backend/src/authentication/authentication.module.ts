@@ -1,3 +1,4 @@
+import { AuditLogsModule } from '../audit-logs';
 import { Module } from '@nestjs/common';
 import { ConfigModule, type ConfigType } from '@nestjs/config';
 import { authConfig } from '../config';
@@ -14,6 +15,7 @@ import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.m
 
 @Module({
   imports: [
+    AuditLogsModule,
     ConfigModule.forFeature(authConfig),
     UtilsModule,
     RolesPermissionsModule,

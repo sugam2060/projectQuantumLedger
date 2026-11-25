@@ -12,9 +12,9 @@ import { RedisService } from '../redis/redis.service';
 import { UtilsService } from '../utils/utils.service';
 import { PlatformUserLoginDto } from './dto/platform-user-login.dto';
 import {
-  AuditLogService,
+  AuditLogsService,
   type AuditRequestContext,
-} from '../database/audit-log.service';
+} from '../audit-logs';
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -43,7 +43,7 @@ export class PlatformAuthService {
     private readonly jwtService: JwtService,
     private readonly utilsService: UtilsService,
     private readonly redisService: RedisService,
-    private readonly auditLogs: AuditLogService,
+    private readonly auditLogs: AuditLogsService,
   ) {}
 
   async login(

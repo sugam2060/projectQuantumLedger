@@ -1,4 +1,4 @@
-﻿import { jest as jestGlobal } from '@jest/globals';
+import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserAuthService } from '../authentication.service.user';
@@ -11,7 +11,7 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import { EndpointAccessCatalogService } from '../../roles-permissions/endpoint-access-catalog.service';
 import { EffectivePermissionsCacheService } from '../../roles-permissions/effective-permissions-cache.service';
-import { AuditLogService } from '../../database/audit-log.service';
+import { AuditLogsService } from '../../audit-logs';
 
 describe('UserAuthService', () => {
   let service: UserAuthService;
@@ -101,7 +101,7 @@ describe('UserAuthService', () => {
           provide: EffectivePermissionsCacheService,
           useValue: permissionsCacheMock,
         },
-        { provide: AuditLogService, useValue: auditLogsMock },
+        { provide: AuditLogsService, useValue: auditLogsMock },
       ],
     }).compile();
 

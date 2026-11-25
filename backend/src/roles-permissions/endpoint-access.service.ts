@@ -13,9 +13,9 @@ import {
 } from '../database/schemas';
 import { EffectivePermissionsCacheService } from './effective-permissions-cache.service';
 import {
-  AuditLogService,
+  AuditLogsService,
   type AuditRequestContext,
-} from '../database/audit-log.service';
+} from '../audit-logs';
 
 export interface EndpointRoleConfiguration {
   endpointKey: string;
@@ -29,7 +29,7 @@ export class EndpointAccessService {
   constructor(
     private readonly database: DatabaseService,
     private readonly permissionsCache: EffectivePermissionsCacheService,
-    private readonly auditLogs: AuditLogService,
+    private readonly auditLogs: AuditLogsService,
   ) {}
 
   async listConfigurations(
