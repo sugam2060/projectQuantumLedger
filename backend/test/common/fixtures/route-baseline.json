@@ -1,0 +1,127 @@
+[
+  {
+    "method": "GET",
+    "path": "/",
+    "public": true
+  },
+  {
+    "method": "POST",
+    "path": "/authentication/login",
+    "public": true
+  },
+  {
+    "method": "POST",
+    "path": "/authentication/logout",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/authentication/me",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/authentication/refresh",
+    "public": true
+  },
+  {
+    "method": "POST",
+    "path": "/authentication/register-owner",
+    "public": true
+  },
+  {
+    "method": "GET",
+    "path": "/business/endpoint-access",
+    "public": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/business/endpoint-access/:endpointKey",
+    "public": false
+  },
+  {
+    "method": "PUT",
+    "path": "/business/endpoint-access/:endpointKey",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/business/endpoint-access/endpoints",
+    "public": true
+  },
+  {
+    "method": "GET",
+    "path": "/businesses/:businessId",
+    "public": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/businesses/:businessId",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/businesses/:businessId/branches",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/businesses/:businessId/branches/:branchId",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/businesses/:businessId/branches/:branchId/terminals/activate",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/onboarding",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/platform",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/platform/business/:business_id",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/platform/business/:business_id/:branch_id",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/platform/businesses/:businessId/branches",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/platform/businesses/create",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/platform/businesses/request",
+    "public": true
+  },
+  {
+    "method": "POST",
+    "path": "/platform/user/login",
+    "public": true
+  },
+  {
+    "method": "POST",
+    "path": "/platform/user/refresh",
+    "public": true
+  },
+  {
+    "method": "POST",
+    "path": "/platform/users/invite",
+    "public": false
+  }
+]
