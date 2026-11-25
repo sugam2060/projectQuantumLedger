@@ -5,6 +5,7 @@ import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
 import { ObjectStoreService } from '../../utils/objectStore.service';
 import { AuditLogsService } from '../../audit-logs';
+import { PlatformBusinessesRepository } from '../platform-businesses.repository';
 import { PlatformBusinessesService } from '../platform-businesses.service';
 import { MailOutboxPublisher } from '../mail-outbox.publisher';
 
@@ -97,8 +98,7 @@ describe('PlatformBusinessesService.createBranch', () => {
         callback(tx),
     );
     service = new PlatformBusinessesService(
-      database as unknown as DatabaseService,
-      {} as unknown as ObjectStoreService,
+      new PlatformBusinessesRepository(database as unknown as DatabaseService),
       redis as unknown as RedisService,
       auditLogs as unknown as AuditLogsService,
       { notifyOutboxAvailable: jest.fn() } as unknown as MailOutboxPublisher,

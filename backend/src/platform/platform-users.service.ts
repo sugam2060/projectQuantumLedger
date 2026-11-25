@@ -8,11 +8,13 @@ import {
 import type { ConfigType } from '@nestjs/config';
 import { appConfig } from '../config';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
-import { DatabaseService } from '../database/database.service';
-import { invitations, mailOutbox, platformUsers } from '../database/schemas';
+import {
+  PG_UNIQUE_VIOLATION,
+  postgresErrorCode,
+} from '../common/utils/postgres-error.util';
 import { RedisService } from '../redis/redis.service';
 import { MailOutboxPublisher } from './mail-outbox.publisher';
+import { PlatformUsersRepository } from './platform-users.repository';
 import type { InvitePlatformUserDto } from './dto/invite-platform-user.dto';
 
 const INVITE_OPERATION = 'platform.users.invite';
@@ -29,7 +31,7 @@ export class PlatformUsersService {
   private readonly logger = new Logger(PlatformUsersService.name);
 
   constructor(
-    private readonly database: DatabaseService,
+    private readonly repository: PlatformUsersRepository,
     private readonly redis: RedisService,
     @Inject(appConfig.KEY)
     private readonly config: ConfigType<typeof appConfig>,
@@ -122,25 +124,18 @@ export class PlatformUsersService {
     const invitationUrl = `${frontendBaseUrl}/accept/invite/${tokenHash}`;
 
     try {
-      await this.database.transactionWithSession(
-        {
-          isPlatform: true,
-          platformUserId,
-          platformAuthEmail: email,
-        },
+      await this.repository.inInvitationTransaction(
+        { platformUserId, inviteeEmail: email },
         async (tx) => {
-          const [existingPlatformUser] = await tx
-            .select({ id: platformUsers.id })
-            .from(platformUsers)
-            .where(eq(platformUsers.emailNormalized, email))
-            .limit(1);
+          const existingPlatformUser =
+            await this.repository.findPlatformUserIdByEmail(tx, email);
           if (existingPlatformUser) {
             throw new ConflictException(
               'A platform user with this email already exists',
             );
           }
 
-          await tx.insert(invitations).values({
+          await this.repository.insertInvitation(tx, {
             emailNormalized: email,
             inviteeName: name,
             invitationType: 'platform_user',
@@ -148,27 +143,23 @@ export class PlatformUsersService {
             expiresAt,
             invitedByPlatformUserId: platformUserId,
           });
-          await tx.insert(mailOutbox).values({
-            businessId: null,
-            requestId: null,
-            payload: {
-              id: randomUUID(),
-              to: email,
-              subject: 'You are invited to manage Fortis',
-              template: 'user-invitation',
-              context: {
-                inviterName: inviterName?.trim() || 'A platform manager',
-                invitationUrl,
-              },
-              correlationId: tokenHash,
-              createdAt: now.toISOString(),
+          await this.repository.enqueueMail(tx, {
+            id: randomUUID(),
+            to: email,
+            subject: 'You are invited to manage Fortis',
+            template: 'user-invitation',
+            context: {
+              inviterName: inviterName?.trim() || 'A platform manager',
+              invitationUrl,
             },
+            correlationId: tokenHash,
+            createdAt: now.toISOString(),
           });
         },
       );
       this.outboxPublisher.notifyOutboxAvailable();
     } catch (error) {
-      if (postgresErrorCode(error) === '23505') {
+      if (postgresErrorCode(error) === PG_UNIQUE_VIOLATION) {
         throw new ConflictException(
           'A platform user or open invitation with this email already exists',
         );
@@ -227,19 +218,4 @@ export class PlatformUsersService {
     }
     return entry.response;
   }
-}
-
-function postgresErrorCode(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null) return undefined;
-  if ('code' in error && typeof error.code === 'string') return error.code;
-  if (
-    'cause' in error &&
-    typeof error.cause === 'object' &&
-    error.cause !== null &&
-    'code' in error.cause &&
-    typeof error.cause.code === 'string'
-  ) {
-    return error.cause.code;
-  }
-  return undefined;
 }

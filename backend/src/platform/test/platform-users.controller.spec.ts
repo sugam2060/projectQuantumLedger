@@ -28,11 +28,9 @@ describe('PlatformUsersController', () => {
         { name: 'Jane Manager', email: 'jane@example.com' },
         { clientType: 'web', idempotencyKey: 'key-1' },
         {
-          user: {
-            isPlatform: true,
-            platformUserId: 'platform-user-id',
-            name: 'Admin',
-          },
+          isPlatform: true,
+          platformUserId: 'platform-user-id',
+          name: 'Admin',
         } as never,
       ),
     ).resolves.toEqual({ message: 'Invite sent to Jane Manager' });
@@ -49,7 +47,7 @@ describe('PlatformUsersController', () => {
       controller.invite(
         { name: 'Jane Manager', email: 'jane@example.com' },
         { clientType: 'web', idempotencyKey: 'key-1' },
-        { user: { isPlatform: false, platformUserId: 'user-id' } } as never,
+        { isPlatform: false, platformUserId: 'user-id' } as never,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(invitations.invitePlatformUser).not.toHaveBeenCalled();

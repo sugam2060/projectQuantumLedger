@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { ConflictException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
+import { PlatformUsersRepository } from '../platform-users.repository';
 import { PlatformUsersService } from '../platform-users.service';
 
 describe('PlatformUsersService', () => {
@@ -43,7 +44,7 @@ describe('PlatformUsersService', () => {
         }),
     );
     service = new PlatformUsersService(
-      database as unknown as DatabaseService,
+      new PlatformUsersRepository(database as unknown as DatabaseService),
       redis as unknown as RedisService,
       config as never,
       outboxPublisher as never,

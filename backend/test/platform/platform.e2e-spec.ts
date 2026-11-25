@@ -7,8 +7,10 @@ import type { Test as SupertestTest } from 'supertest';
 import type { NextFunction, Request, Response } from 'express';
 import { PlatformBusinessesController } from '../../src/platform/platform-businesses.controller';
 import { PlatformBusinessesService } from '../../src/platform/platform-businesses.service';
+import { BusinessRequestsController } from '../../src/platform/business-requests.controller';
+import { BusinessRequestsService } from '../../src/platform/business-requests.service';
 
-describe('PlatformBusinessesController (e2e)', () => {
+describe('Platform routes (e2e)', () => {
   let app: INestApplication;
   const platformBusiness = {
     submitBusinessRequest: jest.fn(),
@@ -18,9 +20,10 @@ describe('PlatformBusinessesController (e2e)', () => {
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
-      controllers: [PlatformBusinessesController],
+      controllers: [PlatformBusinessesController, BusinessRequestsController],
       providers: [
         { provide: PlatformBusinessesService, useValue: platformBusiness },
+        { provide: BusinessRequestsService, useValue: platformBusiness },
       ],
     }).compile();
     app = module.createNestApplication();

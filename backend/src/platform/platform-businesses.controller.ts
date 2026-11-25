@@ -2,97 +2,61 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
+  Headers,
   HttpCode,
   HttpStatus,
-  ForbiddenException,
-  Get,
   Param,
   ParseUUIDPipe,
   Post,
   Query,
-  Req,
-  UploadedFiles,
-  UseInterceptors,
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
-import { Public } from '../common/decorators/public.decorator';
+import { AuditContext, type AuditRequestContext } from '../audit-logs';
 import { RateLimit } from '../authentication/decorators/rate-limit.decorator';
-import { BusinessUploadHeaders } from './decorators/business-upload-headers.decorator';
-import { BusinessUploadHeaderDto } from './dto/business-upload-header.dto';
-import { BusinessRequestDto } from './dto/business-request.dto';
-import { PlatformBusinessesService } from './platform-businesses.service';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../common/types';
+import { BusinessListHeaders } from './decorators/business-list-headers.decorator';
+import { ProvisionBusinessHeaders } from './decorators/provision-business-headers.decorator';
+import { BusinessBranchParamsDto } from './dto/business-branch-params.dto';
+import { BusinessListHeadersDto } from './dto/business-list-headers.dto';
+import { CreateBusinessBranchDto } from './dto/create-business-branch.dto';
+import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { ProvisionBusinessDto } from './dto/provision-business.dto';
 import { ProvisionBusinessHeadersDto } from './dto/provision-business-headers.dto';
 import { ProvisionBusinessQueryDto } from './dto/provision-business-query.dto';
-import { ProvisionBusinessHeaders } from './decorators/provision-business-headers.decorator';
-import { BusinessListHeaders } from './decorators/business-list-headers.decorator';
-import { BusinessListHeadersDto } from './dto/business-list-headers.dto';
-import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
-import { BusinessBranchParamsDto } from './dto/business-branch-params.dto';
-import { CreateBusinessBranchDto } from './dto/create-business-branch.dto';
-import type { AuthenticatedUser } from '../authentication/strategies/jwt.strategy';
-import type { Request } from 'express';
+import { PlatformBusinessesService } from './platform-businesses.service';
+import { requirePlatformUserId } from './utils/platform-user-id.util';
 
-interface PlatformAuthenticatedRequest extends Request {
-  user: AuthenticatedUser;
-}
+const READ_CLIENT_TYPES = ['web', 'mobile', 'desktop'];
 
-export interface BusinessRequestFiles {
-  panCardFront?: Express.Multer.File[];
-  panCardBack?: Express.Multer.File[];
-  businessRegistrationCertificate?: Express.Multer.File[];
-}
-
+/** Fortis-staff routes for reading, listing and provisioning businesses. */
 @Controller('platform')
 export class PlatformBusinessesController {
-  constructor(private readonly platformBusiness: PlatformBusinessesService) {}
+  constructor(private readonly platformBusinesses: PlatformBusinessesService) {}
 
   @Get('business/:business_id')
   @HttpCode(HttpStatus.OK)
   async getBusiness(
     @Param('business_id', new ParseUUIDPipe()) businessId: string,
-    @Req() request: PlatformAuthenticatedRequest,
+    @Headers('x-client-type') clientType: string | undefined,
+    @CurrentUser() user: AuthenticatedUser | undefined,
   ) {
-    const clientType = request.header('x-client-type');
-    if (
-      typeof clientType !== 'string' ||
-      !['web', 'mobile', 'desktop'].includes(clientType)
-    ) {
-      throw new BadRequestException('A valid x-client-type header is required');
-    }
-
-    const isPlatformUser = request.user?.isPlatform === true;
-    const platformUserId = isPlatformUser
-      ? (request.user.platformUserId ??
-        request.user.subjectId ??
-        request.user.userId ??
-        request.user.sub)
-      : undefined;
-    if (!platformUserId) {
-      throw new ForbiddenException('Platform user authentication required');
-    }
-
-    return this.platformBusiness.getBusinessDetails(businessId, platformUserId);
+    assertReadClientType(clientType);
+    return this.platformBusinesses.getBusinessDetails(
+      businessId,
+      requirePlatformUserId(user),
+    );
   }
 
   @Get()
   async listBusinesses(
     @Query() query: ListBusinessesQueryDto,
     @BusinessListHeaders() _headers: BusinessListHeadersDto,
-    @Req() request: PlatformAuthenticatedRequest,
+    @CurrentUser() user: AuthenticatedUser | undefined,
   ) {
-    const user = request.user;
-    const platformUserId = user?.isPlatform
-      ? (user.platformUserId ?? user.subjectId ?? user.userId ?? user.sub)
-      : undefined;
-    if (!platformUserId) {
-      throw new ForbiddenException('Platform user authentication required');
-    }
-
-    return this.platformBusiness.listBusinesses(
+    return this.platformBusinesses.listBusinesses(
       { page: query.page, limit: query.limit },
-      platformUserId,
+      requirePlatformUserId(user),
     );
   }
 
@@ -101,31 +65,14 @@ export class PlatformBusinessesController {
   async getBranch(
     @Param('business_id', new ParseUUIDPipe()) businessId: string,
     @Param('branch_id', new ParseUUIDPipe()) branchId: string,
-    @Req() request: PlatformAuthenticatedRequest,
+    @Headers('x-client-type') clientType: string | undefined,
+    @CurrentUser() user: AuthenticatedUser | undefined,
   ) {
-    const clientType = request.header('x-client-type');
-    if (
-      typeof clientType !== 'string' ||
-      !['web', 'mobile', 'desktop'].includes(clientType)
-    ) {
-      throw new BadRequestException('A valid x-client-type header is required');
-    }
-
-    const isPlatformUser = request.user?.isPlatform === true;
-    const platformUserId = isPlatformUser
-      ? (request.user.platformUserId ??
-        request.user.subjectId ??
-        request.user.userId ??
-        request.user.sub)
-      : undefined;
-    if (!platformUserId) {
-      throw new ForbiddenException('Platform user authentication required');
-    }
-
-    return this.platformBusiness.getBranchDetails(
+    assertReadClientType(clientType);
+    return this.platformBusinesses.getBranchDetails(
       businessId,
       branchId,
-      platformUserId,
+      requirePlatformUserId(user),
     );
   }
 
@@ -140,31 +87,15 @@ export class PlatformBusinessesController {
     @Query() query: ProvisionBusinessQueryDto,
     @Body() body: ProvisionBusinessDto,
     @ProvisionBusinessHeaders() headers: ProvisionBusinessHeadersDto,
-    @Req() request: PlatformAuthenticatedRequest,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @AuditContext() auditContext: AuditRequestContext,
   ) {
-    const isPlatformUser = request.user?.isPlatform === true;
-    const platformUserId = isPlatformUser
-      ? (request.user.platformUserId ??
-        request.user.subjectId ??
-        request.user.userId ??
-        request.user.sub)
-      : undefined;
-    if (!platformUserId) {
-      throw new ForbiddenException('Platform user authentication required');
-    }
-    return this.platformBusiness.provisionBusiness(
+    return this.platformBusinesses.provisionBusiness(
       query.requested_business_id,
       body,
       headers.idempotencyKey,
-      platformUserId,
-      {
-        method: request.method,
-        endpointPath: request.route?.path,
-        requestId: request.header('x-request-id'),
-        clientType: request.header('x-client-type'),
-        ipAddress: request.ip,
-        userAgent: request.header('user-agent'),
-      },
+      requirePlatformUserId(user),
+      auditContext,
     );
   }
 
@@ -174,92 +105,24 @@ export class PlatformBusinessesController {
     @Param() params: BusinessBranchParamsDto,
     @Body() body: CreateBusinessBranchDto,
     @ProvisionBusinessHeaders() headers: ProvisionBusinessHeadersDto,
-    @Req() request: PlatformAuthenticatedRequest,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @AuditContext() auditContext: AuditRequestContext,
   ) {
-    const isPlatformUser = request.user?.isPlatform === true;
-    const platformUserId = isPlatformUser
-      ? (request.user.platformUserId ??
-        request.user.subjectId ??
-        request.user.userId ??
-        request.user.sub)
-      : undefined;
-    if (!platformUserId) {
-      throw new ForbiddenException('Platform user authentication required');
-    }
-
-    return this.platformBusiness.createBranch(
+    return this.platformBusinesses.createBranch(
       params.businessId,
       body,
       headers.idempotencyKey,
-      platformUserId,
-      {
-        method: request.method,
-        endpointPath: request.route?.path,
-        requestId: request.header('x-request-id'),
-        clientType: request.header('x-client-type'),
-        ipAddress: request.ip,
-        userAgent: request.header('user-agent'),
-      },
+      requirePlatformUserId(user),
+      auditContext,
     );
   }
+}
 
-  @Post('businesses/request')
-  @HttpCode(HttpStatus.CREATED)
-  @Public()
-  @RateLimit({
-    requests: 5,
-    windowMs: 60 * 60_000,
-    errorMessage: 'Too many business requests. Try again later.',
-  })
-  @UseInterceptors(
-    FileFieldsInterceptor(
-      [
-        { name: 'panCardFront', maxCount: 1 },
-        { name: 'panCardBack', maxCount: 1 },
-        { name: 'businessRegistrationCertificate', maxCount: 1 },
-      ],
-      {
-        storage: memoryStorage(),
-        limits: { fileSize: 10 * 1024 * 1024, files: 3 },
-      },
-    ),
-  )
-  async submitRequest(
-    @BusinessUploadHeaders() _headers: BusinessUploadHeaderDto,
-    @Body() request: BusinessRequestDto,
-    @UploadedFiles() files: BusinessRequestFiles | undefined,
-    @Req() req: Request,
+function assertReadClientType(clientType: string | undefined): void {
+  if (
+    typeof clientType !== 'string' ||
+    !READ_CLIENT_TYPES.includes(clientType)
   ) {
-    if (
-      !files?.panCardFront?.[0] ||
-      !files.panCardBack?.[0] ||
-      !files.businessRegistrationCertificate?.[0]
-    ) {
-      throw new BadRequestException(
-        'PAN front, PAN back, and business registration files are required',
-      );
-    }
-
-    await this.platformBusiness.submitBusinessRequest(
-      request,
-      {
-        panCardFront: files.panCardFront[0],
-        panCardBack: files.panCardBack[0],
-        businessRegistrationCertificate:
-          files.businessRegistrationCertificate[0],
-      },
-      {
-        method: req.method,
-        endpointPath: req.route?.path,
-        requestId: req.header('x-request-id'),
-        clientType: req.header('x-client-type'),
-        ipAddress: req.ip,
-        userAgent: req.header('user-agent'),
-      },
-    );
-    return {
-      message:
-        'Your request has been submitted. Our team will contact you for further process.',
-    };
+    throw new BadRequestException('A valid x-client-type header is required');
   }
 }
