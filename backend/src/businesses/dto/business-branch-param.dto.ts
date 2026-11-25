@@ -1,10 +1,7 @@
 import { IsUUID } from 'class-validator';
+import { BusinessIdParamDto } from './business-id-param.dto';
 
-export class BusinessIdParamDto {
-  @IsUUID()
-  businessId!: string;
-}
-
+/** `:businessId/branches/:branchId` route parameters. */
 export class BusinessBranchParamDto extends BusinessIdParamDto {
   @IsUUID()
   branchId!: string;

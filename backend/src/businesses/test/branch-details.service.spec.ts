@@ -5,14 +5,12 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
-import { RedisService } from '../../redis/redis.service';
-import { ObjectStoreService } from '../../utils/objectStore.service';
-import { BusinessService } from '../business.service';
-import { BusinessUtilsService } from '../business.utils.service';
+import { BranchesRepository } from '../branches.repository';
+import { BranchesService } from '../branches.service';
 
 const mockFn = () => jest.fn<(...args: any[]) => any>();
 
-describe('BusinessService.getBranchDetails', () => {
+describe('BranchesService.getBranchDetails', () => {
   const database = { transactionWithSession: mockFn() };
   const redis = { get: mockFn() };
   const auditLogs = { insertUserEvent: mockFn() };
@@ -23,7 +21,7 @@ describe('BusinessService.getBranchDetails', () => {
     userId: '00000000-0000-4000-8000-000000000003',
     isOwner: true,
   };
-  let service: BusinessService;
+  let service: BranchesService;
   let membership: { branchId: string | null; isOwner: boolean } | undefined;
   let branch: Record<string, unknown> | undefined;
   let terminalCounts: Array<{ status: string; total: number }>;
@@ -85,11 +83,8 @@ describe('BusinessService.getBranchDetails', () => {
         return callback(tx);
       },
     );
-    service = new BusinessService(
-      database as unknown as DatabaseService,
-      new BusinessUtilsService(redis as unknown as RedisService),
-      {} as unknown as ObjectStoreService,
-      auditLogs as never,
+    service = new BranchesService(
+      new BranchesRepository(database as unknown as DatabaseService),
     );
   });
 

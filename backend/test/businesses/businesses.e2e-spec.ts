@@ -9,12 +9,16 @@ import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
-import { PermissionGuard } from '../src/authentication/guards/permission.guard';
-import type { AuthenticatedUser } from '../src/authentication/strategies/jwt.strategy';
-import { BusinessController } from '../src/business/business.controller';
-import { BusinessService } from '../src/business/business.service';
+import { PermissionGuard } from '../../src/authentication/guards/permission.guard';
+import type { AuthenticatedUser } from '../../src/authentication/strategies/jwt.strategy';
+import { BranchesController } from '../../src/businesses/branches.controller';
+import { BranchesService } from '../../src/businesses/branches.service';
+import { BusinessesController } from '../../src/businesses/businesses.controller';
+import { BusinessesService } from '../../src/businesses/businesses.service';
+import { TerminalsController } from '../../src/businesses/terminals.controller';
+import { TerminalsService } from '../../src/businesses/terminals.service';
 
-describe('BusinessController endpoints (e2e)', () => {
+describe('Businesses endpoints (e2e)', () => {
   let app: INestApplication;
   const businessId = '00000000-0000-4000-8000-000000000001';
   const branchId = '00000000-0000-4000-8000-000000000002';
@@ -29,8 +33,16 @@ describe('BusinessController endpoints (e2e)', () => {
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
-      controllers: [BusinessController],
-      providers: [{ provide: BusinessService, useValue: businessService }],
+      controllers: [
+        BusinessesController,
+        BranchesController,
+        TerminalsController,
+      ],
+      providers: [
+        { provide: BusinessesService, useValue: businessService },
+        { provide: BranchesService, useValue: businessService },
+        { provide: TerminalsService, useValue: businessService },
+      ],
     }).compile();
     app = module.createNestApplication();
     app.useGlobalPipes(

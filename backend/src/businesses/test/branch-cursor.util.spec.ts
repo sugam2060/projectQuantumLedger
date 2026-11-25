@@ -1,9 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
-import { RedisService } from '../../redis/redis.service';
-import { BusinessUtilsService } from '../business.utils.service';
+import {
+  createBranchCursor,
+  parseBranchCursor,
+} from '../utils/branch-cursor.util';
 
-describe('BusinessUtilsService branch cursors', () => {
-  const service = new BusinessUtilsService({} as RedisService);
+describe('branch cursor util', () => {
+  const service = { createBranchCursor, parseBranchCursor };
   const context = {
     businessId: '00000000-0000-4000-8000-000000000001',
     from: new Date('2026-10-01T00:00:00.000Z'),

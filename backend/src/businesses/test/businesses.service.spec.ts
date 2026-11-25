@@ -1,16 +1,17 @@
 import { NotFoundException } from '@nestjs/common';
 import { jest } from '@jest/globals';
-import { BusinessService } from '../business.service';
+import { BusinessesRepository } from '../businesses.repository';
+import { BusinessesService } from '../businesses.service';
 
-describe('BusinessService', () => {
+describe('BusinessesService', () => {
   const limit = jest.fn<(...args: any[]) => any>();
   const where = jest.fn<(...args: any[]) => any>(() => ({ limit }));
   const from = jest.fn<(...args: any[]) => any>(() => ({ where }));
   const database = {
     transactionWithSession: jest.fn<(...args: any[]) => any>(),
   };
-  const service = new BusinessService(
-    database as never,
+  const service = new BusinessesService(
+    new BusinessesRepository(database as never),
     {} as never,
     {} as never,
     {} as never,

@@ -8,12 +8,13 @@ import { AuditLogsService } from '../../audit-logs';
 import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
 import { ObjectStoreService } from '../../utils/objectStore.service';
-import { BusinessService } from '../business.service';
-import { BusinessUtilsService } from '../business.utils.service';
+import { BusinessUpdateIdempotencyService } from '../business-update-idempotency.service';
+import { BusinessesRepository } from '../businesses.repository';
+import { BusinessesService } from '../businesses.service';
 
 const mockFn = () => jest.fn<(...args: any[]) => any>();
 
-describe('BusinessService.updateBusinessProfile', () => {
+describe('BusinessesService.updateBusinessProfile', () => {
   const redis = {
     get: mockFn(),
     set: mockFn(),
@@ -23,7 +24,7 @@ describe('BusinessService.updateBusinessProfile', () => {
   const objectStore = { upload: mockFn(), delete: mockFn() };
   const auditLogs = { insertUserEvent: mockFn() };
   const database = { transactionWithSession: mockFn() };
-  let service: BusinessService;
+  let service: BusinessesService;
   let current: Record<string, unknown>;
   let tx: Record<string, jest.Mock>;
   let selectCount: number;
@@ -109,9 +110,9 @@ describe('BusinessService.updateBusinessProfile', () => {
     });
     objectStore.delete.mockResolvedValue(undefined);
     auditLogs.insertUserEvent.mockResolvedValue(undefined);
-    service = new BusinessService(
-      database as unknown as DatabaseService,
-      new BusinessUtilsService(redis as unknown as RedisService),
+    service = new BusinessesService(
+      new BusinessesRepository(database as unknown as DatabaseService),
+      new BusinessUpdateIdempotencyService(redis as unknown as RedisService),
       objectStore as unknown as ObjectStoreService,
       auditLogs as unknown as AuditLogsService,
     );

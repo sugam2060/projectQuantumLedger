@@ -10,7 +10,7 @@ import { UtilsModule } from './utils/utils.module';
 import { RedisModule } from './redis/redis.module';
 import { RolesPermissionsModule } from './roles-permissions/roles-permissions.module';
 import { PlatformModule } from './platform/platform.module';
-import { BusinessModule } from './business/business.module';
+import { BusinessesModule } from './businesses';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionGuard } from './authentication/guards/permission.guard';
 import { RateLimitGuard } from './authentication/guards/rate-limit.guard';
@@ -29,7 +29,7 @@ import { RateLimitGuard } from './authentication/guards/rate-limit.guard';
     RedisModule,
     RolesPermissionsModule,
     PlatformModule,
-    BusinessModule,
+    BusinessesModule,
   ],
   controllers: [AppController],
   providers: [

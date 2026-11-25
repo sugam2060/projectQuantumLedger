@@ -2,19 +2,16 @@ import { jest } from '@jest/globals';
 import { ForbiddenException } from '@nestjs/common';
 import { AuditLogsService } from '../../audit-logs';
 import { DatabaseService } from '../../database/database.service';
-import { ObjectStoreService } from '../../utils/objectStore.service';
-import { BusinessService } from '../business.service';
-import { BusinessUtilsService } from '../business.utils.service';
+import { TerminalsRepository } from '../terminals.repository';
+import { TerminalsService } from '../terminals.service';
 
 const mockFn = () => jest.fn<(...args: any[]) => any>();
 
-describe('BusinessService.activateTerminal', () => {
+describe('TerminalsService.activateTerminal', () => {
   const database = { transactionWithSession: mockFn() };
   const auditLogs = { insertUserEvent: mockFn() };
-  const service = new BusinessService(
-    database as unknown as DatabaseService,
-    {} as BusinessUtilsService,
-    {} as ObjectStoreService,
+  const service = new TerminalsService(
+    new TerminalsRepository(database as unknown as DatabaseService),
     auditLogs as unknown as AuditLogsService,
   );
   const businessId = '00000000-0000-4000-8000-000000000001';
