@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import { RedisService } from '../redis/redis.service';
-import { business, type BusinessDocuments } from '../database/schema';
+import { business, type BusinessDocuments } from '../database/schemas';
 import type { UpdateBusinessDto } from './dto/update-business.dto';
 
 const OPERATION = 'businesses.update';

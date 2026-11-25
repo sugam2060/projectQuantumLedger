@@ -1,18 +1,19 @@
 import { relations } from 'drizzle-orm';
-import { accessLogs, auditLogs } from './audit_logs/access_audit_logs';
-import { platformAuditLogs } from './audit_logs/platform_audit_logs';
-import { branches } from './Identity_and_tenent/branches';
-import { business } from './Identity_and_tenent/businesses';
-import { businessProvisioningRequests } from './Identity_and_tenent/business_provisioning_requests';
-import { ownerRedemptions } from './Identity_and_tenent/owner_redemptions';
-import { mailOutbox } from './Identity_and_tenent/mail_outbox';
-import { businessMemberships } from './Identity_and_tenent/business_membership';
-import { endpointRoleAccess } from './Identity_and_tenent/endpoint_role_access';
-import { invitations } from './Identity_and_tenent/invitations';
-import { platformUsers } from './Identity_and_tenent/platform_users';
-import { roles } from './Identity_and_tenent/roles';
-import { terminals } from './Identity_and_tenent/terminals';
-import { users } from './Identity_and_tenent/users';
+import { accessLogs } from './audit/access-logs';
+import { auditLogs } from './audit/audit-logs';
+import { platformAuditLogs } from './audit/platform-audit-logs';
+import { branches } from './business/branches';
+import { business } from './business/businesses';
+import { businessProvisioningRequests } from './business/business-provisioning-requests';
+import { ownerRedemptions } from './business/owner-redemptions';
+import { mailOutbox } from './business/mail-outbox';
+import { businessMemberships } from './business/business-memberships';
+import { endpointRoleAccess } from './business/endpoint-role-access';
+import { invitations } from './business/invitations';
+import { platformUsers } from './auth/platform-users';
+import { roles } from './business/roles';
+import { terminals } from './business/terminals';
+import { users } from './auth/users';
 
 export const businessRelations = relations(business, ({ one, many }) => ({
   createdBy: one(platformUsers, {

@@ -1,4 +1,4 @@
-﻿import {
+import {
   BadRequestException,
   ConflictException,
   Injectable,
@@ -18,7 +18,7 @@ import {
   terminals,
   users,
   ownerRedemptions,
-} from '../database/schema';
+} from '../database/schemas';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';
 import { ClientLoginDTO, ClientType } from './dto/clientLogin.dto';
 import { UtilsService } from '../utils/utils.service';

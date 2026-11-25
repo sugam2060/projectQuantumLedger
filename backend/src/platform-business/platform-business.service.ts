@@ -20,8 +20,8 @@ import {
   roles,
   terminals,
   users,
-} from '../database/schema';
-import type { BusinessDocuments } from '../database/schema/Identity_and_tenent/businesses';
+} from '../database/schemas';
+import type { BusinessDocuments } from '../database/schemas/business/businesses';
 import { ObjectStoreService } from '../utils/objectStore.service';
 import type { StoredObject } from '../utils/objectStore.service';
 import type { BusinessRequestDto } from './dto/business-request.dto';

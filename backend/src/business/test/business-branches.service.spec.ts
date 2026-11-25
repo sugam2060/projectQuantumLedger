@@ -5,7 +5,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
-import { businessMemberships } from '../../database/schema';
+import { businessMemberships } from '../../database/schemas';
 import { RedisService } from '../../redis/redis.service';
 import { ObjectStoreService } from '../../utils/objectStore.service';
 import { BusinessService } from '../business.service';

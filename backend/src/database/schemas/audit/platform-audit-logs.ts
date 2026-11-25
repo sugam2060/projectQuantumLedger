@@ -9,9 +9,9 @@ import {
   uuid,
   integer,
 } from 'drizzle-orm/pg-core';
-import { business } from '../Identity_and_tenent/businesses';
-import { businessProvisioningRequests } from '../Identity_and_tenent/business_provisioning_requests';
-import { platformUsers } from '../Identity_and_tenent/platform_users';
+import { business } from '../business/businesses';
+import { businessProvisioningRequests } from '../business/business-provisioning-requests';
+import { platformUsers } from '../auth/platform-users';
 
 export const platformAuditLogs = pgTable(
   'platform_audit_logs',

@@ -10,7 +10,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import type { BusinessDocuments } from './businesses';
-import { platformUsers } from './platform_users';
+import { platformUsers } from '../auth/platform-users';
 import { business } from './businesses';
 
 export interface BusinessRequestAddress {

@@ -1,4 +1,4 @@
-﻿import {
+import {
   pgTable,
   uuid,
   boolean,
@@ -12,7 +12,7 @@ import { sql } from 'drizzle-orm';
 import { business } from './businesses';
 import { branches } from './branches';
 import { roles } from './roles';
-import { users } from './users';
+import { users } from '../auth/users';
 
 export const businessMemberships = pgTable(
   'business_memberships',

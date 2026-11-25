@@ -17,7 +17,7 @@ import {
   branches,
   terminals,
   type BusinessDocuments,
-} from '../database/schema';
+} from '../database/schemas';
 import type { RequestSession } from '../database/request_context.service';
 import {
   AuditLogService,

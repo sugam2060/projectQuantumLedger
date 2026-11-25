@@ -2,7 +2,7 @@ import type { ConfigType } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import type { databaseConfig } from '../config';
-import * as schema from './schema';
+import * as schema from './schemas';
 
 /**
  * Builds the Drizzle client over a pg pool. Values were validated at startup by

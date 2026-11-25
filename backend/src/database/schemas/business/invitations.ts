@@ -11,8 +11,8 @@ import { sql } from 'drizzle-orm';
 import { business } from './businesses';
 import { branches } from './branches';
 import { roles } from './roles';
-import { users } from './users';
-import { platformUsers } from './platform_users';
+import { users } from '../auth/users';
+import { platformUsers } from '../auth/platform-users';
 
 export const invitations = pgTable(
   'invitations',

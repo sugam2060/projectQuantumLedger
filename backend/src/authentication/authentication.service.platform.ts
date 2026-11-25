@@ -7,7 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { DatabaseService } from '../database/database.service';
-import { platformUsers } from '../database/schema';
+import { platformUsers } from '../database/schemas';
 import { RedisService } from '../redis/redis.service';
 import { UtilsService } from '../utils/utils.service';
 import { PlatformUserLoginDto } from './dto/platform-user-login.dto';

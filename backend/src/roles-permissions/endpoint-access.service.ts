@@ -10,7 +10,7 @@ import {
   businessMemberships,
   endpointRoleAccess,
   roles,
-} from '../database/schema';
+} from '../database/schemas';
 import { EffectivePermissionsCacheService } from './effective-permissions-cache.service';
 import {
   AuditLogService,

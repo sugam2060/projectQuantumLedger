@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from './database.service';
-import { accessLogs } from './schema/audit_logs/access_audit_logs';
-import { platformAuditLogs } from './schema/audit_logs/platform_audit_logs';
+import { accessLogs } from './schemas/audit/access-logs';
+import { platformAuditLogs } from './schemas/audit/platform-audit-logs';
 import type { RequestSession } from './request_context.service';
 
 export interface AuditRequestContext {

@@ -10,9 +10,9 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { business } from './businesses';
-import { businessProvisioningRequests } from './business_provisioning_requests';
-import { platformUsers } from './platform_users';
-import { users } from './users';
+import { businessProvisioningRequests } from './business-provisioning-requests';
+import { platformUsers } from '../auth/platform-users';
+import { users } from '../auth/users';
 
 export const ownerRedemptions = pgTable(
   'owner_redemptions',

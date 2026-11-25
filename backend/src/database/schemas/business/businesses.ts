@@ -10,7 +10,7 @@ import {
   jsonb,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { platformUsers } from './platform_users';
+import { platformUsers } from '../auth/platform-users';
 
 export interface BusinessFileReference {
   fileId: string;

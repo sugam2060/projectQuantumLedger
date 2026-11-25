@@ -10,7 +10,7 @@ import { appConfig } from '../config';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
-import { invitations, mailOutbox, platformUsers } from '../database/schema';
+import { invitations, mailOutbox, platformUsers } from '../database/schemas';
 import { RedisService } from '../redis/redis.service';
 import { MailOutboxPublisher } from './mail-outbox.publisher';
 import type { InvitePlatformUserDto } from './dto/invite-platform-user.dto';

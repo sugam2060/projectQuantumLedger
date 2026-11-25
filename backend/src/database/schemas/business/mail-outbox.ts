@@ -12,7 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { MailJob } from '../../../workers/mail/mail.types';
 import { business } from './businesses';
-import { businessProvisioningRequests } from './business_provisioning_requests';
+import { businessProvisioningRequests } from './business-provisioning-requests';
 
 export const mailOutbox = pgTable(
   'mail_outbox',

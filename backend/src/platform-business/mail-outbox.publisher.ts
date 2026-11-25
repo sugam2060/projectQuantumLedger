@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { and, asc, eq, lte, or } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
-import { mailOutbox } from '../database/schema';
+import { mailOutbox } from '../database/schemas';
 import { RabbitMQService } from '../utils/rabbitmq.service';
 
 const CLAIM_DURATION_MS = 60_000;
