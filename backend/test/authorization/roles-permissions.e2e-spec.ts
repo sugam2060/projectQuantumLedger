@@ -9,12 +9,12 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { PermissionGuard } from '../src/authentication/guards/permission.guard';
-import { RequiredRoles } from '../src/authentication/decorators/required_permission.decorator';
-import { EndpointAccessService } from '../src/roles-permissions/endpoint-access.service';
-import { EndpointAccessCatalogService } from '../src/roles-permissions/endpoint-access-catalog.service';
-import { RolesPermissionsController } from '../src/roles-permissions/roles-permissions.controller';
-import type { AuthenticatedUser } from '../src/authentication/strategies/jwt.strategy';
+import { PermissionGuard } from '../../src/authentication/guards/permission.guard';
+import { RequiredRoles } from '../../src/authentication/decorators/required_permission.decorator';
+import { EndpointAccessService } from '../../src/roles-permissions/endpoint-access.service';
+import { EndpointAccessCatalogService } from '../../src/roles-permissions/endpoint-access-catalog.service';
+import { RolesPermissionsController } from '../../src/roles-permissions/roles-permissions.controller';
+import type { AuthenticatedUser } from '../../src/authentication/strategies/jwt.strategy';
 import { Controller, Get } from '@nestjs/common';
 
 class TestSessionGuard implements CanActivate {

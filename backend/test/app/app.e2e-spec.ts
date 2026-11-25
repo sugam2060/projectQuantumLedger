@@ -2,10 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { AppModule } from '../src/app.module';
+import { AppModule } from '../../src/app.module';
 import { JwtService } from '@nestjs/jwt';
-import { REDIS_CLIENT } from '../src/redis/redis.constants';
-import { RABBITMQ_OPTIONS } from '../src/utils/rabbitmq.config';
+import { REDIS_CLIENT } from '../../src/redis/redis.constants';
+import { RABBITMQ_OPTIONS } from '../../src/utils/rabbitmq.config';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;

@@ -6,7 +6,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 
 const backendDirectory = resolve(__dirname, '..');
-const scriptDirectory = resolve(backendDirectory, 'scripts');
+const scriptDirectory = resolve(backendDirectory, 'script');
 const appRole = 'fortis_app';
 
 function quoteSqlLiteral(value: string): string {
