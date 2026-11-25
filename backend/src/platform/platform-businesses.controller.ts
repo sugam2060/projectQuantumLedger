@@ -11,8 +11,8 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '../common/decorators/strict-throttle.decorator';
 import { AuditContext, type AuditRequestContext } from '../audit-logs';
-import { RateLimit } from '../authentication/decorators/rate-limit.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../common/types';
 import { BusinessListHeaders } from './decorators/business-list-headers.decorator';
@@ -78,11 +78,7 @@ export class PlatformBusinessesController {
 
   @Post('businesses/create')
   @HttpCode(HttpStatus.CREATED)
-  @RateLimit({
-    requests: 20,
-    windowMs: 60 * 60_000,
-    errorMessage: 'Too many provisioning requests. Try again later.',
-  })
+  @Throttle({ limit: 20, ttlMs: 60 * 60_000 })
   async provisionBusiness(
     @Query() query: ProvisionBusinessQueryDto,
     @Body() body: ProvisionBusinessDto,

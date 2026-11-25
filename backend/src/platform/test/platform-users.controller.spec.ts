@@ -1,7 +1,7 @@
 import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { ForbiddenException } from '@nestjs/common';
-import { RATE_LIMIT_KEY } from '../../authentication/decorators/rate-limit.decorator';
+import { THROTTLE_OVERRIDE_KEY } from '../../common/throttling/throttling.constants';
 import { PlatformUsersController } from '../platform-users.controller';
 import { PlatformUsersService } from '../platform-users.service';
 
@@ -16,10 +16,10 @@ describe('PlatformUsersController', () => {
   it('delegates an authenticated platform-user invitation', async () => {
     expect(
       Reflect.getMetadata(
-        RATE_LIMIT_KEY,
+        THROTTLE_OVERRIDE_KEY,
         PlatformUsersController.prototype.invite,
       ),
-    ).toEqual(expect.objectContaining({ requests: 20, windowMs: 60 * 60_000 }));
+    ).toEqual(expect.objectContaining({ limit: 20, ttlMs: 60 * 60_000 }));
     invitations.invitePlatformUser.mockResolvedValue({
       message: 'Invite sent to Jane Manager',
     });

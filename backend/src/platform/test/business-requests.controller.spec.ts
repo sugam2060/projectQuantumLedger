@@ -1,7 +1,7 @@
 import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
-import { RATE_LIMIT_KEY } from '../../authentication/decorators/rate-limit.decorator';
+import { THROTTLE_OVERRIDE_KEY } from '../../common/throttling/throttling.constants';
 import { BusinessRequestsController } from '../business-requests.controller';
 import { BusinessRequestsService } from '../business-requests.service';
 
@@ -16,8 +16,8 @@ describe('BusinessRequestsController', () => {
   it('makes the combined upload and request route public and rate limited', () => {
     const handler = BusinessRequestsController.prototype.submitRequest;
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).toBe(true);
-    expect(Reflect.getMetadata(RATE_LIMIT_KEY, handler)).toEqual(
-      expect.objectContaining({ requests: 5, windowMs: 60 * 60_000 }),
+    expect(Reflect.getMetadata(THROTTLE_OVERRIDE_KEY, handler)).toEqual(
+      expect.objectContaining({ limit: 5, ttlMs: 60 * 60_000 }),
     );
   });
 

@@ -1,6 +1,10 @@
 import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test, TestingModule } from '@nestjs/testing';
+import {
+  STRICT_THROTTLE_KEY,
+  THROTTLE_OVERRIDE_KEY,
+} from '../../common/throttling/throttling.constants';
 import { AuthenticationController } from '../authentication.controller';
 import { AuthenticationService } from '../authentication.service';
 import { ClientLoginDto, ClientType } from '../dto/client-login.dto';
@@ -49,9 +53,11 @@ describe('AuthenticationController', () => {
     it('is public, rate limited, web-only, and delegates registration', async () => {
       const handler = AuthenticationController.prototype.registerOwner;
       expect(Reflect.getMetadata('isPublic', handler)).toBe(true);
-      expect(Reflect.getMetadata('rateLimit', handler)).toEqual(
-        expect.objectContaining({ requests: 10, windowMs: 60 * 60_000 }),
-      );
+      expect(Reflect.getMetadata(THROTTLE_OVERRIDE_KEY, handler)).toEqual({
+        limit: 10,
+        ttlMs: 60 * 60_000,
+      });
+      expect(Reflect.getMetadata(STRICT_THROTTLE_KEY, handler)).toBe(true);
       const dto = {
         email: 'owner@example.com',
         name: 'Business Owner',
@@ -85,9 +91,10 @@ describe('AuthenticationController', () => {
     it('requires authentication, applies rate limiting, and has no permission key', async () => {
       const handler = AuthenticationController.prototype.getCurrentUser;
       expect(Reflect.getMetadata('isPublic', handler)).not.toBe(true);
-      expect(Reflect.getMetadata('rateLimit', handler)).toEqual(
-        expect.objectContaining({ requests: 60, windowMs: 60_000 }),
-      );
+      expect(Reflect.getMetadata(THROTTLE_OVERRIDE_KEY, handler)).toEqual({
+        limit: 60,
+        ttlMs: 60_000,
+      });
       expect(Reflect.getMetadata(REQUIRED_ROLES, handler)).toBeUndefined();
     });
 

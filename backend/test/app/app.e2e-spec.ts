@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
+import { configureApp } from '../../src/app.setup';
 import { JwtService } from '@nestjs/jwt';
 import { REDIS_CLIENT } from '../../src/redis/redis.constants';
 import { RABBITMQ_OPTIONS } from '../../src/utils/rabbitmq.config';
@@ -21,21 +22,21 @@ describe('AppController (e2e)', () => {
       .useValue({ connection: null, prefetchCount: 10 })
       .compile();
 
-    app = moduleFixture.createNestApplication();
+    app = configureApp(moduleFixture.createNestApplication());
     jwtService = app.get(JwtService);
     await app.init();
   });
 
   it('/ (GET)', () => {
     return request(app.getHttpServer())
-      .get('/')
+      .get('/api/v1')
       .expect(200)
       .expect('Hello World!');
   });
 
   it('rejects protected routes without a JWT', () => {
     return request(app.getHttpServer())
-      .post('/onboarding')
+      .post('/api/v1/onboarding')
       .send({})
       .expect(401);
   });
@@ -46,7 +47,7 @@ describe('AppController (e2e)', () => {
     });
 
     return request(app.getHttpServer())
-      .post('/onboarding')
+      .post('/api/v1/onboarding')
       .set('Authorization', `Bearer ${token}`)
       .send({ event: 'test' })
       .expect(202);

@@ -5,7 +5,7 @@ import { ClientType } from '../dto/client-login.dto';
 import { PlatformAuthenticationController } from '../platform-authentication.controller';
 import { PlatformAuthenticationService } from '../platform-authentication.service';
 import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
-import { RATE_LIMIT_KEY } from '../decorators/rate-limit.decorator';
+import { THROTTLE_OVERRIDE_KEY } from '../../common/throttling/throttling.constants';
 
 describe('PlatformAuthenticationController', () => {
   const platformAuthService = {
@@ -42,8 +42,8 @@ describe('PlatformAuthenticationController', () => {
     const loginHandler = PlatformAuthenticationController.prototype.login;
 
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, loginHandler)).toBe(true);
-    expect(Reflect.getMetadata(RATE_LIMIT_KEY, loginHandler)).toEqual(
-      expect.objectContaining({ requests: 20, windowMs: 60_000 }),
+    expect(Reflect.getMetadata(THROTTLE_OVERRIDE_KEY, loginHandler)).toEqual(
+      expect.objectContaining({ limit: 20, ttlMs: 60_000 }),
     );
   });
 

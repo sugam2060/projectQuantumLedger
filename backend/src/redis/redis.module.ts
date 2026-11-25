@@ -4,6 +4,8 @@ import { redisConfig } from '../config';
 import Redis from 'ioredis';
 
 import { REDIS_CLIENT } from './redis.constants';
+import { ThrottleStorage } from '../common/throttling/throttle-storage';
+import { RedisThrottleStorage } from './redis-throttle.storage';
 import { RedisService } from './redis.service';
 
 @Global()
@@ -47,7 +49,9 @@ import { RedisService } from './redis.service';
       },
     },
     RedisService,
+    RedisThrottleStorage,
+    { provide: ThrottleStorage, useExisting: RedisThrottleStorage },
   ],
-  exports: [RedisService],
+  exports: [RedisService, ThrottleStorage],
 })
 export class RedisModule {}

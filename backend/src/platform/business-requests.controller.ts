@@ -8,10 +8,10 @@ import {
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
+import { Throttle } from '../common/decorators/strict-throttle.decorator';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AuditContext, type AuditRequestContext } from '../audit-logs';
-import { RateLimit } from '../authentication/decorators/rate-limit.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { BusinessRequestsService } from './business-requests.service';
 import { BusinessUploadHeaders } from './decorators/business-upload-headers.decorator';
@@ -29,11 +29,7 @@ export class BusinessRequestsController {
   @Post('request')
   @HttpCode(HttpStatus.CREATED)
   @Public()
-  @RateLimit({
-    requests: 5,
-    windowMs: 60 * 60_000,
-    errorMessage: 'Too many business requests. Try again later.',
-  })
+  @Throttle({ limit: 5, ttlMs: 60 * 60_000 })
   @UseInterceptors(
     FileFieldsInterceptor(
       [

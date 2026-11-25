@@ -58,4 +58,25 @@ describe('validateEnv', () => {
       'NODE_ENV',
     );
   });
+
+  it('rejects an invalid TRUST_PROXY', () => {
+    expect(() => validateEnv({ ...validEnv(), TRUST_PROXY: 'maybe' })).toThrow(
+      'TRUST_PROXY',
+    );
+  });
+
+  it('rejects a CORS origin with a path', () => {
+    expect(() =>
+      validateEnv({
+        ...validEnv(),
+        CORS_ALLOWED_ORIGINS: 'https://ok.example, https://bad.example/path',
+      }),
+    ).toThrow('CORS_ALLOWED_ORIGINS');
+  });
+
+  it('rejects a throttle limit below 1', () => {
+    expect(() =>
+      validateEnv({ ...validEnv(), AUTH_THROTTLE_LIMIT: '0' }),
+    ).toThrow('AUTH_THROTTLE_LIMIT');
+  });
 });

@@ -3,7 +3,7 @@ const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
-import { RATE_LIMIT_KEY } from '../../authentication/decorators/rate-limit.decorator';
+import { THROTTLE_OVERRIDE_KEY } from '../../common/throttling/throttling.constants';
 import type { AuthenticatedUser } from '../../common/types';
 import { PlatformBusinessesController } from '../platform-businesses.controller';
 import { PlatformBusinessesService } from '../platform-businesses.service';
@@ -173,8 +173,8 @@ describe('PlatformBusinessesController', () => {
     const handler = PlatformBusinessesController.prototype.provisionBusiness;
 
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).not.toBe(true);
-    expect(Reflect.getMetadata(RATE_LIMIT_KEY, handler)).toEqual(
-      expect.objectContaining({ requests: 20 }),
+    expect(Reflect.getMetadata(THROTTLE_OVERRIDE_KEY, handler)).toEqual(
+      expect.objectContaining({ limit: 20 }),
     );
     await expect(
       controller.provisionBusiness(

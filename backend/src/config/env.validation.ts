@@ -1,4 +1,6 @@
 import { plainToInstance } from 'class-transformer';
+import { parseTrustProxy } from './trust-proxy';
+import { isHttpOrigin, splitList } from './env.util';
 import {
   IsIn,
   IsInt,
@@ -72,6 +74,26 @@ class EnvironmentVariables {
     require_protocol: true,
   })
   FRONTEND_BASE_URL?: string;
+
+  /** Extra browser origins allowed by CORS, comma separated (FRONTEND_BASE_URL is always allowed). */
+  @IsOptional()
+  @IsString()
+  CORS_ALLOWED_ORIGINS?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1000)
+  THROTTLE_TTL_MS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  THROTTLE_LIMIT?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  AUTH_THROTTLE_LIMIT?: number;
 }
 
 const NUMERIC_KEYS = [
@@ -80,6 +102,9 @@ const NUMERIC_KEYS = [
   'DB_POOL_MIN',
   'DB_POOL_IDLE_TIMEOUT_MS',
   'DB_POOL_CONNECTION_TIMEOUT_MS',
+  'THROTTLE_TTL_MS',
+  'THROTTLE_LIMIT',
+  'AUTH_THROTTLE_LIMIT',
 ] as const;
 
 /**
@@ -111,6 +136,28 @@ export function validateEnv(
   const poolMax = numericOverrides.DB_POOL_MAX ?? 10;
   if (poolMin > poolMax) {
     messages.push('DB_POOL_MIN: must not exceed DB_POOL_MAX');
+  }
+
+  try {
+    parseTrustProxy(
+      typeof config.TRUST_PROXY === 'string' ? config.TRUST_PROXY : undefined,
+    );
+  } catch (error) {
+    messages.push(
+      error instanceof Error ? error.message : 'TRUST_PROXY is invalid',
+    );
+  }
+
+  const origins =
+    typeof config.CORS_ALLOWED_ORIGINS === 'string'
+      ? config.CORS_ALLOWED_ORIGINS
+      : '';
+  for (const origin of splitList(origins)) {
+    if (!isHttpOrigin(origin)) {
+      messages.push(
+        `CORS_ALLOWED_ORIGINS: "${origin}" is not an http(s) origin`,
+      );
+    }
   }
 
   if (messages.length > 0) {

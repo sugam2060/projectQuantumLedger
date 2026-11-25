@@ -19,3 +19,23 @@ export const readInt = (key: string, defaultValue: number): number => {
   const value = readString(key);
   return value === undefined ? defaultValue : Number.parseInt(value, 10);
 };
+
+/** Splits a comma-separated variable into trimmed, non-empty entries. */
+export const splitList = (value: string | undefined): string[] =>
+  (value ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+/** True for `scheme://host[:port]` with http or https and nothing after it. */
+export const isHttpOrigin = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      url.origin === value.replace(/\/$/, '')
+    );
+  } catch {
+    return false;
+  }
+};

@@ -3,5 +3,7 @@ export { authConfig } from './auth.config';
 export { databaseConfig } from './database.config';
 export { redisConfig } from './redis.config';
 export { storageConfig } from './storage.config';
+export { throttleConfig } from './throttle.config';
+export { parseTrustProxy, type TrustProxySetting } from './trust-proxy';
 export { validateEnv } from './env.validation';
 export type * from './types';

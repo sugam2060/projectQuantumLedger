@@ -10,11 +10,14 @@ import {
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
+import {
+  StrictThrottle,
+  Throttle,
+} from '../common/decorators/strict-throttle.decorator';
 import type { Request, Response } from 'express';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { Public } from '../common/decorators/public.decorator';
-import { RateLimit } from './decorators/rate-limit.decorator';
 import { ClientType } from './dto/client-login.dto';
 import { PlatformRefreshHeadersDto } from './dto/platform-refresh-headers.dto';
 import { PlatformUserLoginDto } from './dto/platform-user-login.dto';
@@ -28,13 +31,10 @@ export class PlatformAuthenticationController {
   ) {}
 
   @Post('login')
+  @StrictThrottle()
   @HttpCode(HttpStatus.OK)
   @Public()
-  @RateLimit({
-    requests: 20,
-    windowMs: 60_000,
-    errorMessage: 'Too many platform login attempts. Try again shortly.',
-  })
+  @Throttle({ limit: 20, ttlMs: 60_000 })
   async login(
     @Body() dto: PlatformUserLoginDto,
     @Req() request: Request,
@@ -83,9 +83,10 @@ export class PlatformAuthenticationController {
   }
 
   @Post('refresh')
+  @StrictThrottle()
   @HttpCode(HttpStatus.OK)
   @Public()
-  @RateLimit({ requests: 60, windowMs: 60_000 })
+  @Throttle({ limit: 60, ttlMs: 60_000 })
   async refresh(
     @Headers() headers: Record<string, string | string[] | undefined>,
     @Req() request: Request,

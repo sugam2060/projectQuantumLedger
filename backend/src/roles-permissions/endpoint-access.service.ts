@@ -12,10 +12,7 @@ import {
   roles,
 } from '../database/schemas';
 import { EffectivePermissionsCacheService } from './effective-permissions-cache.service';
-import {
-  AuditLogsService,
-  type AuditRequestContext,
-} from '../audit-logs';
+import { AuditLogsService, type AuditRequestContext } from '../audit-logs';
 
 export interface EndpointRoleConfiguration {
   endpointKey: string;

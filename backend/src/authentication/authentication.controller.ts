@@ -9,11 +9,14 @@ import {
   Req as ReqDecorator,
   UnauthorizedException,
 } from '@nestjs/common';
+import {
+  StrictThrottle,
+  Throttle,
+} from '../common/decorators/strict-throttle.decorator';
 import type { Request, Response } from 'express';
 import { AuthenticationService } from './authentication.service';
 import { ClientLoginDto, ClientType } from './dto/client-login.dto';
 import { Public } from '../common/decorators/public.decorator';
-import { RateLimit } from './decorators/rate-limit.decorator';
 import { RequiredRoles } from './decorators/required_permission.decorator';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';
 import { AuthenticationMeHeadersDto } from './dto/authentication-me-headers.dto';
@@ -33,13 +36,10 @@ export class AuthenticationController {
   constructor(private readonly authService: AuthenticationService) {}
 
   @Post('register-owner')
+  @StrictThrottle()
   @HttpCode(HttpStatus.CREATED)
   @Public()
-  @RateLimit({
-    requests: 10,
-    windowMs: 60 * 60_000,
-    errorMessage: 'Too many owner registration attempts. Try again later.',
-  })
+  @Throttle({ limit: 10, ttlMs: 60 * 60_000 })
   registerOwner(
     @Body() dto: OwnerRegistrationDto,
     @OwnerRegistrationHeaders() headers: OwnerRegistrationHeadersDto,
@@ -57,7 +57,7 @@ export class AuthenticationController {
   }
 
   @Get('me')
-  @RateLimit({ requests: 60, windowMs: 60_000 })
+  @Throttle({ limit: 60, ttlMs: 60_000 })
   getCurrentUser(
     @ReqDecorator() request: AuthenticatedRequest,
     @AuthenticationMeHeaders()
@@ -72,14 +72,9 @@ export class AuthenticationController {
   }
 
   @Post('login')
+  @StrictThrottle()
   @HttpCode(HttpStatus.OK)
-  @RateLimit({
-    requests: 100,
-    windowMs: 3600000, // 100 requests per hour
-    // Dynamic adjustment based on system load
-    dynamicAdjustment: true,
-    loadThreshold: 0.8,
-  })
+  @Throttle({ limit: 100, ttlMs: 3600000 })
   @Public()
   @RequiredRoles('users.login')
   async login(
@@ -133,6 +128,7 @@ export class AuthenticationController {
 
   @RequiredRoles('users.refresh')
   @Post('refresh')
+  @StrictThrottle()
   @HttpCode(HttpStatus.OK)
   @Public()
   async refreshToken(

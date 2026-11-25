@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { RateLimit } from '../authentication/decorators/rate-limit.decorator';
+import { Throttle } from '../common/decorators/strict-throttle.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../common/types';
 import { InvitePlatformUserHeaders } from './decorators/invite-platform-user-headers.decorator';
@@ -15,11 +15,7 @@ export class PlatformUsersController {
 
   @Post('invite')
   @HttpCode(HttpStatus.OK)
-  @RateLimit({
-    requests: 20,
-    windowMs: 60 * 60_000,
-    errorMessage: 'Too many platform invitations. Try again later.',
-  })
+  @Throttle({ limit: 20, ttlMs: 60 * 60_000 })
   async invite(
     @Body() body: InvitePlatformUserDto,
     @InvitePlatformUserHeaders() headers: InvitePlatformUserHeadersDto,

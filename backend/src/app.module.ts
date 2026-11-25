@@ -1,19 +1,28 @@
-import { Module, ValidationPipe } from '@nestjs/common';
-import { APP_GUARD, APP_PIPE } from '@nestjs/core';
+import {
+  type MiddlewareConsumer,
+  Module,
+  type NestModule,
+} from '@nestjs/common';
+import { ConfigModule, type ConfigType } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ConfigModule } from '@nestjs/config';
-import { appConfig, validateEnv } from './config';
-import { DatabaseModule } from './database/database.module';
+import { PermissionGuard } from './authentication/guards/permission.guard';
 import { AuthenticationModule } from './authentication/authentication.module';
-import { UtilsModule } from './utils/utils.module';
-import { RedisModule } from './redis/redis.module';
-import { RolesPermissionsModule } from './roles-permissions/roles-permissions.module';
-import { PlatformModule } from './platform/platform.module';
 import { BusinessesModule } from './businesses';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
-import { PermissionGuard } from './authentication/guards/permission.guard';
-import { RateLimitGuard } from './authentication/guards/rate-limit.guard';
+import { ThrottleGuard } from './common/guards/throttle.guard';
+import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import {
+  THROTTLER_SETTINGS,
+  type ThrottlerSettings,
+} from './common/throttling/throttling.constants';
+import { appConfig, throttleConfig, validateEnv } from './config';
+import { DatabaseModule } from './database/database.module';
+import { PlatformModule } from './platform/platform.module';
+import { RedisModule } from './redis/redis.module';
+import { RolesPermissionsModule } from './roles-permissions/roles-permissions.module';
+import { UtilsModule } from './utils/utils.module';
 
 @Module({
   imports: [
@@ -21,7 +30,7 @@ import { RateLimitGuard } from './authentication/guards/rate-limit.guard';
       isGlobal: true,
       envFilePath: '.env',
       validate: validateEnv,
-      load: [appConfig],
+      load: [appConfig, throttleConfig],
     }),
     DatabaseModule,
     AuthenticationModule,
@@ -35,21 +44,28 @@ import { RateLimitGuard } from './authentication/guards/rate-limit.guard';
   providers: [
     AppService,
     {
-      provide: APP_PIPE,
-      useFactory: () =>
-        new ValidationPipe({
-          whitelist: true,
-          transform: true,
-          validateCustomDecorators: true,
-        }),
+      provide: THROTTLER_SETTINGS,
+      inject: [throttleConfig.KEY],
+      useFactory: (
+        config: ConfigType<typeof throttleConfig>,
+      ): ThrottlerSettings => ({
+        ttlMs: config.ttlMs,
+        limit: config.limit,
+        authLimit: config.authLimit,
+      }),
     },
     // Global guards run in registration order, and the order is behaviour:
-    // 1. JwtAuthGuard authenticates (skipped by @Public()) and sets request.user.
-    // 2. RateLimitGuard applies per-route @RateLimit() limits.
-    // 3. PermissionGuard must stay last: it reads request.user set by step 1.
+    // 1. ThrottleGuard rejects floods before any authentication work is done.
+    // 2. JwtAuthGuard authenticates (skipped by @Public()) and sets request.user.
+    // 3. PermissionGuard must stay last: it reads request.user set by step 2.
+    { provide: APP_GUARD, useClass: ThrottleGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    // Runs before guards so every response, including 401/429, carries a request id.
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}
