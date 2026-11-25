@@ -13,7 +13,7 @@ import type { AuthenticatedUser } from '../authentication/strategies/jwt.strateg
 import { InvitePlatformUserHeaders } from './decorators/invite-platform-user-headers.decorator';
 import { InvitePlatformUserDto } from './dto/invite-platform-user.dto';
 import { InvitePlatformUserHeadersDto } from './dto/invite-platform-user-headers.dto';
-import { PlatformUserInvitationsService } from './platform-user-invitations.service';
+import { PlatformUsersService } from './platform-users.service';
 
 interface PlatformAuthenticatedRequest extends Request {
   user: AuthenticatedUser;
@@ -21,7 +21,7 @@ interface PlatformAuthenticatedRequest extends Request {
 
 @Controller('platform/users')
 export class PlatformUsersController {
-  constructor(private readonly invitations: PlatformUserInvitationsService) {}
+  constructor(private readonly invitations: PlatformUsersService) {}
 
   @Post('invite')
   @HttpCode(HttpStatus.OK)

@@ -5,10 +5,10 @@ import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
 import { ObjectStoreService } from '../../utils/objectStore.service';
 import { AuditLogsService } from '../../audit-logs';
-import { PlatformBusinessService } from '../platform-business.service';
+import { PlatformBusinessesService } from '../platform-businesses.service';
 import { MailOutboxPublisher } from '../mail-outbox.publisher';
 
-describe('PlatformBusinessService.createBranch', () => {
+describe('PlatformBusinessesService.createBranch', () => {
   const database = { transactionWithSession: jest.fn() };
   const redis = {
     get: jest.fn().mockResolvedValue(null),
@@ -21,7 +21,7 @@ describe('PlatformBusinessService.createBranch', () => {
   };
   const businessId = '00000000-0000-4000-8000-000000000001';
   const platformUserId = '00000000-0000-4000-8000-000000000002';
-  let service: PlatformBusinessService;
+  let service: PlatformBusinessesService;
   let branchValues: unknown;
   let terminalValues: unknown;
   let terminalRows: Array<{ id: string; name: string; terminalCode: string }>;
@@ -96,7 +96,7 @@ describe('PlatformBusinessService.createBranch', () => {
       async (_session: unknown, callback: (transaction: unknown) => unknown) =>
         callback(tx),
     );
-    service = new PlatformBusinessService(
+    service = new PlatformBusinessesService(
       database as unknown as DatabaseService,
       {} as unknown as ObjectStoreService,
       redis as unknown as RedisService,

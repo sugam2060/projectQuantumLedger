@@ -3,12 +3,12 @@ import { ConfigModule } from '@nestjs/config';
 import { appConfig } from '../config';
 import { Module } from '@nestjs/common';
 import { UtilsModule } from '../utils/utils.module';
-import { PlatformBusinessController } from './platform-business.controller';
-import { PlatformBusinessService } from './platform-business.service';
+import { PlatformBusinessesController } from './platform-businesses.controller';
+import { PlatformBusinessesService } from './platform-businesses.service';
 import { MailOutboxPublisher } from './mail-outbox.publisher';
 import { RedisModule } from '../redis/redis.module';
 import { PlatformUsersController } from './platform-users.controller';
-import { PlatformUserInvitationsService } from './platform-user-invitations.service';
+import { PlatformUsersService } from './platform-users.service';
 
 @Module({
   imports: [
@@ -17,11 +17,11 @@ import { PlatformUserInvitationsService } from './platform-user-invitations.serv
     UtilsModule,
     RedisModule,
   ],
-  controllers: [PlatformBusinessController, PlatformUsersController],
+  controllers: [PlatformBusinessesController, PlatformUsersController],
   providers: [
-    PlatformBusinessService,
-    PlatformUserInvitationsService,
+    PlatformBusinessesService,
+    PlatformUsersService,
     MailOutboxPublisher,
   ],
 })
-export class PlatformBusinessModule {}
+export class PlatformModule {}

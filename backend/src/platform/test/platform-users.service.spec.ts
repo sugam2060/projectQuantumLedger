@@ -4,9 +4,9 @@ import { createHash } from 'node:crypto';
 import { ConflictException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
-import { PlatformUserInvitationsService } from '../platform-user-invitations.service';
+import { PlatformUsersService } from '../platform-users.service';
 
-describe('PlatformUserInvitationsService', () => {
+describe('PlatformUsersService', () => {
   const database = { transactionWithSession: jest.fn() };
   const redis = {
     get: jest.fn().mockResolvedValue(null),
@@ -18,7 +18,7 @@ describe('PlatformUserInvitationsService', () => {
     frontendBaseUrl: 'https://frontend.example/',
   };
   const outboxPublisher = { notifyOutboxAvailable: jest.fn() };
-  let service: PlatformUserInvitationsService;
+  let service: PlatformUsersService;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -42,7 +42,7 @@ describe('PlatformUserInvitationsService', () => {
           })),
         }),
     );
-    service = new PlatformUserInvitationsService(
+    service = new PlatformUsersService(
       database as unknown as DatabaseService,
       redis as unknown as RedisService,
       config as never,

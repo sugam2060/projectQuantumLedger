@@ -21,7 +21,7 @@ import { RateLimit } from '../authentication/decorators/rate-limit.decorator';
 import { BusinessUploadHeaders } from './decorators/business-upload-headers.decorator';
 import { BusinessUploadHeaderDto } from './dto/business-upload-header.dto';
 import { BusinessRequestDto } from './dto/business-request.dto';
-import { PlatformBusinessService } from './platform-business.service';
+import { PlatformBusinessesService } from './platform-businesses.service';
 import { ProvisionBusinessDto } from './dto/provision-business.dto';
 import { ProvisionBusinessHeadersDto } from './dto/provision-business-headers.dto';
 import { ProvisionBusinessQueryDto } from './dto/provision-business-query.dto';
@@ -45,8 +45,8 @@ export interface BusinessRequestFiles {
 }
 
 @Controller('platform')
-export class PlatformBusinessController {
-  constructor(private readonly platformBusiness: PlatformBusinessService) {}
+export class PlatformBusinessesController {
+  constructor(private readonly platformBusiness: PlatformBusinessesService) {}
 
   @Get('business/:business_id')
   @HttpCode(HttpStatus.OK)

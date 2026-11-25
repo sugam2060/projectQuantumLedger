@@ -3,12 +3,12 @@ const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { ForbiddenException } from '@nestjs/common';
 import { RATE_LIMIT_KEY } from '../../authentication/decorators/rate-limit.decorator';
 import { PlatformUsersController } from '../platform-users.controller';
-import { PlatformUserInvitationsService } from '../platform-user-invitations.service';
+import { PlatformUsersService } from '../platform-users.service';
 
 describe('PlatformUsersController', () => {
   const invitations = { invitePlatformUser: jest.fn() };
   const controller = new PlatformUsersController(
-    invitations as unknown as PlatformUserInvitationsService,
+    invitations as unknown as PlatformUsersService,
   );
 
   beforeEach(() => jest.clearAllMocks());

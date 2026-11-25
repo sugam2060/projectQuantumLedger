@@ -5,10 +5,10 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { Test as SupertestTest } from 'supertest';
 import type { NextFunction, Request, Response } from 'express';
-import { PlatformBusinessController } from '../src/platform-business/platform-business.controller';
-import { PlatformBusinessService } from '../src/platform-business/platform-business.service';
+import { PlatformBusinessesController } from '../../src/platform/platform-businesses.controller';
+import { PlatformBusinessesService } from '../../src/platform/platform-businesses.service';
 
-describe('PlatformBusinessController (e2e)', () => {
+describe('PlatformBusinessesController (e2e)', () => {
   let app: INestApplication;
   const platformBusiness = {
     submitBusinessRequest: jest.fn(),
@@ -18,9 +18,9 @@ describe('PlatformBusinessController (e2e)', () => {
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
-      controllers: [PlatformBusinessController],
+      controllers: [PlatformBusinessesController],
       providers: [
-        { provide: PlatformBusinessService, useValue: platformBusiness },
+        { provide: PlatformBusinessesService, useValue: platformBusiness },
       ],
     }).compile();
     app = module.createNestApplication();

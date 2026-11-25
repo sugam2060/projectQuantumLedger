@@ -30,10 +30,7 @@ import type { CreateBusinessBranchDto } from './dto/create-business-branch.dto';
 import type { MailJob } from '../workers/mail/mail.types';
 import { RedisService } from '../redis/redis.service';
 import { MailOutboxPublisher } from './mail-outbox.publisher';
-import {
-  AuditLogsService,
-  type AuditRequestContext,
-} from '../audit-logs';
+import { AuditLogsService, type AuditRequestContext } from '../audit-logs';
 
 const PROVISION_OPERATION = 'platform.businesses.create';
 const CREATE_BRANCH_OPERATION = 'platform.businesses.create_branch';
@@ -43,8 +40,8 @@ const IDEMPOTENCY_LOCK_TTL_SECONDS = 5 * 60;
 const REDEMPTION_TTL_MS = 24 * 60 * 60 * 1000;
 
 @Injectable()
-export class PlatformBusinessService {
-  private readonly logger = new Logger(PlatformBusinessService.name);
+export class PlatformBusinessesService {
+  private readonly logger = new Logger(PlatformBusinessesService.name);
 
   constructor(
     private readonly database: DatabaseService,

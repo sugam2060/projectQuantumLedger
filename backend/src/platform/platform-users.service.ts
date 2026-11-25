@@ -25,8 +25,8 @@ interface InviteResponse {
 }
 
 @Injectable()
-export class PlatformUserInvitationsService {
-  private readonly logger = new Logger(PlatformUserInvitationsService.name);
+export class PlatformUsersService {
+  private readonly logger = new Logger(PlatformUsersService.name);
 
   constructor(
     private readonly database: DatabaseService,

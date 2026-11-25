@@ -4,10 +4,10 @@ import { Test } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
 import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 import { RATE_LIMIT_KEY } from '../../authentication/decorators/rate-limit.decorator';
-import { PlatformBusinessController } from '../platform-business.controller';
-import { PlatformBusinessService } from '../platform-business.service';
+import { PlatformBusinessesController } from '../platform-businesses.controller';
+import { PlatformBusinessesService } from '../platform-businesses.service';
 
-describe('PlatformBusinessController', () => {
+describe('PlatformBusinessesController', () => {
   const platformBusiness = {
     submitBusinessRequest: jest.fn(),
     provisionBusiness: jest.fn(),
@@ -16,17 +16,17 @@ describe('PlatformBusinessController', () => {
     createBranch: jest.fn(),
     listBusinesses: jest.fn(),
   };
-  let controller: PlatformBusinessController;
+  let controller: PlatformBusinessesController;
 
   beforeEach(async () => {
     jest.clearAllMocks();
     const module = await Test.createTestingModule({
-      controllers: [PlatformBusinessController],
+      controllers: [PlatformBusinessesController],
       providers: [
-        { provide: PlatformBusinessService, useValue: platformBusiness },
+        { provide: PlatformBusinessesService, useValue: platformBusiness },
       ],
     }).compile();
-    controller = module.get(PlatformBusinessController);
+    controller = module.get(PlatformBusinessesController);
   });
 
   it('allows only platform users to read business details', async () => {
@@ -116,7 +116,7 @@ describe('PlatformBusinessController', () => {
     };
     platformBusiness.listBusinesses.mockResolvedValue(result);
     const handler = Reflect.get(
-      PlatformBusinessController.prototype,
+      PlatformBusinessesController.prototype,
       'listBusinesses',
     );
 
@@ -140,7 +140,7 @@ describe('PlatformBusinessController', () => {
   });
 
   it('makes the combined upload and request route public and rate limited', () => {
-    const handler = PlatformBusinessController.prototype.submitRequest;
+    const handler = PlatformBusinessesController.prototype.submitRequest;
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).toBe(true);
     expect(Reflect.getMetadata(RATE_LIMIT_KEY, handler)).toEqual(
       expect.objectContaining({ requests: 5, windowMs: 60 * 60_000 }),
@@ -202,7 +202,7 @@ describe('PlatformBusinessController', () => {
       ip: '127.0.0.1',
       header: jest.fn().mockReturnValue(undefined),
     };
-    const handler = PlatformBusinessController.prototype.provisionBusiness;
+    const handler = PlatformBusinessesController.prototype.provisionBusiness;
 
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).not.toBe(true);
     expect(Reflect.getMetadata(RATE_LIMIT_KEY, handler)).toEqual(
@@ -283,7 +283,7 @@ describe('PlatformBusinessController', () => {
       ip: '127.0.0.1',
       header: jest.fn().mockReturnValue(undefined),
     };
-    const handler = PlatformBusinessController.prototype.createBranch;
+    const handler = PlatformBusinessesController.prototype.createBranch;
 
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler)).not.toBe(true);
     await expect(

@@ -3,13 +3,13 @@ const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { createHash } from 'node:crypto';
 import { DatabaseService } from '../../database/database.service';
 import { ObjectStoreService } from '../../utils/objectStore.service';
-import { PlatformBusinessService } from '../platform-business.service';
+import { PlatformBusinessesService } from '../platform-businesses.service';
 import { RedisService } from '../../redis/redis.service';
 import { AuditLogsService } from '../../audit-logs';
 import type { BusinessRequestDto } from '../dto/business-request.dto';
 import type { ProvisionBusinessDto } from '../dto/provision-business.dto';
 
-describe('PlatformBusinessService', () => {
+describe('PlatformBusinessesService', () => {
   const database = { transactionWithSession: jest.fn() };
   const objectStore = {
     upload: jest.fn(),
@@ -27,7 +27,7 @@ describe('PlatformBusinessService', () => {
     logUserEvent: jest.fn().mockResolvedValue(undefined),
   };
   const outboxPublisher = { notifyOutboxAvailable: jest.fn() };
-  let service: PlatformBusinessService;
+  let service: PlatformBusinessesService;
 
   const request = {
     legalName: ' Example Retail Pvt. Ltd. ',
@@ -73,7 +73,7 @@ describe('PlatformBusinessService', () => {
         fileId: 'business-request-documents/registration',
         url: 'https://cdn.example/registration.pdf',
       });
-    service = new PlatformBusinessService(
+    service = new PlatformBusinessesService(
       database as unknown as DatabaseService,
       objectStore as unknown as ObjectStoreService,
       redis as unknown as RedisService,
