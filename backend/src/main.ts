@@ -1,24 +1,17 @@
+import { Logger } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { RateLimitMiddleware } from './utils/ratelimit.middleware';
-import { cookieParserMiddleware } from './utils/cookie-parser.middleware';
+import { configureApp } from './app.setup';
+import { appConfig } from './config';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.enableShutdownHooks();
-
-  // Populate req.cookies before the global JWT guard reads web access tokens.
-  app.use(cookieParserMiddleware);
-
-  // Set global prefix
-  app.setGlobalPrefix('/api/v1');
-
-  // Use Nest's managed instance so its heartbeat is stopped during shutdown.
-  const rateLimitMiddleware = app.get(RateLimitMiddleware);
-  app.use(rateLimitMiddleware.use.bind(rateLimitMiddleware));
-
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001; // Use port 3001 as fallback
+async function bootstrap(): Promise<void> {
+  const app = configureApp(await NestFactory.create(AppModule));
+  const { port } = app.get<ConfigType<typeof appConfig>>(appConfig.KEY);
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
+  Logger.log(
+    `Application is running on: http://localhost:${port}`,
+    'Bootstrap',
+  );
 }
 void bootstrap();

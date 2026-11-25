@@ -2,7 +2,6 @@ import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { createHash } from 'node:crypto';
 import { ConflictException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
 import { PlatformUserInvitationsService } from '../platform-user-invitations.service';
@@ -15,8 +14,8 @@ describe('PlatformUserInvitationsService', () => {
     setIfAbsent: jest.fn().mockResolvedValue(true),
     compareAndDelete: jest.fn().mockResolvedValue(true),
   };
-  const config = {
-    get: jest.fn().mockReturnValue('https://frontend.example/'),
+  const config: { frontendBaseUrl: string | undefined } = {
+    frontendBaseUrl: 'https://frontend.example/',
   };
   const outboxPublisher = { notifyOutboxAvailable: jest.fn() };
   let service: PlatformUserInvitationsService;
@@ -27,7 +26,7 @@ describe('PlatformUserInvitationsService', () => {
     redis.setIfAbsent.mockResolvedValue(true);
     redis.set.mockResolvedValue(undefined);
     redis.compareAndDelete.mockResolvedValue(true);
-    config.get.mockReturnValue('https://frontend.example/');
+    config.frontendBaseUrl = 'https://frontend.example/';
     database.transactionWithSession.mockImplementation(
       async (_session: unknown, callback: (transaction: unknown) => unknown) =>
         callback({
@@ -46,7 +45,7 @@ describe('PlatformUserInvitationsService', () => {
     service = new PlatformUserInvitationsService(
       database as unknown as DatabaseService,
       redis as unknown as RedisService,
-      config as unknown as ConfigService,
+      config as never,
       outboxPublisher as never,
     );
   });

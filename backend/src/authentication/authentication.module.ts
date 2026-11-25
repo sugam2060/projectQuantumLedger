@@ -1,5 +1,6 @@
 import { Module, ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigModule, type ConfigType } from '@nestjs/config';
+import { authConfig } from '../config';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -17,13 +18,15 @@ import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.m
 
 @Module({
   imports: [
+    ConfigModule.forFeature(authConfig),
     UtilsModule,
     RolesPermissionsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const secret = configService.getOrThrow<string>('JWT_SECRET');
+      imports: [ConfigModule.forFeature(authConfig)],
+      inject: [authConfig.KEY],
+      useFactory: (config: ConfigType<typeof authConfig>) => {
+        const secret = config.jwtSecret;
         if (secret.length < 32) {
           throw new Error('JWT_SECRET must be at least 32 characters long');
         }

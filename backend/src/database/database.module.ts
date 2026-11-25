@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
+import { databaseConfig } from '../config';
 import { DrizzleModule } from '@nestjs/drizzle';
 import { createDatabaseOptions } from './database.provider';
 import { DatabaseService } from './database.service';
@@ -12,8 +13,8 @@ import { AuditLogService } from './audit-log.service';
 @Module({
   imports: [
     DrizzleModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
+      imports: [ConfigModule.forFeature(databaseConfig)],
+      inject: [databaseConfig.KEY],
       useFactory: createDatabaseOptions,
     }),
   ],

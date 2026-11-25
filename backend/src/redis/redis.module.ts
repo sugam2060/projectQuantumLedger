@@ -1,19 +1,20 @@
 import { Global, Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule, type ConfigType } from '@nestjs/config';
+import { redisConfig } from '../config';
 import Redis from 'ioredis';
 
-import { REDIS_CLIENT } from './redis.config';
+import { REDIS_CLIENT } from './redis.constants';
 import { RedisService } from './redis.service';
 
 @Global()
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule.forFeature(redisConfig)],
   providers: [
     {
       provide: REDIS_CLIENT,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const redisUrl = config.getOrThrow<string>('REDIS_URL');
+      inject: [redisConfig.KEY],
+      useFactory: (config: ConfigType<typeof redisConfig>) => {
+        const redisUrl = config.url;
         const url = new URL(redisUrl);
 
         // Check if it's a secure connection (rediss://)

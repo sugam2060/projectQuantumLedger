@@ -3,7 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { RedisService } from '../src/redis/redis.service';
-import { REDIS_CLIENT } from '../src/redis/redis.config';
+import { REDIS_CLIENT } from '../src/redis/redis.constants';
 
 describe('AuthenticationController (e2e)', () => {
   let app: INestApplication;

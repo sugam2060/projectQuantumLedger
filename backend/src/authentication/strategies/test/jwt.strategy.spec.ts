@@ -1,5 +1,4 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JwtStrategy } from '../jwt.strategy';
 
 describe('JwtStrategy', () => {
@@ -7,8 +6,8 @@ describe('JwtStrategy', () => {
 
   beforeEach(() => {
     strategy = new JwtStrategy({
-      getOrThrow: () => 'test-jwt-secret-that-is-at-least-32-characters',
-    } as unknown as ConfigService);
+      jwtSecret: 'test-jwt-secret-that-is-at-least-32-characters',
+    });
   });
 
   it('maps user and role template claims from the verified token', () => {

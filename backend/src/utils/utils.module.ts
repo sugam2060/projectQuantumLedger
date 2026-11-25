@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { storageConfig } from '../config';
 import { UtilsService } from './utils.service';
 import { RateLimitMiddleware } from './ratelimit.middleware';
 import { ObjectStoreService } from './objectStore.service';
@@ -12,7 +13,7 @@ import {
 } from './rate-limit-key.generator';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, ConfigModule.forFeature(storageConfig)],
   providers: [
     UtilsService,
     CloudinaryObjectStoreService,

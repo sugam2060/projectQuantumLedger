@@ -1,5 +1,6 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
+import { authConfig } from '../../config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { RequestSession } from '../../database/request_context.service';
@@ -37,8 +38,8 @@ const UUID_PATTERN =
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(configService: ConfigService) {
-    const secret = configService.getOrThrow<string>('JWT_SECRET');
+  constructor(@Inject(authConfig.KEY) config: ConfigType<typeof authConfig>) {
+    const secret = config.jwtSecret;
     if (secret.length < 32) {
       throw new Error('JWT_SECRET must be at least 32 characters long');
     }

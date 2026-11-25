@@ -1,3 +1,5 @@
+import { ConfigModule } from '@nestjs/config';
+import { appConfig } from '../config';
 import { Module } from '@nestjs/common';
 import { UtilsModule } from '../utils/utils.module';
 import { PlatformBusinessController } from './platform-business.controller';
@@ -8,7 +10,7 @@ import { PlatformUsersController } from './platform-users.controller';
 import { PlatformUserInvitationsService } from './platform-user-invitations.service';
 
 @Module({
-  imports: [UtilsModule, RedisModule],
+  imports: [ConfigModule.forFeature(appConfig), UtilsModule, RedisModule],
   controllers: [PlatformBusinessController, PlatformUsersController],
   providers: [
     PlatformBusinessService,

@@ -1,10 +1,12 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import type { ConfigType } from '@nestjs/config';
+import { appConfig } from '../config';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
@@ -29,7 +31,8 @@ export class PlatformUserInvitationsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly redis: RedisService,
-    private readonly config: ConfigService,
+    @Inject(appConfig.KEY)
+    private readonly config: ConfigType<typeof appConfig>,
     private readonly outboxPublisher: MailOutboxPublisher,
   ) {}
 
@@ -177,7 +180,7 @@ export class PlatformUserInvitationsService {
   }
 
   private getFrontendBaseUrl(): string {
-    const value = this.config.get<string>('FRONTEND_BASE_URL')?.trim();
+    const value = this.config.frontendBaseUrl?.trim();
     if (!value) {
       throw new ServiceUnavailableException(
         'The frontend base URL is not configured correctly',

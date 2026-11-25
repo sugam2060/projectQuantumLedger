@@ -1,11 +1,13 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import type { ConfigType } from '@nestjs/config';
+import { storageConfig } from '../config';
 import {
   v2 as cloudinary,
   type UploadApiOptions,
@@ -19,11 +21,12 @@ export class CloudinaryObjectStoreService extends ObjectStoreService {
   private readonly folder: string;
   private configured = false;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    @Inject(storageConfig.KEY)
+    private readonly config: ConfigType<typeof storageConfig>,
+  ) {
     super();
-    this.folder =
-      config.get<string>('CLOUDINARY_BUSINESS_REQUEST_FOLDER') ??
-      'business-request-documents';
+    this.folder = config.cloudinary.businessRequestFolder;
   }
 
   upload(file: Express.Multer.File): Promise<StoredObject> {
@@ -115,9 +118,7 @@ export class CloudinaryObjectStoreService extends ObjectStoreService {
 
   private ensureConfigured(): void {
     if (this.configured) return;
-    const cloudName = this.config.get<string>('CLOUDINARY_CLOUD_NAME');
-    const apiKey = this.config.get<string>('CLOUDINARY_API_KEY');
-    const apiSecret = this.config.get<string>('CLOUDINARY_API_SECRET');
+    const { cloudName, apiKey, apiSecret } = this.config.cloudinary;
     if (!cloudName || !apiKey || !apiSecret) {
       throw new ServiceUnavailableException(
         'Cloudinary object storage is not configured',

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
+import { appConfig, validateEnv } from './config';
 import { DatabaseModule } from './database/database.module';
 import { AuthenticationModule } from './authentication/authentication.module';
 import { UtilsModule } from './utils/utils.module';
@@ -15,6 +16,8 @@ import { BusinessModule } from './business/business.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnv,
+      load: [appConfig],
     }),
     DatabaseModule,
     AuthenticationModule,

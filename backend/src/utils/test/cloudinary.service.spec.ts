@@ -1,7 +1,6 @@
 import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   v2 as cloudinary,
   type UploadApiOptions,
@@ -20,19 +19,14 @@ describe('CloudinaryObjectStoreService', () => {
 
   beforeEach(() => {
     jest.restoreAllMocks();
-    const values: Record<string, string> = {
-      CLOUDINARY_CLOUD_NAME: 'test-cloud',
-      CLOUDINARY_API_KEY: 'test-key',
-      CLOUDINARY_API_SECRET: 'test-secret',
-      CLOUDINARY_BUSINESS_REQUEST_FOLDER: 'business-request-documents',
-    };
-    const config = {
-      get: jest.fn((key: string) => values[key]),
-      getOrThrow: jest.fn((key: string) => values[key]),
-    };
-    service = new CloudinaryObjectStoreService(
-      config as never as ConfigService,
-    );
+    service = new CloudinaryObjectStoreService({
+      cloudinary: {
+        cloudName: 'test-cloud',
+        apiKey: 'test-key',
+        apiSecret: 'test-secret',
+        businessRequestFolder: 'business-request-documents',
+      },
+    });
   });
 
   it('rejects a file whose bytes do not match an allowed document type', () => {

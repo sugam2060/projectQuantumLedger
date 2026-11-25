@@ -2,7 +2,7 @@ import { jest as jestGlobal } from '@jest/globals';
 const jest = jestGlobal as unknown as typeof globalThis.jest;
 import { Test, TestingModule } from '@nestjs/testing';
 import { RedisService } from './redis.service';
-import { REDIS_CLIENT } from './redis.config';
+import { REDIS_CLIENT } from './redis.constants';
 import Redis from 'ioredis';
 
 // Mock the Redis client

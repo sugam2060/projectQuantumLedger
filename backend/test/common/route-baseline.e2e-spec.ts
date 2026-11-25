@@ -9,7 +9,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AppModule } from '../../src/app.module';
-import { REDIS_CLIENT } from '../../src/redis/redis.config';
+import { REDIS_CLIENT } from '../../src/redis/redis.constants';
 import { RABBITMQ_OPTIONS } from '../../src/utils/rabbitmq.config';
 
 /**
