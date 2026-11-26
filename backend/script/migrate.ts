@@ -16,6 +16,7 @@ import { Pool, type PoolClient } from 'pg';
  *   02-security-functions.sql     SECURITY DEFINER predicates and auth lookups
  *   Drizzle migrations            tables, indexes, RLS policies
  *   03-app-grant-least-privilege  DML + EXECUTE grants for fortis_app
+ *   04-seed-authorization.sql     permission catalogue, system roles and their grants
  *
  * The SQL files are idempotent and re-applied on every run. The whole run holds a
  * Postgres advisory lock so two deploys cannot migrate concurrently.
@@ -93,6 +94,33 @@ async function setRuntimePassword(client: PoolClient): Promise<void> {
   }
 }
 
+/**
+ * Seeds the authorization reference data. The file runs in one transaction, so a
+ * failure leaves the previous catalogue untouched; the run then fails, because
+ * the API cannot authorize anything without permissions and system roles.
+ */
+async function seedAuthorization(client: PoolClient): Promise<void> {
+  const filename = '04-seed-authorization.sql';
+  try {
+    await applySqlFile(client, filename);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Seeding permissions and system roles (${filename}) failed and was rolled back: ${reason}. ` +
+        'Schema migrations are applied; fix the seed file and run `npm run db:migrate` again (it is idempotent).',
+      { cause: error },
+    );
+  }
+
+  const { rows } = await client.query<{ permissions: number; roles: number }>(
+    `SELECT (SELECT count(*) FROM permissions)::int AS permissions,
+            (SELECT count(*) FROM roles WHERE is_system)::int AS roles`,
+  );
+  console.info(
+    `Seeded ${rows[0].permissions} permissions and ${rows[0].roles} system roles.`,
+  );
+}
+
 async function runMigrations(): Promise<void> {
   const envFile = resolve(backendDirectory, '.env');
   // Variables already in the environment win over the file.
@@ -129,6 +157,9 @@ async function runMigrations(): Promise<void> {
 
       console.info('Granting least-privilege runtime access...');
       await applySqlFile(client, '03-app-grant-least-privilege.sql');
+
+      console.info('Seeding permissions and system roles...');
+      await seedAuthorization(client);
 
       console.info('Database migrations completed.');
     } finally {

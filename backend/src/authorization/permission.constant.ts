@@ -1,8 +1,8 @@
 /**
  * Every business permission code. Code never uses raw permission strings: it uses
- * `Permission.X`. Adding a permission means one line here plus a custom Drizzle
- * migration that inserts the `permissions` row (and `role_permissions` rows for
- * the system roles that should have it). A db spec fails when the table and this
+ * `Permission.X`. Adding a permission means one line here plus its row (and the
+ * grants for the system roles that should have it) in
+ * `script/sql/04-seed-authorization.sql`. A db spec fails when the table and this
  * constant drift apart.
  */
 export const Permission = {

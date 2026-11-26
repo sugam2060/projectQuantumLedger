@@ -2,9 +2,10 @@ import { sql } from 'drizzle-orm';
 import { check, pgPolicy, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
 /**
- * Catalogue of business permission codes, seeded by migration and kept equal to
- * the `Permission` constant (a db spec checks this). Read-only for the runtime
- * role: SELECT policy only, and INSERT/UPDATE/DELETE are revoked in 03.
+ * Catalogue of business permission codes, seeded by
+ * script/sql/04-seed-authorization.sql and kept equal to the `Permission`
+ * constant (a db spec checks this). Read-only for the runtime role: SELECT
+ * policy only, and INSERT/UPDATE/DELETE are revoked in 03.
  */
 export const permissions = pgTable(
   'permissions',

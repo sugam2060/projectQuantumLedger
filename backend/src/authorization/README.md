@@ -58,7 +58,7 @@ audit/access logs call `app.has_permission` too.
 
 ## Data
 
-- `permissions`: the catalogue. Seeded by migrations, read-only for `fortis_app`,
+- `permissions`: the catalogue. Seeded by `script/sql/04-seed-authorization.sql`, read-only for `fortis_app`,
   and must equal `PERMISSION_KEYS` (checked by `test/authorization/permissions.db-spec.ts`).
 - `roles`: system roles (`business_id IS NULL`, `is_system`, read-only) and custom
   roles of one business (optionally limited to a branch with `branch_id`). `key` is
@@ -66,7 +66,7 @@ audit/access logs call `app.has_permission` too.
 - `role_permissions`: grants of a role.
 - `member_permission_overrides`: per-member `allow` / `deny` of one key.
 
-Seeded system roles (migration 0022):
+Seeded system roles (`script/sql/04-seed-authorization.sql`, applied on every `npm run db:migrate`):
 
 | Role                | Permissions                                                                                                               |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -77,15 +77,12 @@ Seeded system roles (migration 0022):
 | `accountant`        | business:read, branch:read, member:read, audit:read                                                                       |
 | `viewer`            | business:read, branch:read, terminal:read, member:read, role:read                                                         |
 
-Migration 0022 also carried existing grants over: the old `roles.permissions` jsonb
-and `endpoint_role_access` rows (`business.read` → `business:read`,
-`branches.read` → `branch:read`, ...). Migration 0024 then dropped both.
-
 ### Adding a permission
 
 1. Add it to `Permission` in `permission.constant.ts`.
-2. Add a custom migration (`npx drizzle-kit generate --custom`) that inserts the
-   `permissions` row and the `role_permissions` rows for system roles that get it.
+2. Add the `permissions` row and the system-role grants that should get it to
+   `script/sql/04-seed-authorization.sql` (`admin` gets every permission
+   automatically), then `npm run db:migrate`.
 3. `npm run test:db`: the catalogue test fails until both match.
 
 ## Platform permissions
