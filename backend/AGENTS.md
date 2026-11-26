@@ -9,6 +9,7 @@ Update this file (and `CLAUDE.md`) in the same change whenever folder layout, co
 ## Commands
 
 ```bash
+npm run dev:up | dev:down                # local Postgres + Redis + Mailpit (docker-compose.yml)
 npm run start:dev | start:prod
 npm run db:generate | db:migrate
 npm run test | test:e2e | test:cov

@@ -1,0 +1,69 @@
+# Local development services for the Fortis backend.
+#
+#   npm run dev:up     start PostgreSQL, Redis and Mailpit (waits until healthy)
+#   npm run db:migrate create the schema in the local database
+#   npm run dev:down   stop (data is kept; `docker compose down -v` wipes it)
+#
+# Credentials and ports come from backend/.env (section "Local Docker services"
+# in .env.example). Every port listens on 127.0.0.1 only.
+# The test suite uses its own throwaway stack: docker-compose.test.yml.
+name: fortis-dev
+
+services:
+  # PostgreSQL 16. On first start (empty volume) docker/postgres/init creates the
+  # application database and its owner, a CREATEROLE but non-superuser account
+  # like Neon's, which `npm run db:migrate` connects as (DATABASE_MIGRATION_URL).
+  # The migration then creates the least-privileged fortis_app role the API uses.
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Set POSTGRES_SUPERUSER_PASSWORD in .env}
+      POSTGRES_DB: postgres
+      FORTIS_DB_NAME: ${LOCAL_DB_NAME:-fortis}
+      FORTIS_MIGRATION_USER: ${LOCAL_DB_MIGRATION_USER:-fortis_owner}
+      FORTIS_MIGRATION_PASSWORD: ${LOCAL_DB_MIGRATION_PASSWORD:?Set LOCAL_DB_MIGRATION_PASSWORD in .env}
+    ports:
+      - '127.0.0.1:${LOCAL_DB_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # TCP check: the temporary server used during first-start init does not
+      # listen on TCP, so this only passes once the database is really ready.
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U postgres -d "$${FORTIS_DB_NAME}"']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # Redis 7: rate-limit counters and the BullMQ email queue (append-only file so
+  # queued jobs survive a restart).
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${LOCAL_REDIS_PASSWORD:?Set LOCAL_REDIS_PASSWORD in .env}
+    command: ['sh', '-c', 'exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"']
+    ports:
+      - '127.0.0.1:${LOCAL_REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli --no-auth-warning -a "$${REDIS_PASSWORD}" ping | grep -q PONG']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # Mailpit: catches every email the API sends (invitations, password reset,
+  # owner codes). Inbox: http://localhost:8025. Nothing leaves your machine.
+  mailpit:
+    image: axllent/mailpit:v1.20
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${LOCAL_SMTP_PORT:-1025}:1025'
+      - '127.0.0.1:${LOCAL_MAIL_UI_PORT:-8025}:8025'
+
+volumes:
+  postgres-data:
+  redis-data:
