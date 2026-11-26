@@ -71,7 +71,18 @@ async function setRuntimePassword(client: PoolClient): Promise<void> {
     `SELECT pg_catalog.format('ALTER ROLE %I PASSWORD %L', $1::text, $2::text) AS statement`,
     [APP_ROLE, password],
   );
-  await client.query(rows[0].statement);
+  try {
+    await client.query(rows[0].statement);
+  } catch (error) {
+    // Managed Postgres (Neon, RDS, ...): a CREATEROLE user that is not a
+    // superuser may only change passwords of roles it administers (PG16+), i.e.
+    // roles it created. If someone else created fortis_app, keep its password.
+    if ((error as { code?: string }).code !== '42501') throw error;
+    console.warn(
+      `Not allowed to change the ${APP_ROLE} password (the role was created by another user); keeping the current one. ` +
+        `If the API cannot connect, set the password as that role's creator or a superuser and make DATABASE_URL match.`,
+    );
+  }
 }
 
 async function runMigrations(): Promise<void> {
