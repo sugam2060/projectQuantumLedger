@@ -11,6 +11,7 @@ import { Pool, type PoolClient } from 'pg';
  *
  *   00-app-role.sql               create/alter the fortis_app runtime role
  *   (password)                    set from FORTIS_APP_DB_PASSWORD via bind parameter
+ *                                 (FORTIS_APP_ROLE_EXTERNALLY_MANAGED=true: role made elsewhere)
  *   01-helper-functions.sql       app schema + request-context readers
  *   02-security-functions.sql     SECURITY DEFINER predicates and auth lookups
  *   Drizzle migrations            tables, indexes, RLS policies
@@ -76,11 +77,18 @@ async function setRuntimePassword(client: PoolClient): Promise<void> {
   } catch (error) {
     // Managed Postgres (Neon, RDS, ...): a CREATEROLE user that is not a
     // superuser may only change passwords of roles it administers (PG16+), i.e.
-    // roles it created. If someone else created fortis_app, keep its password.
+    // roles it created. Someone else created fortis_app: its password is not
+    // under this migration's control, so continue only on explicit opt-in.
     if ((error as { code?: string }).code !== '42501') throw error;
+    if (process.env.FORTIS_APP_ROLE_EXTERNALLY_MANAGED?.trim() !== 'true') {
+      throw new Error(
+        `The migration user may not set the ${APP_ROLE} password: the role was created by another user. ` +
+          `Either drop the role (as its creator or a superuser) and migrate again so this migration creates it, ` +
+          `or, if you manage ${APP_ROLE} and its password yourself, set FORTIS_APP_ROLE_EXTERNALLY_MANAGED=true.`,
+      );
+    }
     console.warn(
-      `Not allowed to change the ${APP_ROLE} password (the role was created by another user); keeping the current one. ` +
-        `If the API cannot connect, set the password as that role's creator or a superuser and make DATABASE_URL match.`,
+      `FORTIS_APP_ROLE_EXTERNALLY_MANAGED=true: keeping the externally managed ${APP_ROLE} password.`,
     );
   }
 }

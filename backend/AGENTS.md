@@ -19,6 +19,10 @@ npm run test:db:up && npm run test:db    # real Postgres + Redis (docker-compose
 
 Raw SQL that Drizzle cannot generate lives in `script/` and is applied by `script/migrate.ts`
 around the Drizzle migrations (`npm run db:migrate`).
+Migration works without SUPERUSER (managed Postgres): the migration user needs CREATEROLE and must own
+the database. It creates `fortis_app` and sets its password (`FORTIS_APP_DB_PASSWORD`); a `fortis_app`
+created by someone else needs `FORTIS_APP_ROLE_EXTERNALLY_MANAGED=true`. Migration refuses a `fortis_app`
+with SUPERUSER, BYPASSRLS, REPLICATION or memberships in other roles.
 
 ## Structure
 

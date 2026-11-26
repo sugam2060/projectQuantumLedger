@@ -11,7 +11,8 @@
 -- BYPASSRLS and REPLICATION attributes, even to switch them off. So the role is
 -- created with safe attributes, only the attributes a CREATEROLE user may change
 -- are corrected (and only when they differ), and the dangerous ones are verified
--- instead of altered: if any is set, migration stops with an explanation.
+-- instead of altered: if any is set, or fortis_app is a member of any other
+-- role, migration stops with an explanation.
 DO $provision_role$
 DECLARE
   r pg_catalog.pg_roles%ROWTYPE;
@@ -27,6 +28,15 @@ BEGIN
     RAISE EXCEPTION
       'fortis_app has SUPERUSER, BYPASSRLS or REPLICATION; row-level security would not protect tenant data'
       USING HINT = 'As a superuser run: ALTER ROLE fortis_app NOSUPERUSER NOBYPASSRLS NOREPLICATION; then migrate again.';
+  END IF;
+
+  -- NOINHERIT does not stop SET ROLE: membership in any other role (a table
+  -- owner, a provider admin role, ...) would let the API escape RLS.
+  IF EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members m WHERE m.member = r.oid
+  ) THEN
+    RAISE EXCEPTION 'fortis_app is a member of other roles; it could SET ROLE past row-level security'
+      USING HINT = 'Revoke those memberships (see pg_auth_members where member is fortis_app), then migrate again.';
   END IF;
 
   IF NOT r.rolcanlogin THEN
