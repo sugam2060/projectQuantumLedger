@@ -197,8 +197,8 @@ export class AuthenticationController {
   @Public()
   @StrictThrottle()
   @HttpCode(HttpStatus.ACCEPTED)
-  async forgotPassword(@Body() dto: ForgotPasswordDto) {
-    await this.passwordReset.requestReset('user', dto.email);
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    this.passwordReset.requestResetInBackground('user', dto.email);
     return {
       message:
         'If an account exists for this email, a reset link has been sent.',

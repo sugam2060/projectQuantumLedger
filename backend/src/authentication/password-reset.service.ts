@@ -48,6 +48,19 @@ export class PasswordResetService {
   ) {}
 
   /**
+   * Starts `requestReset` without waiting for it, so the HTTP response takes the
+   * same time whether or not the email belongs to an account.
+   */
+  requestResetInBackground(actor: PasswordActorKind, email: string): void {
+    this.requestReset(actor, email).catch((error: unknown) => {
+      this.logger.error(
+        `Password reset request failed for a ${actor} account`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    });
+  }
+
+  /**
    * Emails a reset link when an active account has this email. Same outcome (and
    * no error) when it does not; enqueue failures are logged, not returned.
    */

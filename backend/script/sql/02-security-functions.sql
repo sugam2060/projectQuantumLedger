@@ -485,7 +485,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 -- Issues a reset token for an active account with this email. Earlier open tokens
--- of that account are invalidated. Returns the account (for the email) or no row,
+-- of that account are invalidated (at most one new link per minute). Returns the account (for the email) or no row,
 -- so the caller can answer the same way whether or not the account exists.
 CREATE OR REPLACE FUNCTION app.auth_create_reset_token(
   p_actor text,
@@ -517,6 +517,18 @@ BEGIN
   END IF;
 
   IF v_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  -- Cooldown: a link issued in the last minute is not replaced, so repeated
+  -- anonymous requests cannot keep invalidating someone's pending link.
+  IF EXISTS (
+    SELECT 1 FROM public.password_reset_tokens t
+     WHERE t.consumed_at IS NULL
+       AND t.created_at > pg_catalog.now() - interval '60 seconds'
+       AND ((p_actor = 'user' AND t.user_id = v_id)
+         OR (p_actor = 'platform' AND t.platform_user_id = v_id))
+  ) THEN
     RETURN;
   END IF;
 

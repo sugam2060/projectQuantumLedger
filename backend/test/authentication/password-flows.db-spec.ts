@@ -60,15 +60,27 @@ describe('password flows (real database)', () => {
       .send({ refreshToken });
   }
 
-  /** The token embedded in the queued reset email's link. */
-  function resetTokenFor(email: string): string {
-    const mail = queued.find(
-      (job) => job.template === 'password-reset' && job.to === email,
-    );
-    expect(mail).toBeDefined();
-    const url = new URL(String(mail!.context.resetUrl));
-    return url.searchParams.get('token') ?? '';
+  /** Waits for the background reset email to be queued. */
+  async function waitForMail(email: string): Promise<MailJob> {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const mail = queued.find(
+        (job) => job.template === 'password-reset' && job.to === email,
+      );
+      if (mail) return mail;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error(`no reset email for ${email}`);
   }
+
+  /** The token embedded in the queued reset email's link. */
+  async function resetTokenFor(email: string): Promise<string> {
+    const mail = await waitForMail(email);
+    return (
+      new URL(String(mail.context.resetUrl)).searchParams.get('token') ?? ''
+    );
+  }
+
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
 
   describe('forgot + reset', () => {
     it('answers 202 for known and unknown emails, emailing only real accounts', async () => {
@@ -83,6 +95,8 @@ describe('password flows (real database)', () => {
         .expect(202);
 
       expect(known.body).toEqual(unknown.body);
+      await waitForMail(seeded.owner.email);
+      await settle();
       expect(queued).toHaveLength(1);
       expect(String(queued[0].context.resetUrl)).toMatch(
         /^https:\/\/app\.fortis\.test\/reset-password\?token=[A-Za-z0-9_-]{43}$/,
@@ -91,7 +105,9 @@ describe('password flows (real database)', () => {
         'SELECT token_hash FROM password_reset_tokens',
       );
       expect(rows).toHaveLength(1);
-      expect(rows[0].token_hash).not.toBe(resetTokenFor(seeded.owner.email));
+      expect(rows[0].token_hash).not.toBe(
+        await resetTokenFor(seeded.owner.email),
+      );
     });
 
     it('does not email disabled accounts', async () => {
@@ -100,6 +116,7 @@ describe('password flows (real database)', () => {
         .post(`${API}/authentication/forgot-password`)
         .send({ email: disabled.email })
         .expect(202);
+      await settle();
       expect(queued).toHaveLength(0);
     });
 
@@ -110,7 +127,7 @@ describe('password flows (real database)', () => {
         .post(`${API}/authentication/forgot-password`)
         .send({ email: seeded.owner.email })
         .expect(202);
-      const token = resetTokenFor(seeded.owner.email);
+      const token = await resetTokenFor(seeded.owner.email);
 
       await http
         .post(`${API}/authentication/reset-password`)
@@ -131,16 +148,39 @@ describe('password flows (real database)', () => {
       await http
         .post(`${API}/authentication/forgot-password`)
         .send({ email: seeded.owner.email });
-      const first = resetTokenFor(seeded.owner.email);
+      const first = await resetTokenFor(seeded.owner.email);
       queued.length = 0;
+      await owner().query(
+        "UPDATE password_reset_tokens SET created_at = now() - interval '2 minutes'",
+      );
       await http
         .post(`${API}/authentication/forgot-password`)
         .send({ email: seeded.owner.email });
 
+      await waitForMail(seeded.owner.email);
       await http
         .post(`${API}/authentication/reset-password`)
         .send({ token: first, newPassword: NEW_PASSWORD })
         .expect(400);
+    });
+
+    it('does not replace a link issued less than a minute ago', async () => {
+      const seeded = await createBusinessWithOwner();
+      await http
+        .post(`${API}/authentication/forgot-password`)
+        .send({ email: seeded.owner.email });
+      const first = await resetTokenFor(seeded.owner.email);
+      queued.length = 0;
+      await http
+        .post(`${API}/authentication/forgot-password`)
+        .send({ email: seeded.owner.email })
+        .expect(202);
+      await settle();
+      expect(queued).toHaveLength(0);
+      await http
+        .post(`${API}/authentication/reset-password`)
+        .send({ token: first, newPassword: NEW_PASSWORD })
+        .expect(204);
     });
 
     it('rejects short new passwords and malformed tokens', async () => {
@@ -211,10 +251,10 @@ describe('password flows (real database)', () => {
         .post(`${API}/platform/user/forgot-password`)
         .send({ email: staff.email })
         .expect(202);
-      const mail = queued.find((job) => job.to === staff.email);
+      const mail = await waitForMail(staff.email);
       const token =
-        new URL(String(mail!.context.resetUrl)).searchParams.get('token') ?? '';
-      expect(String(mail!.context.resetUrl)).toContain(
+        new URL(String(mail.context.resetUrl)).searchParams.get('token') ?? '';
+      expect(String(mail.context.resetUrl)).toContain(
         '/platform/reset-password?token=',
       );
       await http
@@ -243,7 +283,7 @@ describe('password flows (real database)', () => {
       await http
         .post(`${API}/platform/user/reset-password`)
         .send({
-          token: resetTokenFor(seeded.owner.email),
+          token: await resetTokenFor(seeded.owner.email),
           newPassword: NEW_PASSWORD,
         })
         .expect(400);
