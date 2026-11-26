@@ -10,7 +10,10 @@ import {
 import { permissions } from './permissions';
 import { roles } from './roles';
 
-/** Which permissions a role grants. System-role rows are seeded and fixed. */
+/**
+ * Which permissions a role grants. System-role rows are seeded and fixed;
+ * custom roles change only through app.save_role (no direct writes).
+ */
 export const rolePermissions = pgTable(
   'role_permissions',
   {
@@ -31,16 +34,6 @@ export const rolePermissions = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`EXISTS (SELECT 1 FROM roles r WHERE r.id = role_id)`,
-    }),
-    pgPolicy('role_permissions_insert', {
-      for: 'insert',
-      to: 'fortis_app',
-      withCheck: sql`app.can_manage_role(role_id)`,
-    }),
-    pgPolicy('role_permissions_delete', {
-      for: 'delete',
-      to: 'fortis_app',
-      using: sql`app.can_manage_role(role_id)`,
     }),
   ],
 ).enableRLS();

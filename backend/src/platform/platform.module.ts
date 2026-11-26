@@ -1,3 +1,4 @@
+import { AuthenticationModule } from '../authentication';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuditLogsModule } from '../audit-logs';
@@ -19,6 +20,7 @@ import { PlatformUsersService } from './platform-users.service';
 @Module({
   imports: [
     AuditLogsModule,
+    AuthenticationModule,
     ConfigModule.forFeature(appConfig),
     EmailModule,
     StorageModule,

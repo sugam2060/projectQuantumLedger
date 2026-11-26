@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -7,7 +8,12 @@ import {
 } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { appConfig } from '../config';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { PasswordService } from '../authentication';
+import {
+  generateOpaqueToken,
+  hashOpaqueToken,
+} from '../common/utils/opaque-token.util';
 import {
   PG_UNIQUE_VIOLATION,
   postgresErrorCode,
@@ -16,6 +22,7 @@ import { RedisService } from '../redis/redis.service';
 import { EmailProducer, type MailJob } from '../jobs/email';
 import { PlatformUsersRepository } from './platform-users.repository';
 import type { InvitePlatformUserDto } from './dto/invite-platform-user.dto';
+import type { PlatformRole } from '../authorization';
 
 const INVITE_OPERATION = 'platform.users.invite';
 const IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -36,7 +43,27 @@ export class PlatformUsersService {
     @Inject(appConfig.KEY)
     private readonly config: ConfigType<typeof appConfig>,
     private readonly emailProducer: EmailProducer,
+    private readonly passwords: PasswordService,
   ) {}
+
+  /**
+   * Public: accepts a staff invitation with the emailed token. Creates the
+   * platform account (single use, decided in SQL). Any failure is one 400.
+   */
+  async acceptInvitation(
+    token: string,
+    password: string,
+  ): Promise<{ platformUserId: string }> {
+    const passwordHash = await this.passwords.hash(password);
+    const result = await this.repository.acceptInvitation(
+      hashOpaqueToken(token),
+      passwordHash,
+    );
+    if (result.outcome !== 'accepted' || !result.platformUserId) {
+      throw new BadRequestException('Invitation is invalid or has expired');
+    }
+    return { platformUserId: result.platformUserId };
+  }
 
   async invitePlatformUser(
     input: InvitePlatformUserDto,
@@ -46,8 +73,9 @@ export class PlatformUsersService {
   ): Promise<InviteResponse> {
     const name = input.name.trim();
     const email = input.email.trim().toLowerCase();
+    const role: PlatformRole = input.role ?? 'support';
     const requestHash = createHash('sha256')
-      .update(JSON.stringify({ email, name }))
+      .update(JSON.stringify({ email, name, role }))
       .digest('hex');
     const idempotencyKeyHash = createHash('sha256')
       .update(idempotencyKey)
@@ -85,6 +113,7 @@ export class PlatformUsersService {
       const response = await this.createInvitation(
         name,
         email,
+        role,
         platformUserId,
         inviterName,
       );
@@ -112,16 +141,17 @@ export class PlatformUsersService {
   private async createInvitation(
     name: string,
     email: string,
+    role: PlatformRole,
     platformUserId: string,
     inviterName?: string,
   ): Promise<InviteResponse> {
     const frontendBaseUrl = this.getFrontendBaseUrl();
     const now = new Date();
-    const tokenHash = createHash('sha256')
-      .update(randomBytes(32))
-      .digest('hex');
+    // The raw token travels only in the email; the database keeps its SHA-256.
+    const token = generateOpaqueToken();
+    const tokenHash = hashOpaqueToken(token);
     const expiresAt = new Date(now.getTime() + INVITATION_TTL_MS);
-    const invitationUrl = `${frontendBaseUrl}/accept/invite/${tokenHash}`;
+    const invitationUrl = `${frontendBaseUrl}/platform/accept-invite?token=${encodeURIComponent(token)}`;
 
     let mailJob: MailJob;
     try {
@@ -137,6 +167,7 @@ export class PlatformUsersService {
           await this.repository.insertInvitation(tx, {
             emailNormalized: email,
             inviteeName: name,
+            platformRole: role,
             invitationType: 'platform_user',
             tokenHash,
             expiresAt,
@@ -151,7 +182,7 @@ export class PlatformUsersService {
               inviterName: inviterName?.trim() || 'A platform manager',
               invitationUrl,
             },
-            correlationId: tokenHash,
+            correlationId: platformUserId,
             createdAt: now.toISOString(),
           };
           return job;

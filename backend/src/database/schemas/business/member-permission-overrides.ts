@@ -14,7 +14,8 @@ import { permissions } from './permissions';
 
 /**
  * Per-member exceptions to the role: `allow` grants a permission the role lacks,
- * `deny` removes one it has. Deny wins (see app.has_permission).
+ * `deny` removes one it has. Deny wins (see app.has_permission). Written only
+ * through app.set_member_override / app.clear_member_override.
  */
 export const memberPermissionOverrides = pgTable(
   'member_permission_overrides',
@@ -56,22 +57,6 @@ export const memberPermissionOverrides = pgTable(
         OR app.has_permission(business_id, NULL, 'member:read')
         OR app.is_platform_user()
       `,
-    }),
-    pgPolicy('member_permission_overrides_insert', {
-      for: 'insert',
-      to: 'fortis_app',
-      withCheck: sql`app.has_permission(business_id, NULL, 'override:manage')`,
-    }),
-    pgPolicy('member_permission_overrides_update', {
-      for: 'update',
-      to: 'fortis_app',
-      using: sql`app.has_permission(business_id, NULL, 'override:manage')`,
-      withCheck: sql`app.has_permission(business_id, NULL, 'override:manage')`,
-    }),
-    pgPolicy('member_permission_overrides_delete', {
-      for: 'delete',
-      to: 'fortis_app',
-      using: sql`app.has_permission(business_id, NULL, 'override:manage')`,
     }),
   ],
 ).enableRLS();

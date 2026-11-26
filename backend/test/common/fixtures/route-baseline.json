@@ -70,13 +70,143 @@
     "public": false
   },
   {
+    "method": "GET",
+    "path": "/businesses/:businessId/branches/:branchId/invitations",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/businesses/:businessId/branches/:branchId/invitations",
+    "public": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/businesses/:businessId/branches/:branchId/invitations/:invitationId",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/businesses/:businessId/branches/:branchId/invitations/:invitationId/resend",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/businesses/:businessId/branches/:branchId/members",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/businesses/:businessId/branches/:branchId/members/:userId",
+    "public": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/businesses/:businessId/branches/:branchId/members/:userId",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/businesses/:businessId/branches/:branchId/members/:userId/end-membership",
+    "public": false
+  },
+  {
     "method": "POST",
     "path": "/businesses/:businessId/branches/:branchId/terminals/activate",
     "public": false
   },
   {
+    "method": "GET",
+    "path": "/businesses/:businessId/invitations",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/businesses/:businessId/invitations",
+    "public": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/businesses/:businessId/invitations/:invitationId",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/businesses/:businessId/invitations/:invitationId/resend",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/businesses/:businessId/members",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/businesses/:businessId/members/:userId",
+    "public": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/businesses/:businessId/members/:userId",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/businesses/:businessId/members/:userId/end-membership",
+    "public": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/businesses/:businessId/members/:userId/overrides/:permissionKey",
+    "public": false
+  },
+  {
+    "method": "PUT",
+    "path": "/businesses/:businessId/members/:userId/overrides/:permissionKey",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/businesses/:businessId/roles",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/businesses/:businessId/roles",
+    "public": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/businesses/:businessId/roles/:roleId",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/businesses/:businessId/roles/:roleId",
+    "public": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/businesses/:businessId/roles/:roleId",
+    "public": false
+  },
+  {
+    "method": "POST",
+    "path": "/invitations/accept",
+    "public": true
+  },
+  {
+    "method": "GET",
+    "path": "/invitations/preview",
+    "public": true
+  },
+  {
     "method": "POST",
     "path": "/onboarding",
+    "public": false
+  },
+  {
+    "method": "GET",
+    "path": "/permissions",
     "public": false
   },
   {
@@ -142,6 +272,11 @@
   {
     "method": "POST",
     "path": "/platform/user/reset-password",
+    "public": true
+  },
+  {
+    "method": "POST",
+    "path": "/platform/users/invitations/accept",
     "public": true
   },
   {

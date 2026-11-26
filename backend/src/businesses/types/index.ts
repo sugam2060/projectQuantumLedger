@@ -15,3 +15,12 @@ export type {
   IncomingBusinessUpdateFile,
   StagedBusinessDocument,
 } from './business-update.type';
+export type {
+  AcceptOutcome,
+  InvitationPreview,
+  InvitationResultStatus,
+  InvitationView,
+  MemberDetailView,
+  MemberView,
+  RoleView,
+} from './team.type';

@@ -93,13 +93,26 @@ describe('RLS policies (as fortis_app)', () => {
       ).toEqual([]);
     });
 
-    it('lets coworkers see each other', async () => {
+    it('shows coworkers only to members with member:read', async () => {
       const { a, cashier } = await world();
+      // The custom role grants nothing: the cashier sees only themselves.
       expect(
         await ids(as(cashier.id), 'SELECT id FROM users WHERE id = $1', [
           a.owner.id,
         ]),
-      ).toEqual([a.owner.id]);
+      ).toEqual([]);
+      expect(
+        await ids(
+          as(cashier.id),
+          'SELECT user_id AS id FROM business_memberships',
+        ),
+      ).toEqual([cashier.id]);
+      // The owner holds member:read.
+      expect(
+        await ids(as(a.owner.id), 'SELECT id FROM users WHERE id = $1', [
+          cashier.id,
+        ]),
+      ).toEqual([cashier.id]);
     });
 
     it('returns nothing without a request context', async () => {
@@ -191,30 +204,42 @@ describe('RLS policies (as fortis_app)', () => {
       );
     });
 
-    it('does not let branch members write roles (old hole)', async () => {
+    it('lets nobody write roles directly (only app.save_role)', async () => {
       const { a, cashier } = await world();
-      await expect(
-        rowCount(
-          { ...as(cashier.id), 'app.branch_id': a.branchId },
-          'INSERT INTO roles (business_id, name, key) VALUES ($1, $2, $3)',
-          [a.businessId, 'Sneaky', 'sneaky'],
+      for (const userId of [cashier.id, a.owner.id]) {
+        await expect(
+          rowCount(
+            { ...as(userId), 'app.branch_id': a.branchId },
+            'INSERT INTO roles (business_id, name, key) VALUES ($1, $2, $3)',
+            [a.businessId, 'Sneaky', 'sneaky'],
+          ),
+        ).rejects.toMatchObject({ code: '42501' });
+      }
+      const { rows } = await asApp(as(a.owner.id), (client) =>
+        client.query<{ outcome: string }>(
+          `SELECT outcome FROM app.save_role($1, NULL, 'supervisor', 'Supervisor',
+             NULL, NULL, true, ARRAY['business:read'])`,
+          [a.businessId],
         ),
-      ).rejects.toMatchObject({ code: '42501' });
-      expect(
-        await rowCount(
-          as(a.owner.id),
-          'INSERT INTO roles (business_id, name, key) VALUES ($1, $2, $3)',
-          [a.businessId, 'Supervisor', 'supervisor'],
-        ),
-      ).toBe(1);
+      );
+      expect(rows[0].outcome).toBe('ok');
     });
 
-    it('does not let members change memberships; the owner may change non-owner rows', async () => {
+    it('changes memberships only through app.end_membership', async () => {
       const { a, cashier, manager } = await world();
       const deactivate =
         'UPDATE business_memberships SET is_active = false WHERE user_id = $1';
       expect(await rowCount(as(cashier.id), deactivate, [manager.id])).toBe(0);
-      expect(await rowCount(as(a.owner.id), deactivate, [manager.id])).toBe(1);
+      expect(await rowCount(as(a.owner.id), deactivate, [manager.id])).toBe(0);
+      const end = (userId: string) =>
+        asApp(as(userId), (client) =>
+          client.query<{ outcome: string }>(
+            'SELECT app.end_membership($1, NULL, $2) AS outcome',
+            [a.businessId, manager.id],
+          ),
+        );
+      expect((await end(cashier.id)).rows[0].outcome).toBe('forbidden');
+      expect((await end(a.owner.id)).rows[0].outcome).toBe('ok');
     });
 
     it('never updates the owner row and never promotes a member to owner', async () => {
@@ -230,9 +255,16 @@ describe('RLS policies (as fortis_app)', () => {
           a.owner.id,
         ]),
       ).toBe(0);
+      expect(
+        await rowCount(
+          as(a.owner.id),
+          'UPDATE business_memberships SET is_owner = true WHERE user_id = $1',
+          [manager.id],
+        ),
+      ).toBe(0);
       await expect(
         rowCount(
-          as(a.owner.id),
+          { 'app.platform_user_id': staff.id },
           'UPDATE business_memberships SET is_owner = true WHERE user_id = $1',
           [manager.id],
         ),

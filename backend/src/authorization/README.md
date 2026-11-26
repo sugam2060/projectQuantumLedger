@@ -41,7 +41,9 @@ logoutAll() {}
 1. Unknown key, no user, no active membership, or disabled account → **deny**.
 2. Active owner → **allow** (every key).
 3. Branch limit = membership `branch_id`, else the role's `branch_id`. A check at
-   another branch → **deny**. Business-wide checks (no branch) are not limited.
+   another branch → **deny**. A business-wide check (no branch) → **deny**, except
+   the context reads `business:read`, `branch:read`, `role:read`. Branch-limited
+   members use the `/branches/:branchId/...` routes.
 4. Deny override for the member → **deny**.
 5. Allow override → **allow**.
 6. The member's role grants it (`role_permissions`; system roles or a role of that
@@ -49,7 +51,8 @@ logoutAll() {}
 
 Related SQL (`script/sql/02-security-functions.sql`): `app.has_all_permissions`
 (used by the guard: one query), `app.effective_permissions` (returned on sign-in
-and by `/authentication/me`), and `app.can_manage_role` (RLS on `role_permissions`).
+and by `/authentication/me`), and the write functions for members, roles, overrides and invitations (see
+`../businesses/README.md`, anti-escalation rules).
 RLS policies on business, branches, terminals, memberships, invitations, roles and
 audit/access logs call `app.has_permission` too.
 

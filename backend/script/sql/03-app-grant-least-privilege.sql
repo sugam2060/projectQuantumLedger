@@ -88,3 +88,15 @@ GRANT SELECT (id, email_normalized, name, status, is_bootstrap, role, created_at
 REVOKE INSERT, UPDATE, DELETE ON TABLE public.permissions FROM fortis_app;
 -- Role grants are added or removed, never rewritten in place.
 REVOKE UPDATE ON TABLE public.role_permissions FROM fortis_app;
+
+-- Internal helpers: evaluate other users or act on them. Only the security
+-- definer functions above call them; the runtime role may not.
+REVOKE EXECUTE ON FUNCTION app.member_has_permission(uuid, uuid, uuid, text) FROM fortis_app;
+REVOKE EXECUTE ON FUNCTION app.revoke_user_sessions(uuid) FROM fortis_app;
+REVOKE EXECUTE ON FUNCTION app.role_permission_keys(uuid) FROM fortis_app;
+
+-- Roles, role grants and overrides change only through the security definer
+-- functions in 02 (app.save_role, app.delete_role, app.set_member_override, ...).
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.roles FROM fortis_app;
+REVOKE INSERT, DELETE ON TABLE public.role_permissions FROM fortis_app;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.member_permission_overrides FROM fortis_app;

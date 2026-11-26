@@ -24,7 +24,9 @@ export const businessMemberships = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id),
-    roleId: uuid('role_id').references(() => roles.id),
+    roleId: uuid('role_id').references(() => roles.id, {
+      onDelete: 'set null',
+    }),
     isOwner: boolean('is_owner').notNull().default(false),
     branchId: uuid('branch_id').references(() => branches.id), // NULL = access to all branches in the business
     isActive: boolean('is_active').notNull().default(true),
@@ -51,7 +53,7 @@ export const businessMemberships = pgTable(
     ),
     check(
       'business_memberships_role_required_chk',
-      sql`is_owner = true OR role_id IS NOT NULL`,
+      sql`is_owner = true OR role_id IS NOT NULL OR is_active = false`,
     ),
 
     // RLS Policy: Users can view memberships within their business session, or platform admins can view all
@@ -59,7 +61,9 @@ export const businessMemberships = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-        user_id = app.current_user_id() OR app.is_business_member(business_id) OR app.is_platform_user()
+        user_id = app.current_user_id()
+        OR app.has_permission(business_id, branch_id, 'member:read')
+        OR app.is_platform_user()
       `,
     }),
 
@@ -93,16 +97,10 @@ export const businessMemberships = pgTable(
     pgPolicy('business_memberships_update', {
       for: 'update',
       to: 'fortis_app',
-      using: sql`
-        app.has_permission(business_id, branch_id, 'member:update')
-        OR app.has_permission(business_id, branch_id, 'member:end')
-        OR app.is_platform_user()
-      `,
-      withCheck: sql`
-        app.has_permission(business_id, branch_id, 'member:update')
-        OR app.has_permission(business_id, branch_id, 'member:end')
-        OR app.is_platform_user()
-      `,
+      // Business users change memberships only through app.update_member /
+      // app.end_membership / app.accept_business_invitation (anti-escalation).
+      using: sql`app.is_platform_user()`,
+      withCheck: sql`app.is_platform_user()`,
     }),
     pgPolicy('business_memberships_owner_row_immutable', {
       as: 'restrictive',

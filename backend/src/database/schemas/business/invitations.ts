@@ -24,6 +24,8 @@ export const invitations = pgTable(
     branchId: uuid('branch_id').references(() => branches.id), // NULL = business-wide invite
     invitationType: text('invitation_type').notNull().default('business_user'),
     inviteeName: text('invitee_name'),
+    /** Platform invitations: role of the new staff account (admin | manager | support). */
+    platformRole: text('platform_role'),
     tokenHash: text('token_hash').notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     consumedAt: timestamp('consumed_at', { withTimezone: true }),
@@ -65,6 +67,10 @@ export const invitations = pgTable(
       sql`(invitation_type = 'business_user' AND business_id IS NOT NULL AND role_id IS NOT NULL) OR (invitation_type = 'platform_user' AND business_id IS NULL AND role_id IS NULL AND branch_id IS NULL AND invitee_name IS NOT NULL AND btrim(invitee_name) <> '' AND invited_by_platform_user_id IS NOT NULL)`,
     ),
     check(
+      'invitations_platform_role_chk',
+      sql`platform_role IS NULL OR (invitation_type = 'platform_user' AND platform_role IN ('admin', 'manager', 'support'))`,
+    ),
+    check(
       'invitations_email_chk',
       sql`email_normalized = lower(btrim(email_normalized))`,
     ),
@@ -91,7 +97,7 @@ export const invitations = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-        app.is_platform_user() OR (business_id IS NOT NULL AND app.has_permission(business_id, branch_id, 'member:invite'))
+        app.is_platform_user()
       `,
     }),
 
@@ -100,10 +106,10 @@ export const invitations = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-        app.is_platform_user() OR (business_id IS NOT NULL AND app.has_permission(business_id, branch_id, 'member:invite'))
+        app.is_platform_user()
       `,
       withCheck: sql`
-        app.is_platform_user() OR (business_id IS NOT NULL AND app.has_permission(business_id, branch_id, 'member:invite'))
+        app.is_platform_user()
       `,
     }),
 
@@ -112,7 +118,7 @@ export const invitations = pgTable(
       for: 'delete',
       to: 'fortis_app',
       using: sql`
-        app.is_platform_user() OR (business_id IS NOT NULL AND app.has_permission(business_id, branch_id, 'member:invite'))
+        app.is_platform_user()
       `,
     }),
   ],

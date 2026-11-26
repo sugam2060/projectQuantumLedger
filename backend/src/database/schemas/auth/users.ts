@@ -76,7 +76,7 @@ export const users = pgTable(
           SELECT 1 FROM business_memberships m
           WHERE m.user_id = users.id
             AND m.is_active
-            AND app.is_business_member(m.business_id)
+            AND app.has_permission(m.business_id, m.branch_id, 'member:read')
         )
         OR app.is_platform_user()
       `,

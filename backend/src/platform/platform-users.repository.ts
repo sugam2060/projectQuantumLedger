@@ -33,6 +33,27 @@ export class PlatformUsersRepository {
     return result.rows[0]?.in_use === true;
   }
 
+  /** Public: consumes a staff invitation and creates the account (in SQL). */
+  acceptInvitation(
+    tokenHash: string,
+    passwordHash: string,
+  ): Promise<{ outcome: string; platformUserId: string | null }> {
+    return this.database.transactionWithSession({}, async (tx) => {
+      const result = await tx.execute<{
+        outcome: string;
+        platform_user_id: string | null;
+      }>(
+        sql`SELECT outcome, platform_user_id
+              FROM app.accept_platform_invitation(${tokenHash}, ${passwordHash})`,
+      );
+      const row = result.rows[0];
+      return {
+        outcome: row?.outcome ?? 'invalid',
+        platformUserId: row?.platform_user_id ?? null,
+      };
+    });
+  }
+
   async insertInvitation(
     tx: PlatformTransaction,
     values: NewInvitation,

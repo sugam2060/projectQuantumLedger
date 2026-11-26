@@ -102,14 +102,12 @@ describe('authorization (real database)', () => {
       ).rejects.toMatchObject({ code: '42501' });
       const admin = await systemRole('admin');
       await expect(
-        asApp(settings, async (client) => {
-          const result = await client.query(
-            "UPDATE roles SET name = 'Hacked' WHERE id = $1",
-            [admin],
-          );
-          return result.rowCount;
-        }),
-      ).resolves.toBe(0);
+        asApp(settings, (client) =>
+          client.query("UPDATE roles SET name = 'Hacked' WHERE id = $1", [
+            admin,
+          ]),
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
       const cashier = await systemRole('cashier');
       await expect(
         asApp(settings, (client) =>
@@ -390,7 +388,7 @@ describe('authorization (real database)', () => {
         .post(`${API}/platform/users/invite`)
         .set(auth)
         .set('x-client-type', 'web')
-        .set('idempotency-key', 'support-invite-0001')
+        .set('x-idempotency-key', 'support-invite-0001')
         .send({ email: 'new-staff@fortis.test', name: 'New Staff' })
         .expect(403);
     });
