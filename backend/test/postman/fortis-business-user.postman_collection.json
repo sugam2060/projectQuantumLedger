@@ -1,58 +1,259 @@
 {
   "info": {
-    "name": "Fortis POS API v1 ? Business User",
-    "description": "Business user collection for owner, manager, and staff workflows. Run the relevant login request first. Desktop/mobile login stores bearer tokens in accessToken and refreshToken; owner web login stores an HttpOnly cookie used automatically by owner-only endpoints.",
+    "_postman_id": "837970e1-d341-54fa-abba-ea3b77fa74c3",
+    "name": "Fortis API - Business users",
+    "description": "Every business-user route of the Fortis backend (prefix `/api/v1`): sign-in and sessions, passwords, owner registration, the business, branches and terminals, roles, members, overrides and invitations. Fortis staff routes are in **Fortis API - Fortis staff**.\n\n## Setup\n\n1. Start the API with its services: `npm run dev:up`, `npm run db:migrate`, `npm run start:dev`.\n2. Set `baseUrl` (default `http://localhost:3000/api/v1`).\n3. Set `email`, `password` and, for desktop, `terminalId`. An owner account comes from the provisioning flow (Fortis staff collection) and **03 Owner registration**.\n4. Run **01 Sign in and session > Login (desktop)**. It stores the tokens and the business and branch ids that later requests use.\n\nEmailed tokens (password reset, invitations, owner activation) must be copied from the email into variables; locally the emails are in the Mailpit inbox.\n\n## Authentication\n\nCollection auth is `Bearer {{accessToken}}`; public routes override it with *No Auth*. Tokens are obtained by the requests, never stored in this file.\n\n## Checks\n\nEvery request checks the `X-Request-Id` header and, for errors, the `{ statusCode, error, message, requestId }` body. Each request adds its own status and body checks and stores the ids later requests need.\n\nRequests marked *destructive* change real data (ending a membership, revoking an invitation, deleting a role); run them against test data only.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Shared checks for every request in this collection.",
+          "pm.test('carries a request id', () => {",
+          "  pm.expect(pm.response.headers.get('X-Request-Id')).to.be.a('string').and.not.empty;",
+          "});",
+          "if (pm.response.code >= 400) {",
+          "  pm.test('error body has statusCode and message', () => {",
+          "    const body = pm.response.json();",
+          "    pm.expect(body.statusCode).to.eql(pm.response.code);",
+          "    pm.expect(body).to.have.property('message');",
+          "  });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string",
+      "description": "API base URL including /api/v1"
+    },
+    {
+      "key": "clientType",
+      "value": "desktop",
+      "type": "string",
+      "description": "web, web_terminal, desktop, android_pos or mobile"
+    },
+    {
+      "key": "terminalId",
+      "value": "",
+      "type": "string",
+      "description": "Active terminal id; required for non-web clients"
+    },
+    {
+      "key": "email",
+      "value": "owner@example.com",
+      "type": "string",
+      "description": "Account email (placeholder)"
+    },
+    {
+      "key": "password",
+      "value": "<set-your-password>",
+      "type": "string",
+      "description": "Account password (placeholder; never commit a real one)"
+    },
+    {
+      "key": "newPassword",
+      "value": "<set-a-new-password-10+-chars>",
+      "type": "string",
+      "description": "Used by change/reset password; swapped with password after success"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string",
+      "description": "Set by login, refresh and change-password"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Set by login (native clients), refresh and change-password"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string",
+      "description": "Signed-in user id (set by login)"
+    },
+    {
+      "key": "businessId",
+      "value": "",
+      "type": "string",
+      "description": "Set by login or owner registration"
+    },
+    {
+      "key": "branchId",
+      "value": "",
+      "type": "string",
+      "description": "Set by login (branch members), owner registration or List branches"
+    },
+    {
+      "key": "branchCursor",
+      "value": "",
+      "type": "string",
+      "description": "nextCursor of List branches"
+    },
+    {
+      "key": "terminalCode",
+      "value": "",
+      "type": "string",
+      "description": "Terminal activation code from the email"
+    },
+    {
+      "key": "ownerEmail",
+      "value": "owner@example.com",
+      "type": "string",
+      "description": "Owner registration email"
+    },
+    {
+      "key": "ownerName",
+      "value": "Example Owner",
+      "type": "string",
+      "description": "Owner registration name"
+    },
+    {
+      "key": "redeemCode",
+      "value": "",
+      "type": "string",
+      "description": "Owner redeem code from the activation email"
+    },
+    {
+      "key": "resetToken",
+      "value": "",
+      "type": "string",
+      "description": "token query parameter of the password-reset link"
+    },
+    {
+      "key": "systemRoleId",
+      "value": "",
+      "type": "string",
+      "description": "Cashier system role (set by List roles)"
+    },
+    {
+      "key": "viewerRoleId",
+      "value": "",
+      "type": "string",
+      "description": "Viewer system role (set by List roles)"
+    },
+    {
+      "key": "customRoleId",
+      "value": "",
+      "type": "string",
+      "description": "Set by Create role"
+    },
+    {
+      "key": "memberUserId",
+      "value": "",
+      "type": "string",
+      "description": "A member other than you and the owner (set by List members)"
+    },
+    {
+      "key": "permissionKey",
+      "value": "member:read",
+      "type": "string",
+      "description": "Permission used by the override requests"
+    },
+    {
+      "key": "inviteEmail",
+      "value": "",
+      "type": "string",
+      "description": "Last invited address (set by Invite)"
+    },
+    {
+      "key": "invitationId",
+      "value": "",
+      "type": "string",
+      "description": "Newest open invitation (set by List invitations)"
+    },
+    {
+      "key": "invitationToken",
+      "value": "",
+      "type": "string",
+      "description": "token query parameter of the invitation link"
+    },
+    {
+      "key": "inviteePassword",
+      "value": "<set-an-invitee-password-10+-chars>",
+      "type": "string",
+      "description": "Password the invitee sets or uses"
+    }
+  ],
   "item": [
     {
-      "name": "01. Public & onboarding",
+      "id": "9cf48a46-0d09-5273-a6a8-f56caee03902",
+      "name": "00 Service",
+      "description": "Requests that need no business context.",
       "item": [
         {
-          "name": "GET /",
+          "id": "e0c7e90c-e269-5e08-a6d1-a9c2104b8221",
+          "name": "Hello (public)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/"
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [],
+              "raw": "{{baseUrl}}/"
+            },
+            "description": "Public liveness text. Health endpoints (`/health/live`, `/health/ready`) are not implemented yet.",
+            "auth": {
+              "type": "noauth"
+            }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "POST /onboarding",
+          "id": "987f0e66-0ba9-5a7b-b8f5-3d898824c281",
+          "name": "Onboarding payload (stub)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
+                "value": "application/json"
               }
             ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding"
+              ],
+              "raw": "{{baseUrl}}/onboarding"
             },
-            "url": "{{baseUrl}}/onboarding",
+            "description": "Signed-in stub: accepts any JSON object and answers 202 `{ acknowledged, message }`. Not part of a product flow yet.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"event\": \"business.created\",\n  \"businessName\": \"Example Store\"\n}",
+              "raw": "{\n  \"source\": \"postman\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -60,14 +261,13 @@
               }
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 202', () => pm.response.to.have.status(202));"
+                  "pm.test('responds 202', () => pm.response.to.have.status(202));"
                 ]
               }
             }
@@ -76,226 +276,48 @@
       ]
     },
     {
-      "name": "02. User authentication (business users)",
+      "id": "115a2d3b-3e0a-5180-b08d-34faf9fa8db5",
+      "name": "01 Sign in and session",
+      "description": "Business users (owners and staff). Run **Login** first: it stores `accessToken`, `refreshToken`, `userId`, `businessId` and `branchId`.\n\n- Access tokens last 15 minutes; refresh tokens rotate on every refresh.\n- Refresh **single-flight**: replaying an already-rotated refresh token is treated as theft and signs the account out everywhere.\n- Native clients (`desktop`, `android_pos`, `mobile`) get both tokens in the body. Browsers (`web`, `web_terminal`) get the refresh token only as the httpOnly `refresh_token` cookie (Postman keeps it in its cookie jar).",
       "item": [
         {
-          "name": "POST /authentication/login",
+          "id": "43a7c475-c0e2-5c39-b1b5-953321427fa5",
+          "name": "Login (desktop)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
+                "value": "application/json"
               },
               {
                 "key": "x-client-type",
-                "value": "{{userClientType}}",
-                "type": "text"
+                "value": "{{clientType}}",
+                "description": "web, web_terminal, desktop, android_pos or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
               },
               {
                 "key": "x-terminal-id",
                 "value": "{{terminalId}}",
-                "type": "text"
+                "description": "Required for every client type except web: an active terminal in the member's business and branch."
               }
             ],
-            "url": "{{baseUrl}}/authentication/login",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\",\n  \"remember\": true\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "authentication",
+                "login"
+              ],
+              "raw": "{{baseUrl}}/authentication/login"
             },
-            "description": "Web clients may omit x-terminal-id and use their sole active membership for business/branch context. Mobile and desktop clients must provide the active assigned x-terminal-id. Set userClientType to web and remove the terminal header for the web flow."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.collectionVariables.get('userClientType') === 'web') pm.request.headers.remove('x-terminal-id');"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "const body = pm.response.json();",
-                  "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token ?? body.tokens?.accessToken ?? body.tokens?.access_token;",
-                  "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token ?? body.tokens?.refreshToken ?? body.tokens?.refresh_token;",
-                  "if (token) {",
-                  "  pm.collectionVariables.set('accessToken', token);",
-                  "  try { pm.environment.set('accessToken', token); } catch (_) {}",
-                  "}",
-                  "if (refresh) {",
-                  "  pm.collectionVariables.set('refreshToken', refresh);",
-                  "  try { pm.environment.set('refreshToken', refresh); } catch (_) {}",
-                  "}",
-                  "if (token && body.memberships?.some((membership) => membership.isOwner === true)) {",
-                  "  pm.collectionVariables.set('ownerAccessToken', token);",
-                  "  try { pm.environment.set('ownerAccessToken', token); } catch (_) {}",
-                  "}",
-                  "const roleId = body.memberships?.find((membership) => membership.roleId)?.roleId;",
-                  "if (roleId) { pm.collectionVariables.set('roleId', roleId); try { pm.environment.set('roleId', roleId); } catch (_) {} }",
-                  "if (pm.collectionVariables.get('userClientType') !== 'web') pm.test('Bearer access token is available to later requests', () => { pm.expect(token).to.be.a('string').and.not.empty; pm.expect(pm.variables.replaceIn('{{accessToken}}')).to.eql(token); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST /authentication/refresh",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "x-client-type",
-                "value": "{{userClientType}}",
-                "type": "text"
-              },
-              {
-                "key": "x-terminal-id",
-                "value": "{{terminalId}}",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/authentication/refresh",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "description": "Web clients may omit x-terminal-id and refresh using their sole active membership. Mobile and desktop clients must provide the active assigned x-terminal-id. Set userClientType to web and remove the terminal header for the web flow."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.collectionVariables.get('userClientType') === 'web') pm.request.headers.remove('x-terminal-id');"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "const body = pm.response.json();",
-                  "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token ?? body.tokens?.accessToken ?? body.tokens?.access_token;",
-                  "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token ?? body.tokens?.refreshToken ?? body.tokens?.refresh_token;",
-                  "if (token) {",
-                  "  pm.collectionVariables.set('accessToken', token);",
-                  "  try { pm.environment.set('accessToken', token); } catch (_) {}",
-                  "}",
-                  "if (refresh) {",
-                  "  pm.collectionVariables.set('refreshToken', refresh);",
-                  "  try { pm.environment.set('refreshToken', refresh); } catch (_) {}",
-                  "}",
-                  "if (token && body.memberships?.some((membership) => membership.isOwner === true)) {",
-                  "  pm.collectionVariables.set('ownerAccessToken', token);",
-                  "  try { pm.environment.set('ownerAccessToken', token); } catch (_) {}",
-                  "}",
-                  "const roleId = body.memberships?.find((membership) => membership.roleId)?.roleId;",
-                  "if (roleId) { pm.collectionVariables.set('roleId', roleId); try { pm.environment.set('roleId', roleId); } catch (_) {} }",
-                  "if (pm.collectionVariables.get('userClientType') !== 'web') pm.test('Bearer access token is available to later requests', () => { pm.expect(token).to.be.a('string').and.not.empty; pm.expect(pm.variables.replaceIn('{{accessToken}}')).to.eql(token); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST /authentication/logout (web cookies)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "x-client-type",
-                "value": "web",
-                "type": "text"
-              }
-            ],
+            "description": "Signs in with email and password. `remember: true` gives a 30-day refresh session, otherwise 12 hours.\n\n**Prerequisites:** an active account with an active membership; for non-web clients, `terminalId` of an active terminal in that business and branch.\n\n**Errors:** 400 invalid body or headers, 401 wrong credentials or terminal (same message for unknown emails), 429 rate limited (strict throttle).",
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "url": "{{baseUrl}}/authentication/logout"
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST /authentication/logout (desktop/mobile)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "x-client-type",
-                "value": "{{userClientType}}",
-                "type": "text"
-              }
-            ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "url": "{{baseUrl}}/authentication/logout",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"remember\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -303,492 +325,573 @@
               }
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET /authentication/me",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "x-client-type",
-                "value": "{{userClientType}}",
-                "type": "text"
-              },
-              {
-                "key": "x-terminal-id",
-                "value": "{{terminalId}}",
-                "type": "text"
-              },
-              {
-                "key": "x-initial-load",
-                "value": "true",
-                "type": "text"
-              }
-            ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "url": "{{baseUrl}}/authentication/me",
-            "description": "Requires an access token. x-terminal-id is optional for web and required for mobile/desktop; when omitted, session.terminalId is null. The request example uses the default desktop client."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.collectionVariables.get('userClientType') === 'web') pm.request.headers.remove('x-terminal-id');"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Normal user logout test",
-          "description": "Run these three requests in order. Requires a normal active user assigned to terminalId, and userEmail/userPassword set. The flow logs in, revokes the refresh token, then verifies that refresh is rejected.",
-          "item": [
-            {
-              "name": "1. Login normal user for logout test",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "x-client-type",
-                    "value": "{{userClientType}}",
-                    "type": "text"
-                  },
-                  {
-                    "key": "x-terminal-id",
-                    "value": "{{terminalId}}",
-                    "type": "text"
-                  }
-                ],
-                "url": "{{baseUrl}}/authentication/login",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\",\n  \"remember\": true\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "response": [],
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('Login succeeds for the normal user', () => pm.response.to.have.status(200));",
-                      "const body = pm.response.json();",
-                      "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token;",
-                      "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token;",
-                      "pm.expect(token).to.be.a('string').and.not.empty;",
-                      "pm.expect(refresh).to.be.a('string').and.not.empty;",
-                      "pm.collectionVariables.set('logoutTestAccessToken', token);",
-                      "pm.collectionVariables.set('logoutTestRefreshToken', refresh);",
-                      "try { pm.environment.set('logoutTestAccessToken', token); pm.environment.set('logoutTestRefreshToken', refresh); } catch (_) {}"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "2. Logout normal user",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "x-client-type",
-                    "value": "{{userClientType}}",
-                    "type": "text"
-                  }
-                ],
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [
-                    {
-                      "key": "token",
-                      "value": "{{logoutTestAccessToken}}",
-                      "type": "string"
-                    }
-                  ]
-                },
-                "url": "{{baseUrl}}/authentication/logout",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"refreshToken\": \"{{logoutTestRefreshToken}}\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "response": [],
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('Logout succeeds', () => pm.response.to.have.status(200));",
-                      "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "3. Verify revoked refresh token is rejected",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "type": "text"
-                  },
-                  {
-                    "key": "x-client-type",
-                    "value": "{{userClientType}}",
-                    "type": "text"
-                  },
-                  {
-                    "key": "x-terminal-id",
-                    "value": "{{terminalId}}",
-                    "type": "text"
-                  }
-                ],
-                "url": "{{baseUrl}}/authentication/refresh",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"refreshToken\": \"{{logoutTestRefreshToken}}\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "response": [],
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test('Revoked refresh token is rejected', () => pm.response.to.have.status(401));",
-                      "pm.collectionVariables.unset('logoutTestAccessToken');",
-                      "pm.collectionVariables.unset('logoutTestRefreshToken');"
-                    ]
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "description": "Business user desktop/mobile authentication. Run login first; the response script saves accessToken and refreshToken for subsequent requests. Web login uses cookies and does not return bearer tokens in the response body."
-    },
-    {
-      "name": "03. Business owner ? activation",
-      "item": [
-        {
-          "name": "POST /authentication/register-owner",
-          "request": {
-            "method": "POST",
-            "description": "Web-only owner activation. Use the redemption code and initial terminal activation details received by email. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
-            "header": [
-              {
-                "key": "X-Client-Type",
-                "value": "web",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/authentication/register-owner",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"name\": \"Example Owner\",\n  \"password\": \"{{ownerPassword}}\",\n  \"redeemCode\": \"{{ownerRedeemCode}}\",\n  \"businessId\": \"{{businessId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"terminalCode\": \"{{terminalCode}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "pm.expect(body.isOwner).to.eql(true);",
-                  "pm.expect(body.roleId).to.eql(null);",
-                  "pm.expect(body.branchId).to.eql(null);",
-                  "pm.collectionVariables.set(\"userId\", body.userId);",
-                  "if (body.initialTerminalId) pm.collectionVariables.set(\"terminalId\", body.initialTerminalId);"
+                  "pm.test('returns an access token', () => pm.expect(body.accessToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "if (body.refreshToken) pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "pm.test('lists memberships and effective permissions', () => {",
+                  "  pm.expect(body.memberships).to.be.an('array').that.is.not.empty;",
+                  "  pm.expect(body.effectivePermissions).to.be.an('array');",
+                  "});",
+                  "pm.collectionVariables.set('userId', body.user.id);",
+                  "const membership = body.memberships[0];",
+                  "pm.collectionVariables.set('businessId', membership.businessId);",
+                  "if (membership.branchId) pm.collectionVariables.set('branchId', membership.branchId);"
                 ]
               }
             }
           ]
         },
         {
-          "name": "POST /authentication/login (business owner web session)",
+          "id": "fc0caa95-9aff-598d-b5f3-7eb26ab4f913",
+          "name": "Login (web, refresh token in cookie)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
+                "value": "application/json"
               },
-              {
-                "key": "x-client-type",
-                "value": "web",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/authentication/login",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"password\": \"{{ownerPassword}}\",\n  \"remember\": true\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "description": "Sign in as the business owner before running owner operations. The web login sets an HttpOnly access_token cookie; Postman stores and sends it automatically to the same baseUrl. Set ownerEmail and ownerPassword first. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Owner login returned a user profile', () => pm.expect(pm.response.json().user).to.be.an('object'));",
-                  "pm.test('Web access cookie was set', () => pm.expect(pm.response.headers.get('Set-Cookie') || '').to.include('access_token='));"
-                ]
-              }
-            }
-          ]
-        }
-      ],
-      "description": "Register the owner if needed, then log in as the owner with the web client. Postman stores the HttpOnly cookie for the owner-only terminal activation flow."
-    },
-    {
-      "name": "04. Business users ? profile & branches (permission-checked)",
-      "item": [
-        {
-          "name": "GET /businesses/{businessId} (business:read)",
-          "request": {
-            "method": "GET",
-            "header": [
               {
                 "key": "x-client-type",
                 "value": "web"
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/businesses/{{businessId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "authentication",
+                "login"
+              ],
+              "raw": "{{baseUrl}}/authentication/login"
+            },
+            "description": "Browser sign-in: `x-terminal-id` is optional, the access token is in the body, and the refresh token is only set as the httpOnly `refresh_token` cookie (path `/api/v1/authentication`, SameSite=Lax, Secure in production). `remember: false` makes it a browser-session cookie.\n\nThis request does not overwrite the stored `refreshToken`; the desktop requests keep using theirs.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"remember\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('access token in the body, refresh token not', () => {",
+                  "  pm.expect(body.accessToken).to.be.a('string');",
+                  "  pm.expect(body).to.not.have.property('refreshToken');",
+                  "});",
+                  "pm.test('sets the refresh_token cookie', () => pm.expect(pm.cookies.has('refresh_token')).to.be.true);",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "98ab802e-3a4a-53a5-9ba4-39ef3c8c4a92",
+          "name": "Refresh (desktop)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{clientType}}",
+                "description": "web, web_terminal, desktop, android_pos or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
+              },
+              {
+                "key": "x-terminal-id",
+                "value": "{{terminalId}}",
+                "description": "Required for every client type except web: an active terminal in the member's business and branch."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "authentication",
+                "refresh"
+              ],
+              "raw": "{{baseUrl}}/authentication/refresh"
+            },
+            "description": "Rotates the refresh token and issues a new access token. Native clients send `refreshToken` in the body; browsers send nothing and rely on the cookie.\n\nRun it once per stored token: sending the same token twice is reuse detection and revokes every session.\n\n**Errors:** 401 unknown, expired, revoked or reused token (clears the cookie); 429 rate limited.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const sent = JSON.parse(pm.variables.replaceIn(pm.request.body.raw)).refreshToken;",
+                  "const body = pm.response.json();",
+                  "pm.test('returns an access token', () => pm.expect(body.accessToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "if (body.refreshToken) pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "pm.test('rotated to a new refresh token', () => pm.expect(body.refreshToken).to.not.eql(sent));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "b2346b7e-926f-511c-b9eb-ca031555559c",
+          "name": "Current user (me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "{{clientType}}",
+                "description": "web, web_terminal, desktop, android_pos or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
+              },
+              {
+                "key": "x-terminal-id",
+                "value": "{{terminalId}}",
+                "description": "Required for every client type except web: an active terminal in the member's business and branch."
+              },
+              {
+                "key": "x-initial-load",
+                "value": "true",
+                "description": "true (default) also returns effectivePermissions."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "authentication",
+                "me"
+              ],
+              "raw": "{{baseUrl}}/authentication/me"
+            },
+            "description": "Profile, active business and branch, owner flag, role and role version, session summary, and (with `x-initial-load: true`) effective permissions. Re-checks that the account and membership are still active.\n\n**Errors:** 401 invalid token or inactive account/membership."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('identifies the signed-in user', () => pm.expect(body.user.id).to.eql(pm.collectionVariables.get('userId')));",
+                  "pm.test('returns effective permissions', () => pm.expect(body.effectivePermissions).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c70e0a8a-ee01-5768-9083-40af63322bd9",
+      "name": "02 Passwords",
+      "description": "Password rules: 10 to 128 characters. Reset links are emailed (local stack: the Mailpit inbox) and work once within 30 minutes.\nCopy the `token` query parameter of the emailed link into the `resetToken` variable before running **Reset password**.",
+      "item": [
+        {
+          "id": "6d460d28-ef68-5a33-ad63-c9941555df7a",
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{clientType}}",
+                "description": "web, web_terminal, desktop, android_pos or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "authentication",
+                "change-password"
+              ],
+              "raw": "{{baseUrl}}/authentication/change-password"
+            },
+            "description": "Requires the current password. Signs out every device and returns a new session (same shape as login). The test swaps `password` and `newPassword`, so running it again changes the password back.\n\n**Errors:** 400 missing current password or unchanged password, 403 wrong current password, 429 rate limited.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{password}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns an access token', () => pm.expect(body.accessToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "if (body.refreshToken) pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "const previous = pm.collectionVariables.get('password');",
+                  "pm.collectionVariables.set('password', pm.collectionVariables.get('newPassword'));",
+                  "pm.collectionVariables.set('newPassword', previous);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "b8bda7f8-64d6-51b2-a32c-47617bbdbab0",
+          "name": "Forgot password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "authentication",
+                "forgot-password"
+              ],
+              "raw": "{{baseUrl}}/authentication/forgot-password"
+            },
+            "description": "Always answers 202 with the same message, whether or not the email has an account, so it reveals nothing. Active accounts get a reset link (at most one new link per minute).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 202', () => pm.response.to.have.status(202));",
+                  "pm.test('generic message', () => pm.expect(pm.response.json().message).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "cbf8f433-2f40-5129-8423-5109bc2f5d7b",
+          "name": "Reset password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "authentication",
+                "reset-password"
+              ],
+              "raw": "{{baseUrl}}/authentication/reset-password"
+            },
+            "description": "**Prerequisite:** `resetToken` from the emailed link (`.../reset-password?token=...`).\n\nSets the new password and signs the account out everywhere; sign in again afterwards. The test moves `newPassword` into `password`.\n\n**Errors:** one generic 400 for any unusable token.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 204', () => pm.response.to.have.status(204));",
+                  "const previous = pm.collectionVariables.get('password');",
+                  "pm.collectionVariables.set('password', pm.collectionVariables.get('newPassword'));",
+                  "pm.collectionVariables.set('newPassword', previous);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5a40ed2d-63ac-52b7-8028-97c9bac4bf7e",
+      "name": "03 Owner registration",
+      "description": "The first owner of a business that Fortis staff provisioned. The redeem code, business, branch and terminal code arrive in the owner-activation email.",
+      "item": [
+        {
+          "id": "dffd2402-5ac1-5eea-8a65-45b273abbf94",
+          "name": "Register owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "description": "Must be web."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "authentication",
+                "register-owner"
+              ],
+              "raw": "{{baseUrl}}/authentication/register-owner"
+            },
+            "description": "Creates the owner account (or verifies the password of an existing one), adds the owner membership and activates the business. Issues no tokens: sign in afterwards.\n\n**Prerequisites:** values from the owner-activation email in `redeemCode`, `businessId`, `branchId`, `terminalCode`.\n\n**Errors:** 400 invalid data; 401 invalid, expired or used code, or wrong password for an existing account; 409 already activated or already a member; 429 rate limited.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"name\": \"{{ownerName}}\",\n  \"password\": \"{{password}}\",\n  \"redeemCode\": \"{{redeemCode}}\",\n  \"businessId\": \"{{businessId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"terminalCode\": \"{{terminalCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('businessId', body.businessId);",
+                  "if (body.initialBranchId) pm.collectionVariables.set('branchId', body.initialBranchId);",
+                  "if (body.initialTerminalId) pm.collectionVariables.set('terminalId', body.initialTerminalId);",
+                  "pm.collectionVariables.set('email', pm.collectionVariables.get('ownerEmail'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ad0127d6-7930-5a95-8a32-ebbd710f0fde",
+      "name": "04 Business, branches and terminals",
+      "description": "Every route needs a permission in the business (`:businessId`), checked in the database. Denials are one generic 403; a malformed id is 400.",
+      "item": [
+        {
+          "id": "d2a83485-3afc-56fa-954a-8099e2e18244",
+          "name": "Get business",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "businesses",
                 "{{businessId}}"
-              ]
-            }
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}"
+            },
+            "description": "**Permission:** `business:read`. Business profile and activation state."
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Sensitive registration data is omitted', () => { const body = pm.response.json(); pm.expect(body).not.to.have.property('pan'); pm.expect(body).not.to.have.property('documents'); });"
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is the requested business', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('businessId')));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "PATCH /businesses/{businessId} (business:update)",
+          "id": "6b5d1c19-4ddc-56bd-b468-e3a326123ef0",
+          "name": "Update business (multipart)",
           "request": {
             "method": "PATCH",
-            "description": "Requires an owner access token for businessId. Multipart file fields are optional; configure local file paths. Only approved profile fields and document replacement are allowed. Do not set Content-Type manually; Postman must add its multipart boundary. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
             "header": [
               {
-                "key": "Idempotency-Key",
-                "value": "{{businessUpdateIdempotencyKey}}",
-                "type": "text"
+                "key": "x-client-type",
+                "value": "desktop",
+                "description": "web, desktop or mobile."
               },
               {
-                "key": "x-client-type",
-                "value": "web",
-                "type": "text"
+                "key": "idempotency-key",
+                "value": "{{$guid}}",
+                "description": "Required. Reusing a key with the same payload replays the first response for 7 days; with a different payload it is 409."
               }
             ],
-            "url": "{{baseUrl}}/businesses/{{businessId}}",
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}"
+            },
+            "description": "**Permission:** `business:update`. Multipart: profile fields plus optional replacement documents. PAN, legal name and status cannot be changed (422). Audited.\n\n**Errors:** 403, 409 idempotency conflict, 422 prohibited or no fields.",
             "body": {
               "mode": "formdata",
               "formdata": [
                 {
                   "key": "reason",
-                  "value": "Approved profile update",
-                  "type": "text"
+                  "value": "Corrected display name",
+                  "type": "text",
+                  "description": "Required, up to 500 characters."
                 },
                 {
                   "key": "displayName",
-                  "value": "Updated Trading Name",
+                  "value": "Postman Retail",
                   "type": "text"
                 },
                 {
-                  "key": "country",
-                  "value": "",
-                  "type": "text",
-                  "disabled": true
-                },
-                {
                   "key": "city",
-                  "value": "",
-                  "type": "text",
-                  "disabled": true
-                },
-                {
-                  "key": "postalCode",
-                  "value": "",
+                  "value": "Kathmandu",
                   "type": "text",
                   "disabled": true
                 },
                 {
                   "key": "addressLine1",
-                  "value": "",
-                  "type": "text",
-                  "disabled": true
-                },
-                {
-                  "key": "addressLine2",
-                  "value": "",
+                  "value": "Main Road",
                   "type": "text",
                   "disabled": true
                 },
                 {
                   "key": "primaryContactNumber",
-                  "value": "",
+                  "value": "+977-1-5550100",
                   "type": "text",
                   "disabled": true
                 },
                 {
                   "key": "primaryContactEmail",
-                  "value": "",
+                  "value": "owner@example.com",
                   "type": "text",
                   "disabled": true
                 },
                 {
                   "key": "panCardFront",
                   "type": "file",
-                  "src": "{{panCardFrontPath}}",
+                  "src": "/path/to/pan-front.pdf",
+                  "description": "Optional document, up to 10 MB. Set the file in Postman.",
                   "disabled": true
                 },
                 {
                   "key": "panCardBack",
                   "type": "file",
-                  "src": "{{panCardBackPath}}",
+                  "src": "/path/to/pan-back.pdf",
+                  "description": "Optional document, up to 10 MB.",
                   "disabled": true
                 },
                 {
                   "key": "businessRegistrationCertificate",
                   "type": "file",
-                  "src": "{{businessRegistrationPath}}",
+                  "src": "/path/to/registration.pdf",
+                  "description": "Optional document, up to 10 MB.",
                   "disabled": true
                 }
               ]
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Response contains changed fields without document URLs', () => { const body = pm.response.json(); pm.expect(body.businessId).to.eql(pm.collectionVariables.get('businessId')); pm.expect(body.changedFields).to.be.an('object'); pm.expect(body).not.to.have.property('documents'); });"
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('reports changed fields', () => pm.expect(pm.response.json()).to.have.property('changedFields'));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "GET /businesses/{businessId}/branches (branch:read)",
+          "id": "c9009351-8bd1-57b8-ac0b-7ecb64fde45c",
+          "name": "List branches",
           "request": {
             "method": "GET",
-            "description": "Requires an owner token or a role explicitly assigned the branches.read endpoint key. An assigned branch membership sees only that branch; a membership with no branch assignment has business-wide scope. Enable the cursor query parameter after a page returns nextCursor. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
-            "header": [
-              {
-                "key": "x-client-type",
-                "value": "web",
-                "type": "text"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches?from={{branchFrom}}&to={{branchTo}}&limit={{branchLimit}}",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -799,54 +902,56 @@
               ],
               "query": [
                 {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "1-100"
+                },
+                {
                   "key": "from",
-                  "value": "{{branchFrom}}"
+                  "value": "2026-01-01T00:00:00Z",
+                  "disabled": true,
+                  "description": "ISO timestamp with timezone"
                 },
                 {
                   "key": "to",
-                  "value": "{{branchTo}}"
-                },
-                {
-                  "key": "limit",
-                  "value": "{{branchLimit}}"
+                  "value": "2026-12-31T23:59:59Z",
+                  "disabled": true,
+                  "description": "ISO timestamp with timezone"
                 },
                 {
                   "key": "cursor",
                   "value": "{{branchCursor}}",
-                  "disabled": true
+                  "disabled": true,
+                  "description": "nextCursor from the previous page"
                 }
-              ]
-            }
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches?limit=20"
+            },
+            "description": "**Permission:** `branch:read`. Keyset pagination. Members limited to a branch see only their branch."
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Response contains branch items and cursor', () => { const body = pm.response.json(); pm.expect(body.items).to.be.an('array'); pm.expect(body.nextCursor === null || typeof body.nextCursor === 'string').to.eql(true); body.items.forEach((branch) => { pm.expect(branch.id).to.be.a('string'); pm.expect(branch.status).to.be.oneOf(['active', 'inactive']); }); });",
-                  "if (pm.response.code === 200 && pm.response.json().nextCursor) pm.collectionVariables.set('branchCursor', pm.response.json().nextCursor);"
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns items', () => pm.expect(body.items).to.be.an('array'));",
+                  "if (!pm.collectionVariables.get('branchId') && body.items.length) pm.collectionVariables.set('branchId', body.items[0].id);",
+                  "pm.collectionVariables.set('branchCursor', body.nextCursor || '');"
                 ]
               }
             }
           ]
         },
         {
-          "name": "GET /businesses/{businessId}/branches/{branchId} (branch:read at that branch)",
+          "id": "3edd0e2f-119b-5806-99d8-bc2bfa9d42e1",
+          "name": "Get branch",
           "request": {
             "method": "GET",
-            "description": "Returns branch profile and current terminal status/member counts. Members assigned to another branch receive 404; business-wide members can read any branch. Authenticate with the preceding business owner web login; Postman sends its HttpOnly cookie automatically.",
-            "header": [
-              {
-                "key": "x-client-type",
-                "value": "web",
-                "type": "text"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -855,40 +960,50 @@
                 "{{businessId}}",
                 "branches",
                 "{{branchId}}"
-              ]
-            }
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}"
+            },
+            "description": "**Permission:** `branch:read` at this branch. Branch plus terminal and member counts. **Errors:** 403 another branch of a branch-limited member, 404 out of scope."
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Response contains branch and operational summary', () => { const body = pm.response.json(); pm.expect(body.branch.id).to.eql(pm.collectionVariables.get('branchId')); pm.expect(body.summary.terminals).to.include.all.keys('active', 'inactive', 'maintenance', 'total'); pm.expect(body.summary.members).to.include.all.keys('active', 'inactive', 'total'); });"
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns the branch', () => pm.expect(pm.response.json().branch.id).to.eql(pm.collectionVariables.get('branchId')));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "POST /businesses/{businessId}/branches/{branchId}/terminals/activate (terminal:activate at that branch)",
+          "id": "bebfa63d-8b35-536e-8efe-4a9853a8ec9e",
+          "name": "Activate terminal",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "X-Client-Type",
-                "value": "web",
-                "type": "text"
+                "value": "application/json"
               }
             ],
-            "url": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/terminals/activate",
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}",
+                "terminals",
+                "activate"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/terminals/activate"
+            },
+            "description": "**Permission:** `terminal:activate` at this branch. Activates an inactive terminal by its emailed code (case-insensitive). Repeating it for an active terminal returns it unchanged. Audited.\n\n**Errors:** 404 unknown business, branch or code; 409 terminal cannot be activated.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"terminalCode\": \"{{terminalCode}}\"\n}",
@@ -899,154 +1014,1208 @@
               }
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Terminal is active', () => pm.expect(pm.response.json().status).to.eql('active'));"
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('terminal is active', () => pm.expect(pm.response.json().status).to.eql('active'));"
                 ]
               }
             }
           ]
         }
-      ],
-      "description": "Run the business owner web login in the activation folder first. Web authentication uses the HttpOnly access_token cookie stored by Postman. Set businessId and branchId to the target records."
-    }
-  ],
-  "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:3000/api/v1",
-      "type": "string"
+      ]
     },
     {
-      "key": "userClientType",
-      "value": "desktop",
-      "type": "string"
+      "id": "309fe6bd-6e9f-5c39-900f-2ad0dc60d979",
+      "name": "05 Roles and permissions",
+      "description": "System roles (admin, branch-manager, cashier, inventory-manager, accountant, viewer) are shared and read-only. Custom roles belong to one business. Nobody can put a permission into a role that they do not hold themselves.",
+      "item": [
+        {
+          "id": "652d4e7a-c1f7-5177-9f6f-6f0d7610e5ad",
+          "name": "List permission catalogue",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permissions"
+              ],
+              "raw": "{{baseUrl}}/permissions"
+            },
+            "description": "Signed-in users. Every permission code with its description."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('lists codes', () => pm.expect(body.map((p) => p.key)).to.include('business:read'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "82f16675-bfa5-51b8-9f0d-c0b7fc9558d3",
+          "name": "List roles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "roles"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/roles"
+            },
+            "description": "**Permission:** `role:read`. System roles plus this business's roles, with their permissions. Stores the cashier and viewer role ids."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const roles = pm.response.json();",
+                  "const byKey = (key) => roles.find((r) => r.key === key);",
+                  "pm.test('includes the system roles', () => pm.expect(byKey('cashier')).to.exist);",
+                  "pm.collectionVariables.set('systemRoleId', byKey('cashier').id);",
+                  "pm.collectionVariables.set('viewerRoleId', byKey('viewer').id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "a80640f3-6d49-5567-8c3e-74401543bd5a",
+          "name": "Create role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "roles"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/roles"
+            },
+            "description": "**Permission:** `role:create` (business-wide members). Body: `name`, optional `description`, optional `branchId` (limits the role to that branch, fixed afterwards), `permissions`. The `key` is derived from the name.\n\n**Errors:** 400 unknown code or branch, 403 granting a permission you lack, 409 duplicate name.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Shift Lead {{$timestamp}}\",\n  \"description\": \"Created from Postman\",\n  \"permissions\": [\n    \"business:read\",\n    \"branch:read\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 201', () => pm.response.to.have.status(201));",
+                  "const role = pm.response.json();",
+                  "pm.test('derived key and permissions', () => {",
+                  "  pm.expect(role.key).to.match(/^[a-z0-9]+(-[a-z0-9]+)*$/);",
+                  "  pm.expect(role.permissions).to.eql(['branch:read', 'business:read']);",
+                  "});",
+                  "pm.collectionVariables.set('customRoleId', role.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "b978b7bd-73af-50ee-9f2b-c0686b8524ef",
+          "name": "Get role",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "roles",
+                "{{customRoleId}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/roles/{{customRoleId}}"
+            },
+            "description": "**Permission:** `role:read`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is the created role', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('customRoleId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "27852f4f-3f66-5a90-b9e2-b87bb18a76dd",
+          "name": "Update role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "roles",
+                "{{customRoleId}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/roles/{{customRoleId}}"
+            },
+            "description": "**Permission:** `role:update`. Only the fields sent change; an empty `description` clears it. `version` increases on every edit. You can only edit a role whose permissions you all hold.\n\n**Errors:** 403 system role or a role granting something you lack, 409 duplicate name.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": [\n    \"business:read\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const role = pm.response.json();",
+                  "pm.test('permissions replaced and version raised', () => {",
+                  "  pm.expect(role.permissions).to.eql(['business:read']);",
+                  "  pm.expect(role.version).to.be.above(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "d31d6ffa-356c-5d8f-8351-83d362eedeba",
+          "name": "Delete role",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "roles",
+                "{{customRoleId}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/roles/{{customRoleId}}"
+            },
+            "description": "**Permission:** `role:delete`. **Errors:** 403 system role, 404 unknown, 409 still assigned to active members or open invitations."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     },
     {
-      "key": "userEmail",
-      "value": "cashier@example.com",
-      "type": "string"
+      "id": "ed90580e-6f93-5ede-993e-cca18bdb7818",
+      "name": "06 Members and overrides",
+      "description": "Business-wide member management. Overrides grant (`allow`) or remove (`deny`) one permission for one member; deny wins.",
+      "item": [
+        {
+          "id": "f49533b4-2104-5692-ad98-3de7bbd154b7",
+          "name": "List members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "members"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/members"
+            },
+            "description": "**Permission:** `member:read`. Active members.  Stores the first member who is neither you nor the owner as `memberUserId`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const members = pm.response.json();",
+                  "pm.test('returns members', () => pm.expect(members).to.be.an('array'));",
+                  "const me = pm.collectionVariables.get('userId');",
+                  "const other = members.find((m) => !m.isOwner && m.userId !== me);",
+                  "if (other) pm.collectionVariables.set('memberUserId', other.userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "94937db7-5bf7-5fb9-a62e-18abb50ee135",
+          "name": "Get member",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "members",
+                "{{memberUserId}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/members/{{memberUserId}}"
+            },
+            "description": "**Permission:** `member:read`. Includes overrides and effective permissions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns effective permissions', () => pm.expect(pm.response.json().effectivePermissions).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "c555150f-bfc8-59f7-b507-b8a3108edcec",
+          "name": "Change member role or branch",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "members",
+                "{{memberUserId}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/members/{{memberUserId}}"
+            },
+            "description": "**Permission:** `member:update`. Body: `roleId` and/or `branchId` (`branchId: null` = business-wide). Moving someone to another branch signs them out.\n\nRefused (403): changing yourself or the owner; managing someone who holds a permission you lack; assigning a role that grants something you lack; on branch routes, moving someone out of the branch. Other branches' members are 404 on branch routes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleId\": \"{{viewerRoleId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('role changed', () => pm.expect(pm.response.json().role.id).to.eql(pm.collectionVariables.get('viewerRoleId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "5adc9bd2-47e2-50f0-8529-64519503da19",
+          "name": "Set override",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "members",
+                "{{memberUserId}}",
+                "overrides",
+                "{{permissionKey}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/members/{{memberUserId}}/overrides/{{permissionKey}}"
+            },
+            "description": "**Permission:** `override:manage` (business-wide). `effect` is `allow` or `deny`. You can only allow a permission you hold yourself.\n\n**Errors:** 400 unknown permission, 403 escalation or self/owner, 404 member not found.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"effect\": \"allow\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('override recorded', () => pm.expect(body.overrides.map((o) => o.permissionKey)).to.include(pm.collectionVariables.get('permissionKey')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "44a3a7df-59f3-55e4-8137-58bc8eed2bb2",
+          "name": "Remove override",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "members",
+                "{{memberUserId}}",
+                "overrides",
+                "{{permissionKey}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/members/{{memberUserId}}/overrides/{{permissionKey}}"
+            },
+            "description": "**Permission:** `override:manage`. Lifting a deny counts as granting: you must hold the permission. **Errors:** 404 no such override."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "75b7bf7b-239d-5a5f-918b-d50b06b7d310",
+          "name": "End membership (destructive)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "members",
+                "{{memberUserId}}",
+                "end-membership"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/members/{{memberUserId}}/end-membership"
+            },
+            "description": "**Permission:** `member:end`. Ends the membership, removes the member's overrides and signs them out everywhere. Run it only against a test member.\n\n**Errors:** 403 (same rules as changing a member), 404 no active membership in scope."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     },
     {
-      "key": "userPassword",
-      "value": "CHANGE_ME",
-      "type": "string"
+      "id": "5a63fbd2-07fb-576d-bd85-b1b48d1aac02",
+      "name": "07 Invitations",
+      "description": "Business-wide invitations. The raw token is only ever in the email; the API stores its hash.",
+      "item": [
+        {
+          "id": "80686c79-2898-5998-910f-14a845e8cc3a",
+          "name": "Invite",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "invitations"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/invitations"
+            },
+            "description": "**Permission:** `member:invite`. Up to 20 addresses with one role (and optional `branchId`). Answers 200 with one status per address: `invited`, `already_member`, `already_invited`, `invalid` or `forbidden` (the role grants something you lack). \n\nEach invited address gets an email with a single-use link (`.../invitations/accept?token=...`), valid for 7 days.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emails\": [\n    \"postman.invitee+{{$timestamp}}@example.com\"\n  ],\n  \"roleId\": \"{{systemRoleId}}\",\n  \"branchId\": \"{{branchId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const results = pm.response.json().results;",
+                  "pm.test('one result per address', () => pm.expect(results).to.have.lengthOf(1));",
+                  "pm.collectionVariables.set('inviteEmail', results[0].email);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "f56c67a5-d2f5-58d6-813f-501e77fb50b3",
+          "name": "List invitations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "invitations"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/invitations"
+            },
+            "description": "**Permission:** `member:read`. Latest 200 with status `open`, `expired`, `accepted` or `revoked`. Stores the newest open invitation as `invitationId`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const invitations = pm.response.json();",
+                  "const open = invitations.find((i) => i.status === 'open');",
+                  "if (open) pm.collectionVariables.set('invitationId', open.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "8e3952b0-b800-527d-8f7b-1a54379915b1",
+          "name": "Resend invitation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "invitations",
+                "{{invitationId}}",
+                "resend"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/invitations/{{invitationId}}/resend"
+            },
+            "description": "**Permission:** `member:invite`. Issues a new token and expiry and emails it; the previous link stops working. **Errors:** 404 no open invitation."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "07a7665f-80a6-5445-b17c-88a45755738e",
+          "name": "Revoke invitation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "invitations",
+                "{{invitationId}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/invitations/{{invitationId}}"
+            },
+            "description": "**Permission:** `member:invite`. **Errors:** 404 no open invitation."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     },
     {
-      "key": "terminalId",
-      "value": "01234567-89ab-4cde-8f01-23456789abcd",
-      "type": "string"
+      "id": "732348a8-f6b4-56fc-ac27-797c9e86b0de",
+      "name": "08 Branch-scoped management (branch managers)",
+      "description": "The same member and invitation routes under `/businesses/{{businessId}}/branches/{{branchId}}/`. The permission is checked **at that branch**, only that branch's members and invitations are visible, and people can only be placed in that branch.\n\nMembers limited to one branch (for example a branch manager) must use these routes: business-wide checks fail for them except reading the business, its branches and its roles. Sign in as a branch manager to see the difference; the owner can use them too.",
+      "item": [
+        {
+          "id": "2484da49-2280-5e43-ba13-dbddc92e425c",
+          "name": "List members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}",
+                "members"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/members"
+            },
+            "description": "**Permission:** `member:read`. Active members. Only members of this branch. Stores the first member who is neither you nor the owner as `memberUserId`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const members = pm.response.json();",
+                  "pm.test('returns members', () => pm.expect(members).to.be.an('array'));",
+                  "const me = pm.collectionVariables.get('userId');",
+                  "const other = members.find((m) => !m.isOwner && m.userId !== me);",
+                  "if (other) pm.collectionVariables.set('memberUserId', other.userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "be570e57-1cea-59e2-9bb7-6dea45f4f34f",
+          "name": "Get member",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}",
+                "members",
+                "{{memberUserId}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/members/{{memberUserId}}"
+            },
+            "description": "**Permission:** `member:read`. Includes overrides and effective permissions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns effective permissions', () => pm.expect(pm.response.json().effectivePermissions).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "1d7040ea-120a-5a04-94f7-3548b7d8d25f",
+          "name": "Change member role or branch",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}",
+                "members",
+                "{{memberUserId}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/members/{{memberUserId}}"
+            },
+            "description": "**Permission:** `member:update`. Body: `roleId` and/or `branchId` (`branchId: null` = business-wide). Moving someone to another branch signs them out.\n\nRefused (403): changing yourself or the owner; managing someone who holds a permission you lack; assigning a role that grants something you lack; on branch routes, moving someone out of the branch. Other branches' members are 404 on branch routes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleId\": \"{{viewerRoleId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('role changed', () => pm.expect(pm.response.json().role.id).to.eql(pm.collectionVariables.get('viewerRoleId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "1ea9ed20-46c7-50ee-90b1-facf2d5102ec",
+          "name": "End membership (destructive)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}",
+                "members",
+                "{{memberUserId}}",
+                "end-membership"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/members/{{memberUserId}}/end-membership"
+            },
+            "description": "**Permission:** `member:end`. Ends the membership, removes the member's overrides and signs them out everywhere. Run it only against a test member.\n\n**Errors:** 403 (same rules as changing a member), 404 no active membership in scope."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "23ab8659-e0b4-5caf-a356-2d3ecc622926",
+          "name": "Invite",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}",
+                "invitations"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/invitations"
+            },
+            "description": "**Permission:** `member:invite`. Up to 20 addresses with one role (and optional `branchId`). Answers 200 with one status per address: `invited`, `already_member`, `already_invited`, `invalid` or `forbidden` (the role grants something you lack). On this route the branch is always this branch; a different `branchId` in the body is 400.\n\nEach invited address gets an email with a single-use link (`.../invitations/accept?token=...`), valid for 7 days.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emails\": [\n    \"postman.invitee+{{$timestamp}}@example.com\"\n  ],\n  \"roleId\": \"{{systemRoleId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const results = pm.response.json().results;",
+                  "pm.test('one result per address', () => pm.expect(results).to.have.lengthOf(1));",
+                  "pm.collectionVariables.set('inviteEmail', results[0].email);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "4e5f9171-7dc5-546d-9c73-bee0bc34e726",
+          "name": "List invitations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}",
+                "invitations"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/invitations"
+            },
+            "description": "**Permission:** `member:read`. Latest 200 with status `open`, `expired`, `accepted` or `revoked`. Stores the newest open invitation as `invitationId`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const invitations = pm.response.json();",
+                  "const open = invitations.find((i) => i.status === 'open');",
+                  "if (open) pm.collectionVariables.set('invitationId', open.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "584a1f00-bb78-547d-9867-a3fcc9c7e8a6",
+          "name": "Resend invitation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}",
+                "invitations",
+                "{{invitationId}}",
+                "resend"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/invitations/{{invitationId}}/resend"
+            },
+            "description": "**Permission:** `member:invite`. Issues a new token and expiry and emails it; the previous link stops working. **Errors:** 404 no open invitation."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "cc01388b-fe2b-5ce4-9768-c035d4e51db0",
+          "name": "Revoke invitation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "businesses",
+                "{{businessId}}",
+                "branches",
+                "{{branchId}}",
+                "invitations",
+                "{{invitationId}}"
+              ],
+              "raw": "{{baseUrl}}/businesses/{{businessId}}/branches/{{branchId}}/invitations/{{invitationId}}"
+            },
+            "description": "**Permission:** `member:invite`. **Errors:** 404 no open invitation."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     },
     {
-      "key": "accessToken",
-      "value": "",
-      "type": "string"
+      "id": "ac96364e-c208-5931-9834-8723000dce04",
+      "name": "09 Invitation links (public)",
+      "description": "What the invitee does with the emailed link. Copy the `token` query parameter into `invitationToken`.\n\nAccepting is single use. A person who is an active member of another business must send `confirmResignation: true` (ending that membership and signing them out there); an owner of another business can never accept.",
+      "item": [
+        {
+          "id": "57cb9b15-4104-5ca1-97a1-c80dff2c96a4",
+          "name": "Preview invitation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invitations",
+                "preview"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{invitationToken}}",
+                  "description": "From the emailed link"
+                }
+              ],
+              "raw": "{{baseUrl}}/invitations/preview?token={{invitationToken}}"
+            },
+            "description": "Business, role, branch, expiry, and whether the email already has an account. **Errors:** 400 malformed token, 404 unusable invitation.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('names the invited email', () => pm.expect(pm.response.json().email).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "bbbd43d7-3916-5a29-bb73-039804ebf8cb",
+          "name": "Accept (new account)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invitations",
+                "accept"
+              ],
+              "raw": "{{baseUrl}}/invitations/accept"
+            },
+            "description": "For an email without an account: sets the name and a password (10 to 128 characters). Response: `{ businessId, userId, accountCreated }`; sign in afterwards.\n\n**Errors:** 400 any unusable token or missing name; 409 active elsewhere without confirmation, or owner of another business.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{invitationToken}}\",\n  \"password\": \"{{inviteePassword}}\",\n  \"name\": \"Postman Invitee\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('account created', () => pm.expect(pm.response.json().accountCreated).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "5cddb984-bf4f-5cb7-9c41-c255fde5127c",
+          "name": "Accept (existing account, leave current business)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invitations",
+                "accept"
+              ],
+              "raw": "{{baseUrl}}/invitations/accept"
+            },
+            "description": "For an email that already has an account: send that account's password. `confirmResignation: true` is needed only when the person is active at another business.\n\n**Errors:** 400 wrong password or unusable token; 409 without confirmation, or owner of another business.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{invitationToken}}\",\n  \"password\": \"{{inviteePassword}}\",\n  \"confirmResignation\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('joined with the existing account', () => pm.expect(pm.response.json().accountCreated).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     },
     {
-      "key": "refreshToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "roleId",
-      "value": "9abcde01-2345-4f67-89ab-cdef01234567",
-      "type": "string"
-    },
-    {
-      "key": "panCardFrontPath",
-      "value": "/absolute/path/to/pan-front.pdf",
-      "type": "string"
-    },
-    {
-      "key": "panCardBackPath",
-      "value": "/absolute/path/to/pan-back.pdf",
-      "type": "string"
-    },
-    {
-      "key": "businessRegistrationPath",
-      "value": "/absolute/path/to/registration.pdf",
-      "type": "string"
-    },
-    {
-      "key": "ownerEmail",
-      "value": "owner@example.com",
-      "type": "string"
-    },
-    {
-      "key": "ownerPassword",
-      "value": "CHANGE_ME",
-      "type": "string"
-    },
-    {
-      "key": "ownerRedeemCode",
-      "value": "PASTE_CODE_FROM_EMAIL",
-      "type": "string"
-    },
-    {
-      "key": "logoutTestAccessToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "logoutTestRefreshToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "businessId",
-      "value": "00000000-0000-4000-8000-000000000001",
-      "type": "string"
-    },
-    {
-      "key": "ownerAccessToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "businessUpdateIdempotencyKey",
-      "value": "business-profile-update-001",
-      "type": "string"
-    },
-    {
-      "key": "branchFrom",
-      "value": "2026-10-01T00:00:00+05:45",
-      "type": "string"
-    },
-    {
-      "key": "branchTo",
-      "value": "2026-10-29T23:59:59+05:45",
-      "type": "string"
-    },
-    {
-      "key": "branchLimit",
-      "value": "50",
-      "type": "string"
-    },
-    {
-      "key": "branchCursor",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "branchId",
-      "value": "00000000-0000-4000-8000-000000000002",
-      "type": "string"
-    },
-    {
-      "key": "terminalCode",
-      "value": "PASTE_TERMINAL_CODE_FROM_EMAIL_OR_PLATFORM_RESPONSE",
-      "type": "string"
-    },
-    {
-      "key": "userId",
-      "value": "",
-      "type": "string"
+      "id": "6db4f0d5-63f5-5a71-8e91-521584bb9efd",
+      "name": "10 Sign out",
+      "description": "Run these last.",
+      "item": [
+        {
+          "id": "38c56f64-dd17-575d-9f68-7726aa7b27a1",
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{clientType}}",
+                "description": "web, web_terminal, desktop, android_pos or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "authentication",
+                "logout"
+              ],
+              "raw": "{{baseUrl}}/authentication/logout"
+            },
+            "description": "Public (works with an expired access token). Revokes the session of the given refresh token (or the cookie for web) and clears the cookie. Always 204.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "b315235e-785e-56b0-bd19-693e25f345ca",
+          "name": "Logout everywhere",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "authentication",
+                "logout-all"
+              ],
+              "raw": "{{baseUrl}}/authentication/logout-all"
+            },
+            "description": "Revokes every session of the signed-in user. Response: `{ revoked }` (count)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('reports a count', () => pm.expect(pm.response.json().revoked).to.be.a('number'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

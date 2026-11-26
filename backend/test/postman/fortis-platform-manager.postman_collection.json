@@ -1,33 +1,185 @@
 {
   "info": {
-    "name": "Fortis POS API v1 ? Platform Manager",
-    "description": "Platform manager collection. Run platform manager login first. Login and refresh scripts populate platformAccessToken and platformRefreshToken for platform business and user administration requests.",
+    "_postman_id": "8b5f0e0c-996b-536d-8e89-6f6cec7d7b81",
+    "name": "Fortis API - Fortis staff",
+    "description": "Every Fortis staff (platform) route of the backend (prefix `/api/v1`): staff sign-in and passwords, the business directory, provisioning, branch creation, the public business request form, and staff invitations. Business-user routes are in **Fortis API - Business users**.\n\n## Setup\n\n1. Start the API with its services: `npm run dev:up`, `npm run db:migrate`, `npm run start:dev`.\n2. Set `baseUrl` (default `http://localhost:3000/api/v1`), `platformEmail` and `platformPassword`.\n3. Run **01 Sign in and session > Login**. It stores the staff tokens.\n\nThe first (bootstrap) staff account is created directly in the database by an operator; there is no API for it. Emailed tokens (password reset, staff invitations) must be copied from the email; locally they are in the Mailpit inbox.\n\n## Authentication and checks\n\nCollection auth is `Bearer {{platformAccessToken}}`; public routes override it with *No Auth*. Every request checks the `X-Request-Id` header and, for errors, the `{ statusCode, error, message, requestId }` body. Each request adds its own checks and stores the ids later requests need.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{platformAccessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Shared checks for every request in this collection.",
+          "pm.test('carries a request id', () => {",
+          "  pm.expect(pm.response.headers.get('X-Request-Id')).to.be.a('string').and.not.empty;",
+          "});",
+          "if (pm.response.code >= 400) {",
+          "  pm.test('error body has statusCode and message', () => {",
+          "    const body = pm.response.json();",
+          "    pm.expect(body.statusCode).to.eql(pm.response.code);",
+          "    pm.expect(body).to.have.property('message');",
+          "  });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string",
+      "description": "API base URL including /api/v1"
+    },
+    {
+      "key": "clientType",
+      "value": "desktop",
+      "type": "string",
+      "description": "web, desktop or mobile"
+    },
+    {
+      "key": "platformEmail",
+      "value": "staff@example.com",
+      "type": "string",
+      "description": "Staff email (placeholder)"
+    },
+    {
+      "key": "platformPassword",
+      "value": "<set-your-password>",
+      "type": "string",
+      "description": "Staff password (placeholder; never commit a real one)"
+    },
+    {
+      "key": "platformNewPassword",
+      "value": "<set-a-new-password-10+-chars>",
+      "type": "string",
+      "description": "Used by change/reset password; swapped after success"
+    },
+    {
+      "key": "platformAccessToken",
+      "value": "",
+      "type": "string",
+      "description": "Set by login, refresh and change-password"
+    },
+    {
+      "key": "platformRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Set by login (native clients), refresh and change-password"
+    },
+    {
+      "key": "platformUserId",
+      "value": "",
+      "type": "string",
+      "description": "Signed-in staff id"
+    },
+    {
+      "key": "platformResetToken",
+      "value": "",
+      "type": "string",
+      "description": "token query parameter of the reset link"
+    },
+    {
+      "key": "businessId",
+      "value": "",
+      "type": "string",
+      "description": "Set by List businesses or Provision business"
+    },
+    {
+      "key": "branchId",
+      "value": "",
+      "type": "string",
+      "description": "Set by Get business or Create branch"
+    },
+    {
+      "key": "requestedBusinessId",
+      "value": "",
+      "type": "string",
+      "description": "Id of a reviewed public business request"
+    },
+    {
+      "key": "pan",
+      "value": "<business-pan>",
+      "type": "string",
+      "description": "PAN for provisioning"
+    },
+    {
+      "key": "ownerEmail",
+      "value": "owner@example.com",
+      "type": "string",
+      "description": "Owner email for the request and provisioning"
+    },
+    {
+      "key": "staffInviteEmail",
+      "value": "new.staff@example.com",
+      "type": "string",
+      "description": "Address to invite"
+    },
+    {
+      "key": "staffInvitationToken",
+      "value": "",
+      "type": "string",
+      "description": "token query parameter of the staff invitation link"
+    },
+    {
+      "key": "staffInviteePassword",
+      "value": "<set-an-invitee-password-10+-chars>",
+      "type": "string",
+      "description": "Password for the invited staff account"
+    }
+  ],
   "item": [
     {
-      "name": "06. Platform manager ? authentication",
+      "id": "115a2d3b-3e0a-5180-b08d-34faf9fa8db5",
+      "name": "01 Sign in and session",
+      "description": "Fortis staff use a separate identity (`platform_users`) and token audience: staff tokens are rejected on business routes and business tokens on platform routes.\n\nEach staff member has a platform role (admin, manager or support; bootstrap = admin) that decides their platform permissions. The role travels in the token, so a change applies at the next refresh.",
       "item": [
         {
-          "name": "POST /platform/user/login",
+          "id": "ff64a070-2155-58c2-a13d-294935eb9438",
+          "name": "Login",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
+                "value": "application/json"
               },
               {
                 "key": "x-client-type",
-                "value": "{{platformClientType}}",
-                "type": "text"
+                "value": "{{clientType}}",
+                "description": "web, desktop or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
               }
             ],
-            "url": "{{baseUrl}}/platform/user/login",
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "user",
+                "login"
+              ],
+              "raw": "{{baseUrl}}/platform/user/login"
+            },
+            "description": "**Prerequisite:** an active staff account. The first (bootstrap) account has no API: it is created directly in the database by an operator.\n\n**Errors:** 400 invalid body, 401 wrong credentials (same message for unknown emails), 429 rate limited.",
+            "auth": {
+              "type": "noauth"
+            },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{platformUserEmail}}\",\n  \"password\": \"{{platformUserPassword}}\"\n}",
+              "raw": "{\n  \"email\": \"{{platformEmail}}\",\n  \"password\": \"{{platformPassword}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -35,131 +187,61 @@
               }
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token ?? body.tokens?.accessToken ?? body.tokens?.access_token;",
-                  "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token ?? body.tokens?.refreshToken ?? body.tokens?.refresh_token;",
-                  "if (token) { pm.collectionVariables.set('platformAccessToken', token); try { pm.environment.set('platformAccessToken', token); } catch (_) {} }",
-                  "if (refresh) { pm.collectionVariables.set('platformRefreshToken', refresh); try { pm.environment.set('platformRefreshToken', refresh); } catch (_) {} }",
-                  "pm.test('Platform bearer access token is available to later requests', () => { pm.expect(token).to.be.a('string').and.not.empty; pm.expect(pm.variables.replaceIn('{{platformAccessToken}}')).to.eql(token); });"
+                  "pm.test('returns an access token', () => pm.expect(body.accessToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('platformAccessToken', body.accessToken);",
+                  "if (body.refreshToken) pm.collectionVariables.set('platformRefreshToken', body.refreshToken);",
+                  "pm.test('is a platform session', () => pm.expect(body.isPlatform).to.eql(true));",
+                  "pm.collectionVariables.set('platformUserId', body.user.id);"
                 ]
               }
             }
           ]
         },
         {
-          "name": "POST /platform/user/refresh",
+          "id": "064455c5-11cf-52b7-95c3-77b10b1f6a6d",
+          "name": "Refresh",
           "request": {
             "method": "POST",
             "header": [
               {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
                 "key": "x-client-type",
-                "value": "{{platformClientType}}",
-                "type": "text"
+                "value": "{{clientType}}",
+                "description": "web, desktop or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
               },
               {
                 "key": "refresh-token",
                 "value": "{{platformRefreshToken}}",
-                "type": "text"
+                "description": "Deprecated fallback; send the body field instead.",
+                "disabled": true
               }
             ],
-            "url": "{{baseUrl}}/platform/user/refresh"
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "const body = pm.response.json();",
-                  "const token = body.accessToken ?? body.access_token ?? body.data?.accessToken ?? body.data?.access_token ?? body.tokens?.accessToken ?? body.tokens?.access_token;",
-                  "const refresh = body.refreshToken ?? body.refresh_token ?? body.data?.refreshToken ?? body.data?.refresh_token ?? body.tokens?.refreshToken ?? body.tokens?.refresh_token;",
-                  "if (token) { pm.collectionVariables.set('platformAccessToken', token); try { pm.environment.set('platformAccessToken', token); } catch (_) {} }",
-                  "if (refresh) { pm.collectionVariables.set('platformRefreshToken', refresh); try { pm.environment.set('platformRefreshToken', refresh); } catch (_) {} }",
-                  "pm.test('Platform bearer access token is available to later requests', () => { pm.expect(token).to.be.a('string').and.not.empty; pm.expect(pm.variables.replaceIn('{{platformAccessToken}}')).to.eql(token); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST /authentication/logout (platform web cookies)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "x-client-type",
-                "value": "web",
-                "type": "text"
-              }
-            ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{platformAccessToken}}",
-                  "type": "string"
-                }
-              ]
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "user",
+                "refresh"
+              ],
+              "raw": "{{baseUrl}}/platform/user/refresh"
             },
-            "url": "{{baseUrl}}/authentication/logout"
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST /authentication/logout (platform desktop/mobile)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              },
-              {
-                "key": "x-client-type",
-                "value": "{{platformClientType}}",
-                "type": "text"
-              }
-            ],
+            "description": "Rotates the refresh token (body for native clients, cookie for web). Refresh single-flight: a replayed rotated token signs the staff member out everywhere. **Errors:** 401, 429.",
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{platformAccessToken}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "url": "{{baseUrl}}/authentication/logout",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{platformRefreshToken}}\"\n}",
@@ -170,38 +252,478 @@
               }
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.expect(pm.response.json()).to.deep.equal({ revoked: true });"
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns an access token', () => pm.expect(body.accessToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('platformAccessToken', body.accessToken);",
+                  "if (body.refreshToken) pm.collectionVariables.set('platformRefreshToken', body.refreshToken);"
                 ]
               }
             }
           ]
         }
-      ],
-      "description": "Platform manager authentication. Run login first; response scripts save platformAccessToken and platformRefreshToken for platform API requests."
+      ]
     },
     {
-      "name": "07. Platform manager ? businesses",
+      "id": "c70e0a8a-ee01-5768-9083-40af63322bd9",
+      "name": "02 Passwords",
+      "description": "Same rules as business users. Reset links point to `/platform/reset-password?token=...`; copy the token into `platformResetToken`.",
       "item": [
         {
-          "name": "POST /platform/businesses/request (multipart with files)",
+          "id": "23224324-4c33-5a52-9a79-a21057e85d36",
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{clientType}}",
+                "description": "web, desktop or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "user",
+                "change-password"
+              ],
+              "raw": "{{baseUrl}}/platform/user/change-password"
+            },
+            "description": "Signs out every device and returns a new session. The test swaps the two password variables. **Errors:** 400, 403 wrong current password, 429.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{platformPassword}}\",\n  \"newPassword\": \"{{platformNewPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns an access token', () => pm.expect(body.accessToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('platformAccessToken', body.accessToken);",
+                  "if (body.refreshToken) pm.collectionVariables.set('platformRefreshToken', body.refreshToken);",
+                  "const previous = pm.collectionVariables.get('platformPassword');",
+                  "pm.collectionVariables.set('platformPassword', pm.collectionVariables.get('platformNewPassword'));",
+                  "pm.collectionVariables.set('platformNewPassword', previous);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "6261ca6b-2fb6-52ad-8b63-fb5f0faea176",
+          "name": "Forgot password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "user",
+                "forgot-password"
+              ],
+              "raw": "{{baseUrl}}/platform/user/forgot-password"
+            },
+            "description": "Always 202 with the same message.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{platformEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 202', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "1bf7321f-b7fc-5eeb-ad7b-b2f20cb23022",
+          "name": "Reset password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "user",
+                "reset-password"
+              ],
+              "raw": "{{baseUrl}}/platform/user/reset-password"
+            },
+            "description": "**Prerequisite:** `platformResetToken` from the emailed link. Signs out everywhere. **Errors:** one generic 400.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{platformResetToken}}\",\n  \"newPassword\": \"{{platformNewPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 204', () => pm.response.to.have.status(204));",
+                  "const previous = pm.collectionVariables.get('platformPassword');",
+                  "pm.collectionVariables.set('platformPassword', pm.collectionVariables.get('platformNewPassword'));",
+                  "pm.collectionVariables.set('platformNewPassword', previous);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "af150c60-621f-565f-b04e-c10c29366195",
+      "name": "03 Businesses and branches",
+      "description": "Reading needs `platform:business:read` (every staff role). Provisioning needs `platform:business:provision` and branch creation `platform:branch:create` (admin and manager).",
+      "item": [
+        {
+          "id": "32351ec7-fb16-5f16-ac81-0cf67e1c1bc2",
+          "name": "List businesses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "{{clientType}}",
+                "description": "web, desktop or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": ">= 1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "1-100"
+                }
+              ],
+              "raw": "{{baseUrl}}/platform?page=1&limit=20"
+            },
+            "description": "Paginated directory of active and inactive businesses: `{ data, pagination }`. Stores the first business as `businessId`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('paginated', () => pm.expect(body.pagination.page).to.eql(1));",
+                  "if (body.data.length && !pm.collectionVariables.get('businessId')) pm.collectionVariables.set('businessId', body.data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "e04e8875-a04f-5592-9a4e-7361f39caca8",
+          "name": "Get business",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "{{clientType}}",
+                "description": "web, desktop or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "business",
+                "{{businessId}}"
+              ],
+              "raw": "{{baseUrl}}/platform/business/{{businessId}}"
+            },
+            "description": "Business, its branches (active and inactive) and memberships. Stores the first branch as `branchId`. **Errors:** 400 missing or invalid x-client-type, 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns the business', () => pm.expect(body.business.id).to.eql(pm.collectionVariables.get('businessId')));",
+                  "if (body.branches.length) pm.collectionVariables.set('branchId', body.branches[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "eda32b60-04eb-5333-a81f-5ba8f3c66cdf",
+          "name": "Get branch",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-client-type",
+                "value": "{{clientType}}",
+                "description": "web, desktop or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "business",
+                "{{businessId}}",
+                "{{branchId}}"
+              ],
+              "raw": "{{baseUrl}}/platform/business/{{businessId}}/{{branchId}}"
+            },
+            "description": "Branch details, terminals and active employees."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "00e467f0-6ded-5fc1-9a90-9414bf997205",
+          "name": "Provision business",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "description": "Must be web."
+              },
+              {
+                "key": "idempotency-key",
+                "value": "{{$guid}}",
+                "description": "Required; the same key and payload replay the first response."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "businesses",
+                "create"
+              ],
+              "query": [
+                {
+                  "key": "requested_business_id",
+                  "value": "{{requestedBusinessId}}",
+                  "description": "Id of a reviewed public business request"
+                }
+              ],
+              "raw": "{{baseUrl}}/platform/businesses/create?requested_business_id={{requestedBusinessId}}"
+            },
+            "description": "**Permission:** `platform:business:provision`. Creates the business (inactive), its main branch and an inactive terminal from a reviewed public request, and emails the owner a redeem code. Idempotent and audited.\n\n**Prerequisite:** `requestedBusinessId` of a submitted request (see **04 Public business request**; the id is in `business_provisioning_requests`).\n\n**Errors:** 403, 404 unknown request, 409 duplicate or idempotency conflict, 422 invalid profile, 429.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pan\": \"{{pan}}\",\n  \"ownerEmail\": \"{{ownerEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('businessId', body.businessId);",
+                  "pm.test('owner activation queued', () => pm.expect(body.ownerActivationInvitationStatus).to.eql('queued'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "0568d79a-2bd9-5406-97d1-cd02f43bf6a1",
+          "name": "Create branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-client-type",
+                "value": "web",
+                "description": "Must be web."
+              },
+              {
+                "key": "idempotency-key",
+                "value": "{{$guid}}",
+                "description": "Required."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "businesses",
+                "{{businessId}}",
+                "branches"
+              ],
+              "raw": "{{baseUrl}}/platform/businesses/{{businessId}}/branches"
+            },
+            "description": "**Permission:** `platform:branch:create`. Creates a branch with its terminals (each gets an activation code) and emails the active owner. `terminals` is optional (one inactive terminal by default; up to 50).\n\n**Errors:** 403, 404 unknown business, 409 duplicate code or idempotency conflict, 422.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Branch {{$timestamp}}\",\n  \"code\": \"PM{{$randomInt}}\",\n  \"address\": \"Main Road, Kathmandu\",\n  \"contactNumber\": \"+977-1-5550101\",\n  \"terminals\": [\n    {\n      \"name\": \"Front Counter\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('branchId', body.branch.id);",
+                  "pm.test('created terminals', () => pm.expect(body.terminals).to.be.an('array').that.is.not.empty);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "191766a5-aa37-5502-baf2-fd15e08fe1ff",
+      "name": "04 Public business request",
+      "description": "The website enquiry form. It never creates a business: staff review the request and then provision it.",
+      "item": [
+        {
+          "id": "0386aced-9c3e-5cb0-bac5-6592972be2f8",
+          "name": "Submit business request (multipart)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "x-client-type",
                 "value": "web",
-                "type": "text"
+                "description": "Must be web."
               }
             ],
-            "url": "{{baseUrl}}/platform/businesses/request",
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "businesses",
+                "request"
+              ],
+              "raw": "{{baseUrl}}/platform/businesses/request"
+            },
+            "description": "Public, web only, 5 requests per hour per client. All three documents are required (stored in Cloudinary). Answers 201 with a generic acknowledgement.\n\n**Prerequisite:** replace the three `/path/to/...` placeholders with local files.\n\n**Errors:** 400 missing fields or files, 413 file too large, 429.",
+            "auth": {
+              "type": "noauth"
+            },
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -218,7 +740,8 @@
                 {
                   "key": "country",
                   "value": "NP",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Two-letter country code"
                 },
                 {
                   "key": "city",
@@ -227,18 +750,19 @@
                 },
                 {
                   "key": "postalCode",
-                  "value": "123123123",
+                  "value": "44600",
                   "type": "text"
                 },
                 {
                   "key": "addressLine1",
-                  "value": "Address line 1",
+                  "value": "Main Road",
                   "type": "text"
                 },
                 {
                   "key": "addressLine2",
-                  "value": "Address line 2",
-                  "type": "text"
+                  "value": "",
+                  "type": "text",
+                  "disabled": true
                 },
                 {
                   "key": "primaryContactName",
@@ -247,147 +771,90 @@
                 },
                 {
                   "key": "primaryContactEmail",
-                  "value": "owner@example.com",
+                  "value": "{{ownerEmail}}",
                   "type": "text"
                 },
                 {
                   "key": "primaryContactPhone",
-                  "value": "+9779812345678",
+                  "value": "+977-1-5550100",
                   "type": "text"
                 },
                 {
                   "key": "panCardFront",
                   "type": "file",
-                  "src": "{{panCardFrontPath}}"
+                  "src": "/path/to/pan-front.pdf",
+                  "description": "Required, up to 10 MB. Choose the file in Postman."
                 },
                 {
                   "key": "panCardBack",
                   "type": "file",
-                  "src": "{{panCardBackPath}}"
+                  "src": "/path/to/pan-back.pdf",
+                  "description": "Required, up to 10 MB."
                 },
                 {
                   "key": "businessRegistrationCertificate",
                   "type": "file",
-                  "src": "{{businessRegistrationPath}}"
+                  "src": "/path/to/registration.pdf",
+                  "description": "Required, up to 10 MB."
                 }
               ]
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
-                  "pm.expect(pm.response.json().message).to.include('request has been submitted');"
+                  "pm.test('responds 201', () => pm.response.to.have.status(201));"
                 ]
               }
             }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "id": "67224a74-cc1a-55c7-a779-739de6a38e74",
+      "name": "05 Staff management",
+      "description": "Only platform admins (bootstrap or role admin) can invite staff; the database enforces it too.",
+      "item": [
         {
-          "name": "POST /platform/businesses/create",
+          "id": "f4b32c1a-4a4b-598f-9bd2-43099df4d7d0",
+          "name": "Invite staff member",
           "request": {
             "method": "POST",
-            "description": "Platform-only, web-client provisioning. Requires a pending request ID, PAN, and platform access token. Creates the initial branch and terminal and queues the owner redemption email.",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{platformAccessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "X-Client-Type",
-                "value": "web",
-                "type": "text"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "{{provisioningIdempotencyKey}}",
-                "type": "text"
-              },
               {
                 "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/platform/businesses/create?requested_business_id={{requestedBusinessId}}",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"pan\": \"ABCDE1234F\",\n  \"ownerEmail\": \"{{ownerEmail}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 201\", () => pm.expect(pm.response.code, `Provisioning failed (${pm.response.code}): ${pm.response.text()}`).to.eql(201));",
-                  "if (pm.response.code === 201) {",
-                  "  const body = pm.response.json();",
-                  "  pm.test(\"Response includes business ID and queued invitation\", () => {",
-                  "    pm.expect(body.businessId, `Unexpected response: ${pm.response.text()}`).to.be.a(\"string\");",
-                  "    pm.expect(body.ownerActivationInvitationStatus).to.eql(\"queued\");",
-                  "  });",
-                  "  pm.collectionVariables.set(\"provisionedBusinessId\", body.businessId);",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST /platform/businesses/{businessId}/branches",
-          "request": {
-            "method": "POST",
-            "description": "Platform manager only and idempotent. Creates a branch and one or more inactive terminals with cryptographically random activation codes. The active owner receives branch and terminal details by email.",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{platformAccessToken}}",
-                "type": "text"
+                "value": "application/json"
               },
               {
                 "key": "x-client-type",
-                "value": "web",
-                "type": "text"
+                "value": "{{clientType}}",
+                "description": "web, desktop or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
               },
               {
-                "key": "Idempotency-Key",
-                "value": "{{branchCreationIdempotencyKey}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
+                "key": "x-idempotency-key",
+                "value": "{{$guid}}",
+                "description": "Required (note the x- prefix on this route)."
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/platform/businesses/{{businessId}}/branches",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "platform",
-                "businesses",
-                "{{businessId}}",
-                "branches"
-              ]
+                "users",
+                "invite"
+              ],
+              "raw": "{{baseUrl}}/platform/users/invite"
             },
+            "description": "**Permission:** `platform:user:invite`. `role` is admin, manager or support (default support). Emails a single-use link to `/platform/accept-invite?token=...` (7 days); only the token's hash is stored.\n\n**Errors:** 403 not an admin, 409 the email already has a staff account or an open invitation, 429.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Downtown Branch\",\n  \"code\": \"DOWNTOWN\",\n  \"address\": \"Main Street, Kathmandu\",\n  \"contactNumber\": \"+977-1-5550100\",\n  \"terminals\": [\n    { \"name\": \"Front Counter\" },\n    { \"name\": \"Cafe Counter\" }\n  ]\n}",
+              "raw": "{\n  \"name\": \"Postman Support\",\n  \"email\": \"{{staffInviteEmail}}\",\n  \"role\": \"support\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -395,117 +862,49 @@
               }
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
-                  "if (pm.response.code === 201) { const body = pm.response.json(); pm.test('Response contains branch and generated activation codes', () => { pm.expect(body.branch.id).to.be.a('string'); pm.expect(body.branch.name).to.eql('Downtown Branch'); pm.expect(body.terminals).to.have.length(2); body.terminals.forEach((terminal) => pm.expect(terminal.terminalCode).to.match(/^POS-[A-F0-9]{16}$/)); }); pm.collectionVariables.set('branchId', body.branch.id); pm.collectionVariables.set('terminalCode', body.terminals[0].terminalCode); }"
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('confirms the invite', () => pm.expect(pm.response.json().message).to.be.a('string'));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "GET /platform/businesses",
-          "request": {
-            "method": "GET",
-            "description": "Lists registered active and inactive businesses. Requires a platform access token and a supported x-client-type.",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{platformAccessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "x-client-type",
-                "value": "{{platformClientType}}",
-                "type": "text"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/platform/businesses?page=1&limit=20"
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "if (pm.response.code === 200) {",
-                  "  const body = pm.response.json();",
-                  "  pm.test('Response contains business data and pagination metadata', () => {",
-                  "    pm.expect(body.data).to.be.an('array');",
-                  "    pm.expect(body.pagination).to.include({ page: 1, limit: 20 });",
-                  "    pm.expect(body.pagination.total).to.be.a('number');",
-                  "    pm.expect(body.pagination.totalPages).to.be.a('number');",
-                  "  });",
-                  "  pm.test('Every result exposes status without sensitive identifiers or documents', () => {",
-                  "    body.data.forEach((business) => {",
-                  "      pm.expect(business.isActive).to.be.a('boolean');",
-                  "      pm.expect(business).not.to.have.property('pan');",
-                  "      pm.expect(business).not.to.have.property('documents');",
-                  "    });",
-                  "  });",
-                  "  const provisionedBusinessId = pm.collectionVariables.get('provisionedBusinessId');",
-                  "  if (provisionedBusinessId) {",
-                  "    pm.test('Includes the business created earlier in this collection run as inactive', () => {",
-                  "      const provisionedBusiness = body.data.find((business) => business.id === provisionedBusinessId);",
-                  "      pm.expect(provisionedBusiness, 'The newly provisioned business should be in the first page').to.be.an('object');",
-                  "      pm.expect(provisionedBusiness.isActive).to.eql(false);",
-                  "    });",
-                  "  }",
-                  "}"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "08. Platform manager ? user administration",
-      "item": [
-        {
-          "name": "POST /platform/users/invite",
+          "id": "1cb8457b-588e-5496-b622-3826f738844c",
+          "name": "Accept staff invitation",
           "request": {
             "method": "POST",
-            "description": "Platform-only invitation. Requires an unused email address, a platform access token, and a unique x-idempotency-key.",
             "header": [
               {
-                "key": "Authorization",
-                "value": "Bearer {{platformAccessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "x-client-type",
-                "value": "{{platformClientType}}",
-                "type": "text"
-              },
-              {
-                "key": "x-idempotency-key",
-                "value": "{{platformUserInviteIdempotencyKey}}",
-                "type": "text"
-              },
-              {
                 "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
+                "value": "application/json"
               }
             ],
-            "url": "{{baseUrl}}/platform/users/invite",
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "users",
+                "invitations",
+                "accept"
+              ],
+              "raw": "{{baseUrl}}/platform/users/invitations/accept"
+            },
+            "description": "**Prerequisite:** `staffInvitationToken` from the emailed link. Creates the staff account with the invited name and role. Single use; the inviter must still be an active admin.\n\n**Errors:** one generic 400.",
+            "auth": {
+              "type": "noauth"
+            },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Jane Manager\",\n  \"email\": \"jane@example.com\"\n}",
+              "raw": "{\n  \"token\": \"{{staffInvitationToken}}\",\n  \"password\": \"{{staffInviteePassword}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -513,113 +912,112 @@
               }
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.expect(pm.response.json()).to.deep.equal({ message: 'Invite sent to Jane Manager' });"
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns the new staff id', () => pm.expect(pm.response.json().platformUserId).to.be.a('string'));"
                 ]
               }
             }
           ]
         }
       ]
-    }
-  ],
-  "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:3000/api/v1",
-      "type": "string"
     },
     {
-      "key": "platformClientType",
-      "value": "mobile",
-      "type": "string"
-    },
-    {
-      "key": "platformUserEmail",
-      "value": "platformmanager@example.com",
-      "type": "string"
-    },
-    {
-      "key": "platformUserPassword",
-      "value": "CHANGE_ME",
-      "type": "string"
-    },
-    {
-      "key": "platformAccessToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "platformRefreshToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "panCardFrontPath",
-      "value": "/absolute/path/to/pan-front.pdf",
-      "type": "string"
-    },
-    {
-      "key": "panCardBackPath",
-      "value": "/absolute/path/to/pan-back.pdf",
-      "type": "string"
-    },
-    {
-      "key": "businessRegistrationPath",
-      "value": "/absolute/path/to/registration.pdf",
-      "type": "string"
-    },
-    {
-      "key": "requestedBusinessId",
-      "value": "00000000-0000-4000-8000-000000000001",
-      "type": "string"
-    },
-    {
-      "key": "provisioningIdempotencyKey",
-      "value": "provision-business-req-1092",
-      "type": "string"
-    },
-    {
-      "key": "branchCreationIdempotencyKey",
-      "value": "platform-branch-create-001",
-      "type": "string"
-    },
-    {
-      "key": "platformUserInviteIdempotencyKey",
-      "value": "platform-user-inv-123",
-      "type": "string"
-    },
-    {
-      "key": "ownerEmail",
-      "value": "owner@example.com",
-      "type": "string"
-    },
-    {
-      "key": "businessId",
-      "value": "00000000-0000-4000-8000-000000000001",
-      "type": "string"
-    },
-    {
-      "key": "branchId",
-      "value": "00000000-0000-4000-8000-000000000002",
-      "type": "string"
-    },
-    {
-      "key": "terminalCode",
-      "value": "PASTE_TERMINAL_CODE_FROM_EMAIL_OR_PLATFORM_RESPONSE",
-      "type": "string"
-    },
-    {
-      "key": "provisionedBusinessId",
-      "value": "",
-      "type": "string"
+      "id": "875280e5-f29e-57ec-bf7e-634d3e6a490a",
+      "name": "06 Sign out",
+      "description": "Run these last.",
+      "item": [
+        {
+          "id": "3a40c7ad-1e16-555f-89af-d2ac84edfd34",
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-client-type",
+                "value": "{{clientType}}",
+                "description": "web, desktop or mobile. Native clients get the refresh token in the body; web gets it as an httpOnly cookie."
+              }
+            ],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "user",
+                "logout"
+              ],
+              "raw": "{{baseUrl}}/platform/user/logout"
+            },
+            "description": "Public. Revokes the given session (or the cookie for web). Always 204.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{platformRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "1afed0f9-4538-51c6-b490-7f3101dae6c9",
+          "name": "Logout everywhere",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "user",
+                "logout-all"
+              ],
+              "raw": "{{baseUrl}}/platform/user/logout-all"
+            },
+            "description": "Revokes every session of the signed-in staff member: `{ revoked }`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds 200', () => pm.response.to.have.status(200));",
+                  "pm.test('reports a count', () => pm.expect(pm.response.json().revoked).to.be.a('number'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

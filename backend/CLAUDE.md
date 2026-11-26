@@ -73,9 +73,12 @@ npx @nestjs/observe link
 
 ## Postman API Collection
 
-The importable collection at
-`test/postman/fortis-api.postman_collection.json` is the runnable request
-catalog for the backend API. Update it in the same change whenever a controller
+The importable collections in `test/postman/` are the runnable request catalog
+for the backend API: `fortis-business-user.postman_collection.json` (business
+users) and `fortis-platform-manager.postman_collection.json` (Fortis staff).
+`test/common/postman-coverage.e2e-spec.ts` fails when a controller route is
+missing from them or a request names a route that does not exist. Update them
+in the same change whenever a controller
 endpoint is added, modified, or removed. Include request method/path, auth and
 headers, request bodies and multipart file fields, response checks, and
 collection variables needed to run dependent requests. Use placeholders for

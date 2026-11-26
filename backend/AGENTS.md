@@ -60,9 +60,12 @@ Follow existing modules before introducing new patterns.
 
 ## Postman API Collection
 
-- Keep `test/postman/fortis-api.postman_collection.json` synchronized with all
-  routes declared by controllers. Whenever an endpoint is added, changed, or
-  removed, update the collection in the same change.
+- Keep the collections in `test/postman/` synchronized with all routes declared
+  by controllers: `fortis-business-user.postman_collection.json` (business users)
+  and `fortis-platform-manager.postman_collection.json` (Fortis staff). Whenever
+  an endpoint is added, changed, or removed, update them in the same change.
+  `test/common/postman-coverage.e2e-spec.ts` fails on a missing route or on a
+  request whose route does not exist.
 - Add the exact HTTP method and `/api/v1` path, required headers, auth mode,
   body/query/path fields, and multipart file parts where applicable.
 - Use collection variables for base URL, tokens, IDs, credentials, and file
