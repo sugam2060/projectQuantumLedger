@@ -48,6 +48,7 @@ describe('TokenService', () => {
       email: 'staff@fortis.test',
       isPlatform: true,
       isBootstrap: false,
+      role: 'support',
     });
     await expect(
       jwt.verifyAsync(signed.token, { audience: 'fortis-pos' }),

@@ -82,7 +82,7 @@ function setup() {
       expiresInSeconds: 900,
     }),
   };
-  const effective = { resolve: jest.fn().mockResolvedValue(null) };
+  const effective = { effective: jest.fn().mockResolvedValue([]) };
   const audit = {
     logUserEvent: jest.fn().mockResolvedValue(undefined),
     insertUserEvent: jest.fn(),

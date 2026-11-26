@@ -192,7 +192,10 @@ export class PlatformAuthenticationService {
   }
 
   private async startSession(
-    account: Pick<PlatformAccount, 'id' | 'email' | 'name' | 'isBootstrap'>,
+    account: Pick<
+      PlatformAccount,
+      'id' | 'email' | 'name' | 'isBootstrap' | 'role'
+    >,
     meta: AuthMetadata,
   ): Promise<PlatformAuthResult> {
     const refreshToken = generateOpaqueToken();
@@ -212,7 +215,10 @@ export class PlatformAuthenticationService {
   }
 
   private async issue(
-    account: Pick<PlatformAccount, 'id' | 'email' | 'name' | 'isBootstrap'>,
+    account: Pick<
+      PlatformAccount,
+      'id' | 'email' | 'name' | 'isBootstrap' | 'role'
+    >,
     refreshToken: string,
   ): Promise<PlatformAuthResult> {
     const access = await this.tokens.signPlatformToken({
@@ -221,6 +227,7 @@ export class PlatformAuthenticationService {
       email: account.email,
       isPlatform: true,
       isBootstrap: account.isBootstrap,
+      role: account.isBootstrap ? 'admin' : account.role,
     });
     return {
       accessToken: access.token,

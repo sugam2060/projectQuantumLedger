@@ -1,17 +1,15 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { AuditContext, type AuditRequestContext } from '../audit-logs';
+import {
+  BranchId,
+  BusinessId,
+  Permission,
+  RequiredPermission,
+} from '../authorization';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../common/types';
-import { ActivateTerminalDto, BusinessBranchParamDto } from './dto';
+import { ActivateTerminalDto } from './dto';
 import { TerminalsService } from './terminals.service';
-import { requireBusinessOwner } from './utils/business-access.util';
 
 /** Terminal administration inside a branch. */
 @Controller('businesses')
@@ -20,18 +18,19 @@ export class TerminalsController {
 
   @Post(':businessId/branches/:branchId/terminals/activate')
   @HttpCode(HttpStatus.OK)
+  @RequiredPermission(Permission.TERMINAL_ACTIVATE)
   activateTerminal(
-    @Param() params: BusinessBranchParamDto,
+    @BusinessId() businessId: string,
+    @BranchId() branchId: string,
     @Body() dto: ActivateTerminalDto,
-    @CurrentUser() user: AuthenticatedUser | undefined,
+    @CurrentUser() user: AuthenticatedUser,
     @AuditContext() auditContext: AuditRequestContext,
   ) {
-    const owner = requireBusinessOwner(user, params.businessId);
     return this.terminals.activateTerminal(
-      params.businessId,
-      params.branchId,
+      businessId,
+      branchId,
       dto.terminalCode.trim().toUpperCase(),
-      owner,
+      user,
       auditContext,
     );
   }

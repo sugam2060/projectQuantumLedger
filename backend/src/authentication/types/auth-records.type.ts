@@ -15,8 +15,14 @@ export type UserAccount = {
   status: string;
 };
 
-export type PlatformCredential = UserCredential & { isBootstrap: boolean };
-export type PlatformAccount = UserAccount & { isBootstrap: boolean };
+export type PlatformCredential = UserCredential & {
+  isBootstrap: boolean;
+  role: string;
+};
+export type PlatformAccount = UserAccount & {
+  isBootstrap: boolean;
+  role: string;
+};
 
 /** One active membership with its role summary. */
 export type ActiveMembership = {

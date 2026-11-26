@@ -38,7 +38,7 @@ src/<feature>/
   README.md                 endpoints, rules, gotchas, tests
 ```
 
-Current features: `authentication/`, `audit-logs/`, `businesses/`, `platform/`, `roles-permissions/`.
+Current features: `authentication/`, `audit-logs/`, `authorization/`, `businesses/`, `platform/`.
 Cross-cutting and infra folders:
 
 - `common/`: framework pieces used by 2+ features (`decorators/`, `guards/`, `types/`, `utils/`). No business rules, no SQL, no imports from feature folders.
@@ -89,6 +89,9 @@ Tests:
 - Multi-step DB writes use transactions.
 - SQL and Drizzle calls only in `*.repository.ts`; services never touch `DatabaseService`.
 - Auth/security rules: see `src/authentication/README.md`.
+- Authorization: business routes with `:businessId` use `@RequiredPermission(Permission.X)`; platform routes use
+  `@RequiredPlatformPermission`; own-account routes use `@SelfService()`. The route audit test enforces this.
+  Details and how to add a permission: `src/authorization/README.md`.
 
 ## NestJS Building Blocks (use where needed; never inline this logic in services/controllers)
 

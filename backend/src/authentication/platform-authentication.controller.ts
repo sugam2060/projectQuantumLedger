@@ -18,6 +18,7 @@ import {
   Throttle,
 } from '../common/decorators/strict-throttle.decorator';
 import type { AuthenticatedUser } from '../common/types';
+import { SelfService } from '../authorization';
 import { AuthCookieService } from './auth-cookie.service';
 import { ClientTypeHeaders } from './decorators/client-type-headers.decorator';
 import { AuthenticationLogoutHeadersDto } from './dto/authentication-logout-headers.dto';
@@ -126,6 +127,7 @@ export class PlatformAuthenticationController {
   }
 
   @Post('logout-all')
+  @SelfService()
   @StrictThrottle()
   @HttpCode(HttpStatus.OK)
   async logoutAll(
@@ -139,6 +141,7 @@ export class PlatformAuthenticationController {
 
   /** Changes the password, signs out every device, returns a new session. */
   @Post('change-password')
+  @SelfService()
   @StrictThrottle()
   @HttpCode(HttpStatus.OK)
   async changePassword(

@@ -28,13 +28,7 @@ export class TerminalsService {
     session: RequestSession,
     auditContext: AuditRequestContext = {},
   ) {
-    if (
-      session.isOwner !== true ||
-      session.isPlatform === true ||
-      session.businessId !== businessId
-    ) {
-      throw new ForbiddenException('Business owner access required');
-    }
+    // terminal:activate was checked by PermissionGuard; RLS checks it again.
     try {
       return await this.repository.inSession(session, async (tx) => {
         const target = { businessId, branchId, terminalCode };

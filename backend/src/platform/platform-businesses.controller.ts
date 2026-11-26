@@ -15,6 +15,10 @@ import { Throttle } from '../common/decorators/strict-throttle.decorator';
 import { AuditContext, type AuditRequestContext } from '../audit-logs';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PlatformRoute } from '../common/decorators/platform-route.decorator';
+import {
+  PlatformPermission,
+  RequiredPlatformPermission,
+} from '../authorization';
 import type { AuthenticatedUser } from '../common/types';
 import { BusinessListHeaders } from './decorators/business-list-headers.decorator';
 import { ProvisionBusinessHeaders } from './decorators/provision-business-headers.decorator';
@@ -38,6 +42,7 @@ export class PlatformBusinessesController {
 
   @Get('business/:business_id')
   @HttpCode(HttpStatus.OK)
+  @RequiredPlatformPermission(PlatformPermission.BUSINESS_READ)
   async getBusiness(
     @Param('business_id', new ParseUUIDPipe()) businessId: string,
     @Headers('x-client-type') clientType: string | undefined,
@@ -51,6 +56,7 @@ export class PlatformBusinessesController {
   }
 
   @Get()
+  @RequiredPlatformPermission(PlatformPermission.BUSINESS_READ)
   async listBusinesses(
     @Query() query: ListBusinessesQueryDto,
     @BusinessListHeaders() _headers: BusinessListHeadersDto,
@@ -64,6 +70,7 @@ export class PlatformBusinessesController {
 
   @Get('business/:business_id/:branch_id')
   @HttpCode(HttpStatus.OK)
+  @RequiredPlatformPermission(PlatformPermission.BUSINESS_READ)
   async getBranch(
     @Param('business_id', new ParseUUIDPipe()) businessId: string,
     @Param('branch_id', new ParseUUIDPipe()) branchId: string,
@@ -80,6 +87,7 @@ export class PlatformBusinessesController {
 
   @Post('businesses/create')
   @HttpCode(HttpStatus.CREATED)
+  @RequiredPlatformPermission(PlatformPermission.BUSINESS_PROVISION)
   @Throttle({ limit: 20, ttlMs: 60 * 60_000 })
   async provisionBusiness(
     @Query() query: ProvisionBusinessQueryDto,
@@ -99,6 +107,7 @@ export class PlatformBusinessesController {
 
   @Post('businesses/:businessId/branches')
   @HttpCode(HttpStatus.CREATED)
+  @RequiredPlatformPermission(PlatformPermission.BRANCH_CREATE)
   async createBranch(
     @Param() params: BusinessBranchParamsDto,
     @Body() body: CreateBusinessBranchDto,

@@ -5,7 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuditLogsModule } from '../audit-logs';
 import { EmailModule } from '../jobs/email';
 import { appConfig, authConfig } from '../config';
-import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.module';
+import { AuthorizationModule } from '../authorization';
 import { AuthCookieService } from './auth-cookie.service';
 import { AuthenticationController } from './authentication.controller';
 import { AuthenticationRepository } from './authentication.repository';
@@ -31,7 +31,7 @@ import { TokenService } from './token.service';
     ConfigModule.forFeature(appConfig),
     AuditLogsModule,
     EmailModule,
-    RolesPermissionsModule,
+    AuthorizationModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule.forFeature(authConfig)],

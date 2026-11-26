@@ -81,5 +81,10 @@ REVOKE SELECT ON TABLE public.users FROM fortis_app;
 GRANT SELECT (id, email_normalized, name, status, created_at, updated_at)
   ON TABLE public.users TO fortis_app;
 REVOKE SELECT ON TABLE public.platform_users FROM fortis_app;
-GRANT SELECT (id, email_normalized, name, status, is_bootstrap, created_at, updated_at)
+GRANT SELECT (id, email_normalized, name, status, is_bootstrap, role, created_at, updated_at)
   ON TABLE public.platform_users TO fortis_app;
+
+-- The permission catalogue is seeded by migrations and read-only at runtime.
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.permissions FROM fortis_app;
+-- Role grants are added or removed, never rewritten in place.
+REVOKE UPDATE ON TABLE public.role_permissions FROM fortis_app;

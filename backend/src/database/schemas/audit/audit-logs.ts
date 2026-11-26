@@ -46,7 +46,7 @@ export const auditLogs = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-        app.is_business_owner(business_id) OR app.is_platform_user()
+        app.has_permission(business_id, NULL, 'audit:read') OR app.is_platform_user()
       `,
     }),
 

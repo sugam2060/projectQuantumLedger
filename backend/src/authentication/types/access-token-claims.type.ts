@@ -19,6 +19,8 @@ export type PlatformAccessTokenClaims = {
   email: string;
   isPlatform: true;
   isBootstrap: boolean;
+  /** Platform role (admin | manager | support); bootstrap users are admin. */
+  role: string;
 };
 
 export type SignedAccessToken = {

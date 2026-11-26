@@ -32,7 +32,7 @@ const ADDRESS_KEYS = [
   'addressLine2',
 ] as const;
 
-/** Business profile read and owner-only profile update. */
+/** Business profile read and update (permission-checked by the guard). */
 @Injectable()
 export class BusinessesService {
   private readonly logger = new Logger(BusinessesService.name);
@@ -61,13 +61,8 @@ export class BusinessesService {
     idempotencyKey: string,
     auditContext: AuditRequestContext = {},
   ) {
-    if (
-      !session.userId ||
-      session.isOwner !== true ||
-      session.businessId !== businessId
-    ) {
-      throw new ForbiddenException('Business owner access required');
-    }
+    // business:update was checked by PermissionGuard; RLS checks it again.
+    if (!session.userId) throw new ForbiddenException();
     const userId = session.userId;
 
     const input = normalizeBusinessUpdate(dto);
@@ -104,18 +99,6 @@ export class BusinessesService {
       }
 
       const result = await this.repository.inSession(session, async (tx) => {
-        const ownerMembership =
-          await this.repository.findActiveOwnerMembershipId(
-            tx,
-            businessId,
-            userId,
-          );
-        if (!ownerMembership) {
-          throw new ForbiddenException(
-            'Only the active business owner can update business details',
-          );
-        }
-
         const current = await this.repository.lockBusiness(tx, businessId);
         if (!current) throw new NotFoundException('Business was not found');
 

@@ -2,6 +2,7 @@ import { jest } from '@jest/globals';
 import {
   ConflictException,
   ForbiddenException,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { AuditLogsService } from '../../audit-logs';
@@ -27,8 +28,6 @@ describe('BusinessesService.updateBusinessProfile', () => {
   let service: BusinessesService;
   let current: Record<string, unknown>;
   let tx: Record<string, jest.Mock>;
-  let selectCount: number;
-  let activeMembership = true;
 
   const session = {
     userId: '00000000-0000-4000-8000-000000000002',
@@ -38,8 +37,6 @@ describe('BusinessesService.updateBusinessProfile', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    selectCount = 0;
-    activeMembership = true;
     current = {
       id: session.businessId,
       legalName: 'Legal Name Ltd',
@@ -68,16 +65,14 @@ describe('BusinessesService.updateBusinessProfile', () => {
       isActive: false,
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     };
-    const membershipLimit = mockFn().mockImplementation(async () =>
-      activeMembership ? [{ id: 'membership' }] : [],
-    );
     const businessLimit = mockFn().mockImplementation(() => ({
-      for: mockFn().mockResolvedValue([current]),
+      for: mockFn().mockImplementation(async () =>
+        current.id ? [current] : [],
+      ),
     }));
-    const whereSelect = mockFn().mockImplementation(() => {
-      const isMembershipQuery = selectCount++ % 2 === 0;
-      return { limit: isMembershipQuery ? membershipLimit : businessLimit };
-    });
+    const whereSelect = mockFn().mockImplementation(() => ({
+      limit: businessLimit,
+    }));
     const valuesInsert = mockFn().mockResolvedValue(undefined);
     const whereUpdate = mockFn().mockImplementation(() => ({
       returning: mockFn().mockResolvedValue([
@@ -262,11 +257,11 @@ describe('BusinessesService.updateBusinessProfile', () => {
     expect(database.transactionWithSession).not.toHaveBeenCalled();
   });
 
-  it('denies a session for another business before touching Redis', async () => {
+  it('denies a session without a user before touching Redis', async () => {
     await expect(
       service.updateBusinessProfile(
         session.businessId,
-        { ...session, businessId: '00000000-0000-4000-8000-000000000003' },
+        { businessId: session.businessId },
         { reason: 'Approved operation', displayName: 'New Display' },
         undefined,
         'idempotency-key',
@@ -275,8 +270,8 @@ describe('BusinessesService.updateBusinessProfile', () => {
     expect(redis.get).not.toHaveBeenCalled();
   });
 
-  it('denies an owner claim without an active owner membership', async () => {
-    activeMembership = false;
+  it('answers 404 when row-level security hides the business', async () => {
+    current = {};
     await expect(
       service.updateBusinessProfile(
         session.businessId,
@@ -285,7 +280,7 @@ describe('BusinessesService.updateBusinessProfile', () => {
         undefined,
         'idempotency-key',
       ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect(tx.update).not.toHaveBeenCalled();
     expect(auditLogs.insertUserEvent).not.toHaveBeenCalled();
   });

@@ -10,6 +10,7 @@ type PlatformRow = {
   name: string;
   status: string;
   is_bootstrap: boolean;
+  role: string;
 };
 
 /** SQL for platform-user (Fortis staff) sign-in. */
@@ -34,6 +35,7 @@ export class PlatformAuthenticationRepository {
             passwordHash: row.password_hash,
             status: row.status,
             isBootstrap: row.is_bootstrap,
+            role: row.role,
           }
         : null;
     });
@@ -55,6 +57,7 @@ export class PlatformAuthenticationRepository {
               name: row.name,
               status: row.status,
               isBootstrap: row.is_bootstrap,
+              role: row.role,
             }
           : null;
       },

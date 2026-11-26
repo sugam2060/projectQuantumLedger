@@ -193,9 +193,7 @@ rotate, so a refresh token should only be used once.
 
 The `x-client-type` header controls web behavior. For web, the controller sets
 new HTTP-only cookies and omits the tokens from the response body. For desktop
-and mobile, tokens are returned in JSON. `@RequiredRoles('users.refresh')` is
-present in code, but this route is public, so the permission guard skips that
-check. For mobile and desktop, `x-terminal-id` is required and must be active and match the user's membership. Web clients may omit it; refresh then uses the sole active membership and its assigned branch (or business-wide scope). A supplied terminal is still validated. The server issues a token with the current role ID and version. Owners with a role-free membership can also
+and mobile, tokens are returned in JSON. For mobile and desktop, `x-terminal-id` is required and must be active and match the user's membership. Web clients may omit it; refresh then uses the sole active membership and its assigned branch (or business-wide scope). A supplied terminal is still validated. The server issues a token with the current role ID and version. Owners with a role-free membership can also
 refresh; their response has an empty effective-permission list and the token
 omits role claims. Non-owners need an assigned role. The effective permission
 snapshot is returned separately from the JWT so the client can refresh its
@@ -721,140 +719,6 @@ Mobile/desktop receive tokens in the response body.
 }
 ```
 
-## Endpoint role access management
-
-### `GET /api/v1/business/endpoint-access/endpoints`
-
-**Description:** Lists the code-registered endpoints that carry
-`@RequiredRoles` metadata, including their endpoint keys, controller/method,
-HTTP method, and path. This is a catalog; it does not list a business's current
-role configuration. **Auth:** public. **Rate limit:** none. **Errors:** none
-specific to the handler. **Idempotency:** read-only.
-
-```json
-{
-  "phase": 1,
-  "endpoint": "GET /api/v1/business/endpoint-access/endpoints",
-  "requestData": {
-    "pathParams": {},
-    "queryParams": null,
-    "headers": {},
-    "body": null
-  },
-  "responseData": {
-    "httpStatus": 200,
-    "body": [
-      {
-        "endpointKey": "users.login",
-        "controller": "AuthenticationController",
-        "method": "POST",
-        "path": "/authentication/login"
-      }
-    ]
-  }
-}
-```
-
-### `GET /api/v1/business/endpoint-access`
-
-**Description:** Lists endpoint-role configuration for the authenticated
-business. Only the active business owner can manage or list these settings; the
-service validates both the signed owner claim and the active owner membership.
-**Auth:** signed-in business owner. **Rate limit:** none. **Errors:** 401 for
-authentication failure, 403 when the active owner check fails.
-**Idempotency:** read-only.
-
-```json
-{
-  "phase": 1,
-  "endpoint": "GET /api/v1/business/endpoint-access",
-  "requestData": {
-    "pathParams": {},
-    "queryParams": null,
-    "headers": {
-      "Authorization": "Bearer <access-token>"
-    },
-    "body": null
-  },
-  "responseData": {
-    "httpStatus": 200,
-    "body": [
-      {
-        "endpointKey": "users.login",
-        "roleIds": ["9abcde01-2345-4f67-89ab-cdef01234567"]
-      }
-    ]
-  }
-}
-```
-
-### `PUT /api/v1/business/endpoint-access/:endpointKey`
-
-**Description:** Replaces the allowed role-template IDs for one registered
-endpoint in the authenticated business. The endpoint key must exist in the
-catalog, and each role must be a global role or belong to the active business.
-**Auth:** signed-in business owner. **Rate limit:** none. **Errors:** 400 for an
-invalid/unregistered key, empty/duplicate/invalid role IDs, or roles outside
-the business; 401 for authentication failure; 403 when the owner check fails.
-**Idempotency:** yes; repeating the same role list results in the same
-configuration.
-
-```json
-{
-  "phase": 1,
-  "endpoint": "PUT /api/v1/business/endpoint-access/users.login",
-  "requestData": {
-    "pathParams": {
-      "endpointKey": "users.login"
-    },
-    "queryParams": null,
-    "headers": {
-      "Authorization": "Bearer <owner-access-token>",
-      "Content-Type": "application/json"
-    },
-    "body": {
-      "roleIds": ["9abcde01-2345-4f67-89ab-cdef01234567"]
-    }
-  },
-  "responseData": {
-    "httpStatus": 200,
-    "body": {
-      "endpointKey": "users.login",
-      "roleIds": ["9abcde01-2345-4f67-89ab-cdef01234567"]
-    }
-  }
-}
-```
-
-### `DELETE /api/v1/business/endpoint-access/:endpointKey`
-
-**Description:** Clears all role assignments for the endpoint key in the
-authenticated business. **Auth:** signed-in business owner. **Rate limit:**
-none. **Errors:** 400 for an invalid endpoint key, 401 for authentication
-failure, 403 when the owner check fails. **Idempotency:** yes; clearing an
-already-cleared configuration leaves it cleared.
-
-```json
-{
-  "phase": 1,
-  "endpoint": "DELETE /api/v1/business/endpoint-access/users.login",
-  "requestData": {
-    "pathParams": {
-      "endpointKey": "users.login"
-    },
-    "queryParams": null,
-    "headers": {
-      "Authorization": "Bearer <owner-access-token>"
-    },
-    "body": null
-  },
-  "responseData": {
-    "httpStatus": 204,
-    "body": null
-  }
-}
-```
-
 ## Notes for API consumers
 
 - `Authorization: Bearer <access-token>` is used for private routes. For web
@@ -862,27 +726,23 @@ already-cleared configuration leaves it cleared.
   `x-client-type: web` is supplied.
 - User login reads `client_type` from the JSON body. Platform login prefers the
   `x-client-type` header and falls back to the optional body field.
-- Public endpoints bypass `PermissionGuard`, even if they have
-  `@RequiredRoles` metadata.
-- The current catalog includes `users.login` and `users.refresh`, but both
-  routes are public. Their endpoint-role configuration therefore does not
-  protect those routes; public login/refresh is controlled by credentials and
-  token validation instead.
+- Business routes with `:businessId` require permissions (`@RequiredPermission`),
+  decided in the database by `app.has_permission` (owner, branch scope,
+  allow/deny overrides, role grants). Denials are one generic 403; a malformed
+  `:businessId`/`:branchId` is 400. See `src/authorization/README.md`.
+- Platform routes require platform permissions derived from the staff member's
+  platform role (`admin`, `manager`, `support`; bootstrap acts as admin).
 - `@RateLimit` limits are enforced by the global rate-limit guard. Routes with
   no `@RateLimit` decorator have no route-specific limit.
-- The endpoint catalog contains only routes currently decorated with
-  `@RequiredRoles`; it is not a list of every API route.
 ## GET /api/v1/businesses/{businessId}
 
-**Description:** Returns the authenticated owner's business profile and current
-activation state. **Auth:** business owner only; the JWT must identify the same
-business as the path parameter. Platform users and non-owner users are denied.
-The route is registered with the `business.read` permission key; the owner-only
-check also applies after the global permission guard.
+**Description:** Returns the business profile and current activation state.
+**Auth:** `business:read` in that business (the owner, or a member whose role or
+overrides grant it). Platform tokens are denied.
 **Headers:** `Authorization: Bearer <owner-access-token>` and optional
 `x-client-type: web|desktop|mobile` (used by client-specific authentication
 behavior; not a business selector). **Errors:** 400 for an invalid UUID, 401 for
-missing/invalid authentication, 403 unless the caller is the owner of that
+missing/invalid authentication, 403 without `business:read` in that
 business, and 404 when the business does not exist. PAN and registration
 document references are not returned.
 
@@ -926,8 +786,8 @@ document references are not returned.
 ## PATCH /api/v1/businesses/{businessId}
 
 **Description:** Updates approved business profile fields and optionally replaces
-business documents. **Auth:** only the active business owner for the path business;
-the route is registered with `business.update`. **Headers:**
+business documents. **Auth:** `business:update` in the path business (owner and
+admins by default). **Headers:**
 `Authorization: Bearer <owner-access-token>`, `Idempotency-Key`, and
 `x-client-type: web|desktop|mobile`. Use multipart form data; the client must set
 the multipart boundary. **Permitted fields:** `reason` (required), `displayName`,
@@ -989,9 +849,8 @@ or documents, or an empty update; 503 if the idempotency service is unavailable.
 ## GET /api/v1/businesses/{businessId}/branches
 
 **Description:** Lists business branches with their current operational status.
-**Auth:** the active owner or a business member with an explicit `branches.read`
-role assignment. This endpoint fails closed until roles are configured. A
-branch-scoped membership sees only its assigned branch; a membership with a null
+**Auth:** `branch:read` in the business (the owner, or a member whose role or
+overrides grant it). A branch-scoped membership sees only its assigned branch; a membership with a null
 branch assignment and the owner see all branches in the business. Platform users
 are denied. **Headers:** `Authorization: Bearer <access-token>` and optional
 `x-client-type: web|desktop|mobile` (required when using the web access-token
@@ -1050,10 +909,9 @@ unconfigured `branches.read`; 503 for an unexpected database failure.
 ## GET /api/v1/businesses/{businessId}/branches/{branchId}
 
 **Description:** Reads a branch profile and current operational summary.
-**Auth:** the active owner or a business member with an explicit `branches.read`
-role assignment. A branch-scoped member can read only their assigned branch; a
-business-wide member and the owner can read any branch in the business. Role
-configuration is required for non-owner users; platform users are denied.
+**Auth:** `branch:read` at that branch. A branch-scoped member (or one whose role
+is limited to a branch) gets 403 for other branches; a business-wide member and
+the owner can read any branch in the business. Platform users are denied.
 **Headers:** `Authorization: Bearer <access-token>` and optional
 `x-client-type: web|desktop|mobile` (required when using the web access-token
 cookie). **Response:** `branch` contains `id`, `businessId`, `name`, `code`,
@@ -1168,7 +1026,7 @@ created inactive terminal IDs, names, and generated activation codes.
 
 ### `POST /api/v1/businesses/{businessId}/branches/{branchId}/terminals/activate`
 
-**Description:** Activates an inactive terminal using its emailed activation code. The authenticated business owner must belong to the matching business. Business ID and branch ID scope the code to one terminal; repeating activation for an active terminal returns its current details. **Auth:** business owner. **Errors:** 403 for non-owner or out-of-business access; 404 if the business, branch, terminal, or code combination does not match; 409 if the terminal cannot be activated. Activation is audited and the activation code is excluded from audit metadata.
+**Description:** Activates an inactive terminal using its emailed activation code. Requires `terminal:activate` at that branch (owners, admins, and branch managers of that branch by default). Business ID and branch ID scope the code to one terminal; repeating activation for an active terminal returns its current details. **Auth:** `terminal:activate` at the branch. **Errors:** 403 without that permission (including other branches or businesses); 404 if the business, branch, terminal, or code combination does not match; 409 if the terminal cannot be activated. Activation is audited and the activation code is excluded from audit metadata.
 
 ```json
 {

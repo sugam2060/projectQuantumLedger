@@ -2,6 +2,10 @@ import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { Throttle } from '../common/decorators/strict-throttle.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PlatformRoute } from '../common/decorators/platform-route.decorator';
+import {
+  PlatformPermission,
+  RequiredPlatformPermission,
+} from '../authorization';
 import type { AuthenticatedUser } from '../common/types';
 import { InvitePlatformUserHeaders } from './decorators/invite-platform-user-headers.decorator';
 import { InvitePlatformUserDto } from './dto/invite-platform-user.dto';
@@ -17,6 +21,7 @@ export class PlatformUsersController {
 
   @Post('invite')
   @HttpCode(HttpStatus.OK)
+  @RequiredPlatformPermission(PlatformPermission.PLATFORM_USER_INVITE)
   @Throttle({ limit: 20, ttlMs: 60 * 60_000 })
   async invite(
     @Body() body: InvitePlatformUserDto,

@@ -19,6 +19,8 @@ export const platformUsers = pgTable(
     name: text('name').notNull(),
     status: text('status').notNull().default('active'),
     isBootstrap: boolean('is_bootstrap').notNull().default(false), // Identifies the initial bootstrap PM
+    /** admin | manager | support; maps to PLATFORM_ROLE_PERMISSIONS. Bootstrap acts as admin. */
+    role: text('role').notNull().default('support'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -34,6 +36,10 @@ export const platformUsers = pgTable(
     check(
       'platform_users_email_chk',
       sql`email_normalized = lower(btrim(email_normalized))`,
+    ),
+    check(
+      'platform_users_role_chk',
+      sql`role IN ('admin', 'manager', 'support')`,
     ),
     check(
       'platform_users_status_chk',

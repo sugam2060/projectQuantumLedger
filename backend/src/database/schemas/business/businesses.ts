@@ -66,7 +66,7 @@ export const business = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-        app.is_business_owner(id)
+        app.has_permission(id, NULL, 'business:read')
         OR app.is_platform_user()
         OR EXISTS (
           SELECT 1
@@ -86,10 +86,10 @@ export const business = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-        app.is_business_owner(id) OR app.is_platform_user()
+        app.has_permission(id, NULL, 'business:update') OR app.is_platform_user()
       `,
       withCheck: sql`
-        app.is_business_owner(id) OR app.is_platform_user()
+        app.has_permission(id, NULL, 'business:update') OR app.is_platform_user()
       `,
     }),
 

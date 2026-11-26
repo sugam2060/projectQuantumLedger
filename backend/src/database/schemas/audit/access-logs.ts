@@ -47,7 +47,7 @@ export const accessLogs = pgTable(
       to: 'fortis_app',
       using: sql`
         user_id = app.current_user_id()
-        OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+        OR (business_id IS NOT NULL AND app.has_permission(business_id, NULL, 'audit:read'))
         OR app.is_platform_user()
       `,
     }),

@@ -51,26 +51,6 @@
   },
   {
     "method": "GET",
-    "path": "/business/endpoint-access",
-    "public": false
-  },
-  {
-    "method": "DELETE",
-    "path": "/business/endpoint-access/:endpointKey",
-    "public": false
-  },
-  {
-    "method": "PUT",
-    "path": "/business/endpoint-access/:endpointKey",
-    "public": false
-  },
-  {
-    "method": "GET",
-    "path": "/business/endpoint-access/endpoints",
-    "public": true
-  },
-  {
-    "method": "GET",
     "path": "/businesses/:businessId",
     "public": false
   },

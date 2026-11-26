@@ -94,10 +94,14 @@ export const businessMemberships = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-        app.is_business_owner(business_id) OR app.is_platform_user()
+        app.has_permission(business_id, branch_id, 'member:update')
+        OR app.has_permission(business_id, branch_id, 'member:end')
+        OR app.is_platform_user()
       `,
       withCheck: sql`
-        app.is_business_owner(business_id) OR app.is_platform_user()
+        app.has_permission(business_id, branch_id, 'member:update')
+        OR app.has_permission(business_id, branch_id, 'member:end')
+        OR app.is_platform_user()
       `,
     }),
     pgPolicy('business_memberships_owner_row_immutable', {

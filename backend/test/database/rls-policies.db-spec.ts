@@ -110,12 +110,15 @@ describe('RLS policies (as fortis_app)', () => {
         'terminals',
         'business_memberships',
         'users',
-        'roles',
         'access_logs',
       ]) {
         const rows = await ids({}, `SELECT id FROM ${table}`);
         expect({ table, rows }).toEqual({ table, rows: [] });
       }
+      // System roles are shared reference data; business roles stay hidden.
+      expect(
+        await ids({}, 'SELECT id FROM roles WHERE business_id IS NOT NULL'),
+      ).toEqual([]);
     });
   });
 
@@ -193,15 +196,15 @@ describe('RLS policies (as fortis_app)', () => {
       await expect(
         rowCount(
           { ...as(cashier.id), 'app.branch_id': a.branchId },
-          'INSERT INTO roles (business_id, name) VALUES ($1, $2)',
-          [a.businessId, 'Sneaky'],
+          'INSERT INTO roles (business_id, name, key) VALUES ($1, $2, $3)',
+          [a.businessId, 'Sneaky', 'sneaky'],
         ),
       ).rejects.toMatchObject({ code: '42501' });
       expect(
         await rowCount(
           as(a.owner.id),
-          'INSERT INTO roles (business_id, name) VALUES ($1, $2)',
-          [a.businessId, 'Supervisor'],
+          'INSERT INTO roles (business_id, name, key) VALUES ($1, $2, $3)',
+          [a.businessId, 'Supervisor', 'supervisor'],
         ),
       ).toBe(1);
     });

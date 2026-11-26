@@ -18,7 +18,7 @@ import {
   isOpaqueTokenShape,
 } from '../common/utils/opaque-token.util';
 import { authConfig } from '../config';
-import { EffectivePermissionsService } from '../roles-permissions/effective-permissions.service';
+import { PermissionService } from '../authorization';
 import {
   AuthenticationRepository,
   type AuthTransaction,
@@ -56,7 +56,7 @@ export class AuthenticationService {
     private readonly passwordsRepository: PasswordsRepository,
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
-    private readonly effectivePermissions: EffectivePermissionsService,
+    private readonly permissions: PermissionService,
     private readonly auditLogs: AuditLogsService,
     @Inject(authConfig.KEY)
     private readonly config: ConfigType<typeof authConfig>,
@@ -308,18 +308,12 @@ export class AuthenticationService {
     let effectivePermissions: string[] | undefined;
     let currentRoleVersion = roleVersion;
     if (initialLoad) {
-      effectivePermissions = [];
-      if (businessId && roleId) {
-        const snapshot = await this.effectivePermissions.resolve({
-          userId,
-          businessId,
-          roleId,
-        });
-        if (snapshot) {
-          effectivePermissions = snapshot.permissions;
-          currentRoleVersion = snapshot.roleVersion ?? roleVersion;
-        }
-      }
+      effectivePermissions = businessId
+        ? await this.permissions.effective(userId, businessId, branchId)
+        : [];
+      currentRoleVersion =
+        memberships.find((item) => item.businessId === businessId)
+          ?.roleVersion ?? roleVersion;
     }
 
     const now = Math.floor(Date.now() / 1000);
@@ -562,15 +556,13 @@ export class AuthenticationService {
     persistent: boolean,
   ): Promise<UserAuthResult> {
     const { membership, terminal } = binding;
-    const snapshot = membership.roleId
-      ? await this.effectivePermissions.resolve({
-          userId: account.id,
-          businessId: membership.businessId,
-          roleId: membership.roleId,
-        })
-      : null;
     const branchId = terminal?.branchId ?? membership.branchId ?? undefined;
-    const roleVersion = snapshot?.roleVersion ?? membership.roleVersion;
+    const effectivePermissions = await this.permissions.effective(
+      account.id,
+      membership.businessId,
+      branchId,
+    );
+    const roleVersion = membership.roleVersion;
 
     const access = await this.tokens.signUserToken({
       sub: account.id,
@@ -603,7 +595,7 @@ export class AuthenticationService {
         role: item.roleName,
         roleVersion: item.roleVersion,
       })),
-      effectivePermissions: snapshot?.permissions ?? [],
+      effectivePermissions,
     };
   }
 

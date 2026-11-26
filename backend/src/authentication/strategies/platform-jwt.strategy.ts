@@ -15,6 +15,7 @@ type PlatformJwtPayload = {
   sub?: unknown;
   email?: unknown;
   isBootstrap?: unknown;
+  role?: unknown;
   exp?: unknown;
   iat?: unknown;
 };
@@ -46,6 +47,7 @@ export class PlatformJwtStrategy extends PassportStrategy(
       isPlatform: true,
       isOwner: false,
       isBootstrap: payload.isBootstrap === true,
+      platformRole: optionalStringClaim(payload.role, 'role'),
       permissions: [],
       tokenIssuedAt: typeof payload.iat === 'number' ? payload.iat : undefined,
       tokenExpiresAt,

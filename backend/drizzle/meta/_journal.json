@@ -148,6 +148,34 @@
       "when": 1795663077500,
       "tag": "0020_tighten_tenant_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795663779657,
+      "tag": "0021_authorization_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795663810522,
+      "tag": "0022_seed_permissions_and_system_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795663849393,
+      "tag": "0023_roles_key_required",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795664878460,
+      "tag": "0024_drop_endpoint_role_access",
+      "breakpoints": true
     }
   ]
 }

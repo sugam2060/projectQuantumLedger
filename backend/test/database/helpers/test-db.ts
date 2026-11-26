@@ -30,7 +30,55 @@ export async function truncateAll(): Promise<void> {
   );
   if (rows.length === 0) return;
   const tables = rows.map((row) => `"public"."${row.tablename}"`).join(', ');
+  const reference = await referenceData();
   await owner().query(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`);
+  await restoreReferenceData(reference);
+}
+
+/**
+ * Reference data seeded by migrations (permission catalogue, system roles and
+ * their grants). TRUNCATE ... CASCADE also empties it, so it is captured once
+ * from the freshly migrated database and put back after every truncate.
+ */
+type ReferenceData = {
+  permissions: Record<string, unknown>[];
+  roles: Record<string, unknown>[];
+  grants: Record<string, unknown>[];
+};
+let reference: ReferenceData | undefined;
+
+async function referenceData(): Promise<ReferenceData> {
+  if (reference) return reference;
+  const db = owner();
+  const [permissions, roles, grants] = await Promise.all([
+    db.query('SELECT * FROM permissions'),
+    db.query('SELECT * FROM roles WHERE is_system'),
+    db.query(
+      `SELECT rp.* FROM role_permissions rp
+         JOIN roles r ON r.id = rp.role_id WHERE r.is_system`,
+    ),
+  ]);
+  reference = {
+    permissions: permissions.rows,
+    roles: roles.rows,
+    grants: grants.rows,
+  };
+  return reference;
+}
+
+async function restoreReferenceData(data: ReferenceData): Promise<void> {
+  const db = owner();
+  for (const [table, rows] of [
+    ['permissions', data.permissions],
+    ['roles', data.roles],
+    ['role_permissions', data.grants],
+  ] as const) {
+    if (rows.length === 0) continue;
+    await db.query(
+      `INSERT INTO ${table} SELECT * FROM json_populate_recordset(NULL::${table}, $1)`,
+      [JSON.stringify(rows)],
+    );
+  }
 }
 
 /**

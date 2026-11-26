@@ -66,10 +66,10 @@ export const branches = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-        app.is_business_owner(business_id) OR app.is_platform_user()
+        app.has_permission(business_id, id, 'branch:update') OR app.is_platform_user()
       `,
       withCheck: sql`
-        app.is_business_owner(business_id) OR app.is_platform_user()
+        app.has_permission(business_id, id, 'branch:update') OR app.is_platform_user()
       `,
     }),
   ],

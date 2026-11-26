@@ -17,6 +17,7 @@ import {
   Throttle,
 } from '../common/decorators/strict-throttle.decorator';
 import type { AuthenticatedUser } from '../common/types';
+import { SelfService } from '../authorization';
 import { AuthCookieService } from './auth-cookie.service';
 import { AuthenticationService } from './authentication.service';
 import { AuthenticationLoginHeaders } from './decorators/authentication-login-headers.decorator';
@@ -156,6 +157,7 @@ export class AuthenticationController {
 
   /** Ends every session of the signed-in user (all devices). */
   @Post('logout-all')
+  @SelfService()
   @StrictThrottle()
   @HttpCode(HttpStatus.OK)
   async logoutAll(
@@ -169,6 +171,7 @@ export class AuthenticationController {
 
   /** Changes the password, signs out every device, returns a new session. */
   @Post('change-password')
+  @SelfService()
   @StrictThrottle()
   @HttpCode(HttpStatus.OK)
   async changePassword(

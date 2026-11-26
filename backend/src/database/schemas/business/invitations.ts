@@ -82,7 +82,7 @@ export const invitations = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-        app.is_platform_user() OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+        app.is_platform_user() OR (business_id IS NOT NULL AND app.has_permission(business_id, branch_id, 'member:read'))
       `,
     }),
 
@@ -91,7 +91,7 @@ export const invitations = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-        app.is_platform_user() OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+        app.is_platform_user() OR (business_id IS NOT NULL AND app.has_permission(business_id, branch_id, 'member:invite'))
       `,
     }),
 
@@ -100,10 +100,10 @@ export const invitations = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-        app.is_platform_user() OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+        app.is_platform_user() OR (business_id IS NOT NULL AND app.has_permission(business_id, branch_id, 'member:invite'))
       `,
       withCheck: sql`
-        app.is_platform_user() OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+        app.is_platform_user() OR (business_id IS NOT NULL AND app.has_permission(business_id, branch_id, 'member:invite'))
       `,
     }),
 
@@ -112,7 +112,7 @@ export const invitations = pgTable(
       for: 'delete',
       to: 'fortis_app',
       using: sql`
-        app.is_platform_user() OR (business_id IS NOT NULL AND app.is_business_owner(business_id))
+        app.is_platform_user() OR (business_id IS NOT NULL AND app.has_permission(business_id, branch_id, 'member:invite'))
       `,
     }),
   ],

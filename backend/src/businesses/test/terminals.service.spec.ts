@@ -1,5 +1,4 @@
 import { jest } from '@jest/globals';
-import { ForbiddenException } from '@nestjs/common';
 import { AuditLogsService } from '../../audit-logs';
 import { DatabaseService } from '../../database/database.service';
 import { TerminalsRepository } from '../terminals.repository';
@@ -26,16 +25,6 @@ describe('TerminalsService.activateTerminal', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  it('requires owner access for terminal activation', async () => {
-    await expect(
-      service.activateTerminal(businessId, branchId, 'POS-A1B2C3D4E5F60718', {
-        ...session,
-        isOwner: false,
-      }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(database.transactionWithSession).not.toHaveBeenCalled();
   });
 
   it('activates the matching terminal and audits without storing its code', async () => {

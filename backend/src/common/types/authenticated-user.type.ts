@@ -19,6 +19,8 @@ export type AuthenticatedUser = {
   roleId?: string;
   roleVersion?: number;
   isBootstrap?: boolean;
+  /** Platform users: role from the token (admin | manager | support). */
+  platformRole?: string;
   tokenIssuedAt?: number;
   tokenExpiresAt?: number;
 };

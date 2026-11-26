@@ -17,17 +17,23 @@ async function insert(sql: string, params: unknown[]): Promise<string> {
 }
 
 export async function createPlatformUser(
-  overrides: { email?: string; isBootstrap?: boolean; status?: string } = {},
+  overrides: {
+    email?: string;
+    isBootstrap?: boolean;
+    status?: string;
+    role?: 'admin' | 'manager' | 'support';
+  } = {},
 ): Promise<{ id: string; email: string }> {
   const email = overrides.email ?? `staff-${unique()}@fortis.test`;
   const id = await insert(
-    `INSERT INTO platform_users (email_normalized, password_hash, name, status, is_bootstrap)
-     VALUES ($1, $2, 'Platform Staff', $3, $4) RETURNING id`,
+    `INSERT INTO platform_users (email_normalized, password_hash, name, status, is_bootstrap, role)
+     VALUES ($1, $2, 'Platform Staff', $3, $4, $5) RETURNING id`,
     [
       email,
       await bcrypt.hash(TEST_PASSWORD, 4),
       overrides.status ?? 'active',
       overrides.isBootstrap ?? false,
+      overrides.role ?? (overrides.isBootstrap ? 'admin' : 'manager'),
     ],
   );
   return { id, email };
@@ -87,8 +93,17 @@ export async function createRole(
   name = `Role ${unique()}`,
 ): Promise<string> {
   return insert(
-    `INSERT INTO roles (business_id, name) VALUES ($1, $2) RETURNING id`,
-    [businessId, name],
+    `INSERT INTO roles (business_id, name, key, is_system)
+     VALUES ($1, $2, $3, $4) RETURNING id`,
+    [
+      businessId,
+      name,
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'role',
+      businessId === null,
+    ],
   );
 }
 

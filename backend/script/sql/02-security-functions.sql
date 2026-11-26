@@ -131,6 +131,148 @@ END;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Authorization. Every business permission decision is made here: the API's
+-- PermissionGuard and the RLS policies both call app.has_permission.
+-- ---------------------------------------------------------------------------
+
+-- Does the current user hold the permission in the business (and, when a branch
+-- is given, at that branch)? Evaluated in order:
+--   1. no active membership (or inactive account)   -> false
+--   2. active owner                                  -> true for every known key
+--   3. member limited to another branch              -> false
+--      (limit = membership branch, else the role's branch)
+--   4. deny override                                 -> false
+--   5. allow override                                -> true
+--   6. the member's role grants it                   -> true
+-- Unknown permission keys are always false.
+CREATE OR REPLACE FUNCTION app.has_permission(
+  p_business_id uuid,
+  p_branch_id uuid,
+  p_permission text
+)
+RETURNS boolean
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_member record;
+  v_effect text;
+BEGIN
+  IF p_business_id IS NULL OR p_permission IS NULL
+     OR app.current_user_id() IS NULL THEN
+    RETURN false;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.permissions p WHERE p.key = p_permission) THEN
+    RETURN false;
+  END IF;
+
+  SELECT m.is_owner,
+         m.role_id,
+         COALESCE(m.branch_id, r.branch_id) AS branch_id
+    INTO v_member
+    FROM public.business_memberships m
+    JOIN public.users u ON u.id = m.user_id
+    LEFT JOIN public.roles r ON r.id = m.role_id
+   WHERE m.business_id = p_business_id
+     AND m.user_id = app.current_user_id()
+     AND m.is_active
+     AND u.status = 'active';
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
+  IF v_member.is_owner THEN
+    RETURN true;
+  END IF;
+
+  IF p_branch_id IS NOT NULL
+     AND v_member.branch_id IS NOT NULL
+     AND v_member.branch_id <> p_branch_id THEN
+    RETURN false;
+  END IF;
+
+  SELECT o.effect INTO v_effect
+    FROM public.member_permission_overrides o
+   WHERE o.business_id = p_business_id
+     AND o.user_id = app.current_user_id()
+     AND o.permission_key = p_permission;
+  IF v_effect = 'deny' THEN
+    RETURN false;
+  ELSIF v_effect = 'allow' THEN
+    RETURN true;
+  END IF;
+
+  RETURN EXISTS (
+    SELECT 1
+      FROM public.role_permissions rp
+      JOIN public.roles r ON r.id = rp.role_id
+     WHERE rp.role_id = v_member.role_id
+       AND rp.permission_key = p_permission
+       AND (r.business_id IS NULL OR r.business_id = p_business_id)
+  );
+END;
+$$;
+
+-- True only when the current user holds every one of the permissions. An empty
+-- list is false (nothing to authorize means a programming error).
+CREATE OR REPLACE FUNCTION app.has_all_permissions(
+  p_business_id uuid,
+  p_branch_id uuid,
+  p_permissions text[]
+)
+RETURNS boolean
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF p_permissions IS NULL OR pg_catalog.cardinality(p_permissions) = 0 THEN
+    RETURN false;
+  END IF;
+  RETURN pg_catalog.bool_and(app.has_permission(p_business_id, p_branch_id, k))
+    FROM pg_catalog.unnest(p_permissions) AS k;
+END;
+$$;
+
+-- Every permission the current user holds in the business (at the branch).
+CREATE OR REPLACE FUNCTION app.effective_permissions(
+  p_business_id uuid,
+  p_branch_id uuid
+)
+RETURNS SETOF text
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+    SELECT p.key
+      FROM public.permissions p
+     WHERE app.has_permission(p_business_id, p_branch_id, p.key)
+     ORDER BY p.key;
+END;
+$$;
+
+-- May the current user change this role's permissions? Never for system roles.
+CREATE OR REPLACE FUNCTION app.can_manage_role(p_role_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_business_id uuid;
+  v_is_system boolean;
+BEGIN
+  SELECT r.business_id, r.is_system INTO v_business_id, v_is_system
+    FROM public.roles r
+   WHERE r.id = p_role_id;
+  IF NOT FOUND OR v_is_system OR v_business_id IS NULL THEN
+    RETURN false;
+  END IF;
+  RETURN app.has_permission(v_business_id, NULL, 'role:create')
+      OR app.has_permission(v_business_id, NULL, 'role:update');
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Pre-authentication lookups. Sign-in happens before any user context exists,
 -- so RLS would hide these rows; these functions expose exactly one account.
 -- ---------------------------------------------------------------------------
@@ -181,6 +323,7 @@ END;
 $$;
 
 -- Platform (Fortis staff) user by email.
+DROP FUNCTION IF EXISTS app.auth_find_platform_user_by_email(text);
 CREATE OR REPLACE FUNCTION app.auth_find_platform_user_by_email(p_email text)
 RETURNS TABLE (
   id uuid,
@@ -188,7 +331,8 @@ RETURNS TABLE (
   name text,
   password_hash text,
   status text,
-  is_bootstrap boolean
+  is_bootstrap boolean,
+  role text
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
@@ -196,7 +340,7 @@ AS $$
 BEGIN
   RETURN QUERY
     SELECT p.id, p.email_normalized, p.name, p.password_hash, p.status,
-           p.is_bootstrap
+           p.is_bootstrap, p.role
       FROM public.platform_users p
      WHERE p.email_normalized = pg_catalog.lower(pg_catalog.btrim(p_email))
      LIMIT 1;
@@ -212,14 +356,15 @@ RETURNS TABLE (
   email text,
   name text,
   status text,
-  is_bootstrap boolean
+  is_bootstrap boolean,
+  role text
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
   RETURN QUERY
-    SELECT p.id, p.email_normalized, p.name, p.status, p.is_bootstrap
+    SELECT p.id, p.email_normalized, p.name, p.status, p.is_bootstrap, p.role
       FROM public.platform_users p
      WHERE p.id = p_platform_user_id
        AND p.id = app.current_platform_user_id();

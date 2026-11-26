@@ -7,9 +7,10 @@ import { business } from './business/businesses';
 import { businessProvisioningRequests } from './business/business-provisioning-requests';
 import { ownerRedemptions } from './business/owner-redemptions';
 import { businessMemberships } from './business/business-memberships';
-import { endpointRoleAccess } from './business/endpoint-role-access';
 import { invitations } from './business/invitations';
 import { platformUsers } from './auth/platform-users';
+import { permissions } from './business/permissions';
+import { rolePermissions } from './business/role-permissions';
 import { roles } from './business/roles';
 import { terminals } from './business/terminals';
 import { users } from './auth/users';
@@ -26,7 +27,6 @@ export const businessRelations = relations(business, ({ one, many }) => ({
   terminals: many(terminals),
   accessLogs: many(accessLogs),
   auditLogs: many(auditLogs),
-  endpointRoleAccess: many(endpointRoleAccess),
   ownerRedemptions: many(ownerRedemptions),
   platformAuditLogs: many(platformAuditLogs),
 }));
@@ -123,8 +123,22 @@ export const rolesRelations = relations(roles, ({ one, many }) => ({
   }),
   memberships: many(businessMemberships),
   invitations: many(invitations),
-  endpointRoleAccess: many(endpointRoleAccess),
+  permissions: many(rolePermissions),
 }));
+
+export const rolePermissionsRelations = relations(
+  rolePermissions,
+  ({ one }) => ({
+    role: one(roles, {
+      fields: [rolePermissions.roleId],
+      references: [roles.id],
+    }),
+    permission: one(permissions, {
+      fields: [rolePermissions.permissionKey],
+      references: [permissions.key],
+    }),
+  }),
+);
 
 export const businessMembershipsRelations = relations(
   businessMemberships,

@@ -4,7 +4,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Param,
   Patch,
   UploadedFiles,
   UseInterceptors,
@@ -12,36 +11,34 @@ import {
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AuditContext, type AuditRequestContext } from '../audit-logs';
-import { RequiredRoles } from '../authentication/decorators/required_permission.decorator';
+import { BusinessId, Permission, RequiredPermission } from '../authorization';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../common/types';
 import { BusinessesService } from './businesses.service';
 import { UpdateBusinessHeaders } from './decorators/update-business-headers.decorator';
-import { BusinessIdParamDto, UpdateBusinessHeadersDto } from './dto';
+import { UpdateBusinessHeadersDto } from './dto';
 import type { UpdateBusinessDto } from './dto';
 import { UpdateBusinessValidationPipe } from './pipes/update-business-validation.pipe';
 import type { BusinessUpdateFiles } from './types';
-import { requireBusinessOwner } from './utils/business-access.util';
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
-/** Business profile routes for the owner. */
+/** Business profile routes (permission-checked). */
 @Controller('businesses')
 export class BusinessesController {
   constructor(private readonly businesses: BusinessesService) {}
 
   @Get(':businessId')
-  @RequiredRoles('business.read')
+  @RequiredPermission(Permission.BUSINESS_READ)
   getBusiness(
-    @Param() params: BusinessIdParamDto,
-    @CurrentUser() user: AuthenticatedUser | undefined,
+    @BusinessId() businessId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const owner = requireBusinessOwner(user, params.businessId);
-    return this.businesses.getBusinessProfile(params.businessId, owner);
+    return this.businesses.getBusinessProfile(businessId, user);
   }
 
   @Patch(':businessId')
-  @RequiredRoles('business.update')
+  @RequiredPermission(Permission.BUSINESS_UPDATE)
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(
     FileFieldsInterceptor(
@@ -57,17 +54,16 @@ export class BusinessesController {
     ),
   )
   updateBusiness(
-    @Param() params: BusinessIdParamDto,
+    @BusinessId() businessId: string,
     @Body(new UpdateBusinessValidationPipe()) dto: object,
     @UpdateBusinessHeaders() headers: UpdateBusinessHeadersDto,
     @UploadedFiles() files: BusinessUpdateFiles | undefined,
-    @CurrentUser() user: AuthenticatedUser | undefined,
+    @CurrentUser() user: AuthenticatedUser,
     @AuditContext() auditContext: AuditRequestContext,
   ) {
-    const owner = requireBusinessOwner(user, params.businessId);
     return this.businesses.updateBusinessProfile(
-      params.businessId,
-      owner,
+      businessId,
+      user,
       dto as UpdateBusinessDto,
       files,
       headers.idempotencyKey,

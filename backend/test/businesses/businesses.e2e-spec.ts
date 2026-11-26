@@ -9,8 +9,8 @@ import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
-import { PermissionGuard } from '../../src/authentication/guards/permission.guard';
-import type { AuthenticatedUser } from '../../src/authentication/strategies/jwt.strategy';
+import { PermissionGuard } from '../../src/authorization';
+import type { AuthenticatedUser } from '../../src/common/types';
 import { BranchesController } from '../../src/businesses/branches.controller';
 import { BranchesService } from '../../src/businesses/branches.service';
 import { BusinessesController } from '../../src/businesses/businesses.controller';
@@ -29,7 +29,7 @@ describe('Businesses endpoints (e2e)', () => {
     getBranchDetails: jest.fn(),
     activateTerminal: jest.fn(),
   };
-  const endpointAccess = { hasAccess: jest.fn() };
+  const permissions = { hasAll: jest.fn(), platformHasAll: jest.fn() };
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
@@ -62,8 +62,7 @@ describe('Businesses endpoints (e2e)', () => {
           subjectId: '00000000-0000-4000-8000-000000000003',
           userId: '00000000-0000-4000-8000-000000000003',
           businessId,
-          branchId: req.header('x-test-branch-id') ?? undefined,
-          isOwner: req.header('x-test-owner') === 'true',
+          isOwner: false,
           isPlatform: false,
           permissions: [],
         };
@@ -71,7 +70,7 @@ describe('Businesses endpoints (e2e)', () => {
       },
     );
     app.useGlobalGuards(
-      new PermissionGuard(module.get(Reflector), endpointAccess as never),
+      new PermissionGuard(module.get(Reflector), permissions as never),
     );
     await app.init();
   });
@@ -82,7 +81,7 @@ describe('Businesses endpoints (e2e)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    endpointAccess.hasAccess.mockResolvedValue(true);
+    permissions.hasAll.mockResolvedValue(true);
     businessService.getBusinessProfile.mockResolvedValue({
       id: businessId,
       displayName: 'Example Retail',
@@ -123,136 +122,132 @@ describe('Businesses endpoints (e2e)', () => {
     });
   });
 
-  it('reads a business profile only for its owner', async () => {
+  const userId = '00000000-0000-4000-8000-000000000003';
+
+  it('reads a business profile when business:read is granted', async () => {
     await request(app.getHttpServer())
       .get(`/businesses/${businessId}`)
-      .set('x-test-owner', 'true')
       .expect(200)
       .expect(({ body }) => {
-        expect(body).toMatchObject({
-          id: businessId,
-          displayName: 'Example Retail',
-        });
+        expect(body).toMatchObject({ id: businessId });
       });
+    expect(permissions.hasAll).toHaveBeenCalledWith(
+      userId,
+      businessId,
+      undefined,
+      ['business:read'],
+    );
 
+    permissions.hasAll.mockResolvedValue(false);
     await request(app.getHttpServer())
       .get(`/businesses/${businessId}`)
-      .expect(403);
+      .expect(403)
+      .expect(({ body }) =>
+        expect(body.message).toBe('You do not have permission for this action'),
+      );
     expect(businessService.getBusinessProfile).toHaveBeenCalledTimes(1);
   });
 
-  it('lists branches for an owner or a member with branches.read access', async () => {
+  it('rejects a malformed business id with 400 before any permission check', async () => {
+    await request(app.getHttpServer())
+      .get('/businesses/not-a-uuid')
+      .expect(400);
+    expect(permissions.hasAll).not.toHaveBeenCalled();
+  });
+
+  it('lists branches with branch:read', async () => {
     await request(app.getHttpServer())
       .get(`/businesses/${businessId}/branches?limit=10`)
       .expect(200)
       .expect(({ body }) => {
         expect(body.items[0]).toMatchObject({ id: branchId, status: 'active' });
-        expect(body.nextCursor).toBeNull();
       });
-    expect(endpointAccess.hasAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: expect.any(String) }),
-      'branches.read',
-      { requireConfiguration: true },
+    expect(permissions.hasAll).toHaveBeenCalledWith(
+      userId,
+      businessId,
+      undefined,
+      ['branch:read'],
     );
     expect(businessService.listBranches).toHaveBeenCalledWith(
       businessId,
-      expect.objectContaining({ branchId: undefined }),
+      expect.objectContaining({ userId }),
       expect.objectContaining({ limit: 10 }),
     );
-
-    businessService.listBranches.mockClear();
-    await request(app.getHttpServer())
-      .get(`/businesses/${businessId}/branches`)
-      .set('x-test-owner', 'true')
-      .expect(200);
-    expect(endpointAccess.hasAccess).toHaveBeenCalledTimes(1);
-    expect(businessService.listBranches).toHaveBeenCalledTimes(1);
   });
 
-  it('denies branch listing when the role check fails', async () => {
-    endpointAccess.hasAccess.mockResolvedValue(false);
-    await request(app.getHttpServer())
-      .get(`/businesses/${businessId}/branches`)
-      .expect(403);
-    expect(businessService.listBranches).not.toHaveBeenCalled();
-  });
-
-  it('reads branch details for an authorized branch-scoped member', async () => {
+  it('checks branch-scoped permissions at the requested branch', async () => {
     await request(app.getHttpServer())
       .get(`/businesses/${businessId}/branches/${branchId}`)
-      .set('x-test-branch-id', branchId)
       .expect(200)
       .expect(({ body }) => {
-        expect(body.branch).toMatchObject({ id: branchId, status: 'active' });
         expect(body.summary.terminals.total).toBe(1);
-        expect(body.summary.members.total).toBe(1);
       });
-    expect(endpointAccess.hasAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ branchId }),
-      'branches.read',
-      { requireConfiguration: true },
-    );
-    expect(businessService.getBranchDetails).toHaveBeenCalledWith(
+    expect(permissions.hasAll).toHaveBeenCalledWith(
+      userId,
       businessId,
       branchId,
-      expect.objectContaining({ branchId }),
+      ['branch:read'],
     );
+    await request(app.getHttpServer())
+      .get(`/businesses/${businessId}/branches/not-a-uuid`)
+      .expect(400);
   });
 
-  it('returns 404 for an out-of-scope branch and validates branch UUIDs', async () => {
+  it('returns 404 from the service for an out-of-scope branch', async () => {
     businessService.getBranchDetails.mockRejectedValueOnce(
       new NotFoundException('Branch was not found'),
     );
     await request(app.getHttpServer())
       .get(`/businesses/${businessId}/branches/${branchId}`)
       .expect(404);
-    await request(app.getHttpServer())
-      .get(`/businesses/${businessId}/branches/not-a-uuid`)
-      .set('x-test-owner', 'true')
-      .expect(400);
   });
 
-  it('allows only the business owner to activate a terminal with its code', async () => {
+  it('activates a terminal only with terminal:activate at that branch', async () => {
+    permissions.hasAll.mockResolvedValue(false);
     await request(app.getHttpServer())
       .post(`/businesses/${businessId}/branches/${branchId}/terminals/activate`)
       .send({ terminalCode: 'pos-a1b2c3d4e5f60718' })
       .expect(403);
     expect(businessService.activateTerminal).not.toHaveBeenCalled();
 
+    permissions.hasAll.mockResolvedValue(true);
     await request(app.getHttpServer())
       .post(`/businesses/${businessId}/branches/${branchId}/terminals/activate`)
-      .set('x-test-owner', 'true')
       .send({ terminalCode: 'pos-a1b2c3d4e5f60718' })
       .expect(200)
       .expect(({ body }) => expect(body.status).toBe('active'));
+    expect(permissions.hasAll).toHaveBeenLastCalledWith(
+      userId,
+      businessId,
+      branchId,
+      ['terminal:activate'],
+    );
     expect(businessService.activateTerminal).toHaveBeenCalledWith(
       businessId,
       branchId,
       'POS-A1B2C3D4E5F60718',
-      expect.objectContaining({ isOwner: true }),
+      expect.objectContaining({ userId }),
       expect.objectContaining({ method: 'POST' }),
     );
   });
 
-  it('updates permitted profile fields for the owner and rejects sensitive fields', async () => {
+  it('updates permitted profile fields and rejects sensitive fields', async () => {
     await request(app.getHttpServer())
       .patch(`/businesses/${businessId}`)
-      .set('x-test-owner', 'true')
       .set('x-client-type', 'desktop')
       .set('idempotency-key', 'business-update-e2e-001')
       .field('reason', 'Approved display name update')
       .field('displayName', 'Updated Retail')
-      .expect(200)
-      .expect(({ body }) => {
-        expect(body).toMatchObject({
-          businessId,
-          changedFields: { displayName: 'Updated Retail' },
-        });
-      });
-
+      .expect(200);
+    expect(permissions.hasAll).toHaveBeenCalledWith(
+      userId,
+      businessId,
+      undefined,
+      ['business:update'],
+    );
     expect(businessService.updateBusinessProfile).toHaveBeenCalledWith(
       businessId,
-      expect.objectContaining({ isOwner: true }),
+      expect.objectContaining({ userId }),
       expect.objectContaining({ displayName: 'Updated Retail' }),
       {},
       'business-update-e2e-001',
@@ -261,7 +256,6 @@ describe('Businesses endpoints (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch(`/businesses/${businessId}`)
-      .set('x-test-owner', 'true')
       .set('x-client-type', 'desktop')
       .set('idempotency-key', 'business-update-e2e-002')
       .field('reason', 'Attempted sensitive update')

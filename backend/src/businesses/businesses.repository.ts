@@ -39,26 +39,6 @@ export class BusinessesRepository {
     return row;
   }
 
-  async findActiveOwnerMembershipId(
-    tx: BusinessTransaction,
-    businessId: string,
-    userId: string,
-  ) {
-    const [row] = await tx
-      .select({ id: businessMemberships.id })
-      .from(businessMemberships)
-      .where(
-        and(
-          eq(businessMemberships.businessId, businessId),
-          eq(businessMemberships.userId, userId),
-          eq(businessMemberships.isOwner, true),
-          eq(businessMemberships.isActive, true),
-        ),
-      )
-      .limit(1);
-    return row;
-  }
-
   /** Reads the business row with `FOR UPDATE` so concurrent edits serialise. */
   async lockBusiness(tx: BusinessTransaction, businessId: string) {
     const [row] = await tx

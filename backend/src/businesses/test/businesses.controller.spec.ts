@@ -1,9 +1,9 @@
-import { ForbiddenException } from '@nestjs/common';
 import { jest } from '@jest/globals';
 import {
-  REQUIRE_CONFIGURED_ROLES,
-  REQUIRED_ROLES,
-} from '../../authentication/decorators/required_permission.decorator';
+  Permission,
+  REQUIRED_PERMISSIONS_KEY,
+  type PermissionKey,
+} from '../../authorization';
 import type { AuthenticatedUser } from '../../common/types';
 import { BranchesController } from '../branches.controller';
 import { BusinessesController } from '../businesses.controller';
@@ -15,8 +15,15 @@ const asUser = (fields: Partial<AuthenticatedUser>): AuthenticatedUser => ({
   permissions: [],
   ...fields,
 });
-const handlerOf = (controller: object, name: string): unknown =>
-  Object.getOwnPropertyDescriptor(controller, name)?.value;
+const requiredFor = (
+  controller: { prototype: object },
+  name: string,
+): PermissionKey[] | undefined =>
+  Reflect.getMetadata(
+    REQUIRED_PERMISSIONS_KEY,
+    Object.getOwnPropertyDescriptor(controller.prototype, name)
+      ?.value as object,
+  );
 
 describe('businesses controllers', () => {
   const service = {
@@ -30,60 +37,42 @@ describe('businesses controllers', () => {
   const branches = new BranchesController(service as never);
   const terminals = new TerminalsController(service as never);
   const businessId = '00000000-0000-4000-8000-000000000001';
+  const branchId = '00000000-0000-4000-8000-000000000002';
+  const user = asUser({ businessId, userId: 'user-id' });
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('registers the business read permission key', () => {
-    expect(
-      Reflect.getMetadata(
-        REQUIRED_ROLES,
-        handlerOf(BusinessesController.prototype, 'getBusiness') as object,
-      ),
-    ).toBe('business.read');
+  it.each([
+    [BusinessesController, 'getBusiness', Permission.BUSINESS_READ],
+    [BusinessesController, 'updateBusiness', Permission.BUSINESS_UPDATE],
+    [BranchesController, 'listBranches', Permission.BRANCH_READ],
+    [BranchesController, 'getBranch', Permission.BRANCH_READ],
+    [TerminalsController, 'activateTerminal', Permission.TERMINAL_ACTIVATE],
+  ] as const)('%p.%s requires %s', (controller, handler, permission) => {
+    expect(requiredFor(controller, handler)).toEqual([permission]);
   });
 
-  it('returns the profile for the owner of the requested business', async () => {
-    const profile = { id: businessId, isActive: false };
-    const user = asUser({ isOwner: true, businessId });
+  it('passes the authorized business to the profile read', async () => {
+    const profile = { id: businessId };
     service.getBusinessProfile.mockResolvedValue(profile);
-    await expect(businesses.getBusiness({ businessId }, user)).resolves.toBe(
+    await expect(businesses.getBusiness(businessId, user)).resolves.toBe(
       profile,
     );
     expect(service.getBusinessProfile).toHaveBeenCalledWith(businessId, user);
   });
 
-  it.each([
-    ['non-owner', asUser({ isOwner: false, businessId })],
-    [
-      'different business',
-      asUser({
-        isOwner: true,
-        businessId: '00000000-0000-4000-8000-000000000002',
-      }),
-    ],
-    ['platform owner', asUser({ isOwner: true, isPlatform: true, businessId })],
-    ['anonymous', undefined],
-  ])('denies %s access', (_description, user) => {
-    expect(() => businesses.getBusiness({ businessId }, user)).toThrow(
-      ForbiddenException,
-    );
-    expect(service.getBusinessProfile).not.toHaveBeenCalled();
-  });
-
-  it('routes an authorized owner update with files and audit context', async () => {
-    const result = { businessId, updatedAt: '2026-02-01T00:00:00.000Z' };
+  it('routes an update with files, idempotency key and audit context', async () => {
+    const result = { businessId };
     service.updateBusinessProfile.mockResolvedValue(result);
-    const user = asUser({ isOwner: true, businessId, userId: 'owner-id' });
     const dto = { reason: 'Approved operation', displayName: 'New name' };
     const files = { panCardFront: [{ originalname: 'front.pdf' }] };
-    const headers = { idempotencyKey: 'key-1', clientType: 'desktop' };
     const auditContext = { method: 'PATCH', clientType: 'desktop' };
 
     await expect(
       businesses.updateBusiness(
-        { businessId },
+        businessId,
         dto,
-        headers,
+        { idempotencyKey: 'key-1', clientType: 'desktop' },
         files as never,
         user,
         auditContext,
@@ -99,71 +88,14 @@ describe('businesses controllers', () => {
     );
   });
 
-  it('registers the business update permission key', () => {
-    expect(
-      Reflect.getMetadata(
-        REQUIRED_ROLES,
-        handlerOf(BusinessesController.prototype, 'updateBusiness') as object,
-      ),
-    ).toBe('business.update');
-  });
-
-  it('registers branch read as fail-closed role access', () => {
-    const handler = handlerOf(
-      BranchesController.prototype,
-      'listBranches',
-    ) as object;
-    expect(Reflect.getMetadata(REQUIRED_ROLES, handler)).toBe('branches.read');
-    expect(Reflect.getMetadata(REQUIRE_CONFIGURED_ROLES, handler)).toBe(true);
-  });
-
-  it('routes branch listing for the authenticated business user', async () => {
-    const response = { items: [], nextCursor: null };
-    service.listBranches.mockResolvedValue(response);
-    const user = asUser({ isOwner: false, businessId, userId: 'user-id' });
-    await expect(
-      branches.listBranches({ businessId }, { limit: 50 }, user),
-    ).resolves.toBe(response);
+  it('routes branch listing and detail reads', async () => {
+    service.listBranches.mockResolvedValue({ items: [] });
+    service.getBranchDetails.mockResolvedValue({ branch: {} });
+    await branches.listBranches(businessId, { limit: 50 }, user);
+    await branches.getBranch(businessId, branchId, user);
     expect(service.listBranches).toHaveBeenCalledWith(businessId, user, {
       limit: 50,
     });
-  });
-
-  it('denies branch reads to platform users and other businesses', () => {
-    expect(() =>
-      branches.listBranches(
-        { businessId },
-        { limit: 50 },
-        asUser({ isPlatform: true, businessId }),
-      ),
-    ).toThrow(ForbiddenException);
-    expect(() =>
-      branches.getBranch(
-        { businessId, branchId: businessId },
-        asUser({ businessId: '00000000-0000-4000-8000-000000000009' }),
-      ),
-    ).toThrow(ForbiddenException);
-    expect(service.listBranches).not.toHaveBeenCalled();
-    expect(service.getBranchDetails).not.toHaveBeenCalled();
-  });
-
-  it('registers branch detail read as fail-closed role access', () => {
-    const handler = handlerOf(
-      BranchesController.prototype,
-      'getBranch',
-    ) as object;
-    expect(Reflect.getMetadata(REQUIRED_ROLES, handler)).toBe('branches.read');
-    expect(Reflect.getMetadata(REQUIRE_CONFIGURED_ROLES, handler)).toBe(true);
-  });
-
-  it('routes branch detail requests with the authenticated user', async () => {
-    const response = { branch: { id: businessId }, summary: {} };
-    const branchId = '00000000-0000-4000-8000-000000000002';
-    const user = asUser({ isOwner: false, businessId, userId: 'user-id' });
-    service.getBranchDetails.mockResolvedValue(response);
-    await expect(
-      branches.getBranch({ businessId, branchId }, user),
-    ).resolves.toBe(response);
     expect(service.getBranchDetails).toHaveBeenCalledWith(
       businessId,
       branchId,
@@ -171,32 +103,21 @@ describe('businesses controllers', () => {
     );
   });
 
-  it('normalises the terminal code and requires the owner to activate', async () => {
-    const branchId = '00000000-0000-4000-8000-000000000002';
-    const owner = asUser({ isOwner: true, businessId, userId: 'owner-id' });
+  it('normalises the terminal code before activation', async () => {
     service.activateTerminal.mockResolvedValue({ status: 'active' });
-
     await terminals.activateTerminal(
-      { businessId, branchId },
+      businessId,
+      branchId,
       { terminalCode: ' pos-abc ' },
-      owner,
+      user,
       {},
     );
     expect(service.activateTerminal).toHaveBeenCalledWith(
       businessId,
       branchId,
       'POS-ABC',
-      owner,
+      user,
       {},
     );
-
-    expect(() =>
-      terminals.activateTerminal(
-        { businessId, branchId },
-        { terminalCode: 'POS-ABC' },
-        asUser({ isOwner: false, businessId }),
-        {},
-      ),
-    ).toThrow(ForbiddenException);
   });
 });

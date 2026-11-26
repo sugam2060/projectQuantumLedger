@@ -103,14 +103,14 @@ export const terminals = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-        app.is_business_owner(business_id)
+        app.has_permission(business_id, branch_id, 'terminal:activate')
         AND business_id = NULLIF(current_setting('app.terminal_activation_business_id', true), '')::uuid
         AND branch_id = NULLIF(current_setting('app.terminal_activation_branch_id', true), '')::uuid
         AND terminal_code = NULLIF(current_setting('app.terminal_activation_code', true), '')
         AND status = 'inactive'
       `,
       withCheck: sql`
-        app.is_business_owner(business_id)
+        app.has_permission(business_id, branch_id, 'terminal:activate')
         AND business_id = NULLIF(current_setting('app.terminal_activation_business_id', true), '')::uuid
         AND branch_id = NULLIF(current_setting('app.terminal_activation_branch_id', true), '')::uuid
         AND terminal_code = NULLIF(current_setting('app.terminal_activation_code', true), '')
