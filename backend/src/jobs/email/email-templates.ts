@@ -5,6 +5,7 @@ export const MAIL_TEMPLATE_FILES = {
   'redeem-code': 'redeem-code.html',
   'branch-created': 'branch-created.html',
   'marketing-email': 'marketing-email.html',
+  'password-reset': 'password-reset.html',
 } as const;
 
 export type MailTemplateName = keyof typeof MAIL_TEMPLATE_FILES;
@@ -15,6 +16,7 @@ export const TEMPLATE_URL_VARIABLES: Partial<
 > = {
   'user-invitation': ['invitationUrl'],
   'marketing-email': ['ctaUrl', 'unsubscribeUrl'],
+  'password-reset': ['resetUrl'],
 };
 
 /** The template file for a name, or undefined when the name is not allowed. */

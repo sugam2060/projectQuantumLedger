@@ -66,7 +66,7 @@ export const business = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-        app.is_business_member(id)
+        app.is_business_owner(id)
         OR app.is_platform_user()
         OR EXISTS (
           SELECT 1

@@ -4,18 +4,22 @@ Sign-in for business users (owners and staff, `users`) and Fortis staff (`platfo
 
 ## Endpoints (prefix `/api/v1`)
 
-| Method | Path                             | Auth                    | Notes                                                                                                                                                    |
-| ------ | -------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/authentication/login`          | public, strict throttle | Email + password. `x-terminal-id` is required for every client except `web`; the terminal must be active and belong to the member's business and branch. |
-| POST   | `/authentication/refresh`        | public, strict throttle | Rotates the refresh token (body `refreshToken`, or the cookie for browsers).                                                                             |
-| POST   | `/authentication/logout`         | public                  | Always **204**. Revokes the session of the given refresh token and clears the cookie.                                                                    |
-| POST   | `/authentication/logout-all`     | business user           | Revokes every session of the caller: `{ revoked }`.                                                                                                      |
-| GET    | `/authentication/me`             | business user           | Profile, active context, effective permissions. Re-checks that the account and membership are still active.                                              |
-| POST   | `/authentication/register-owner` | public, web only        | First owner of a provisioned business (redeem code). Issues no tokens.                                                                                   |
-| POST   | `/platform/user/login`           | public, strict throttle | Fortis staff.                                                                                                                                            |
-| POST   | `/platform/user/refresh`         | public, strict throttle | Body `refreshToken` (the `refresh-token` header is a deprecated fallback).                                                                               |
-| POST   | `/platform/user/logout`          | public                  | Always 204.                                                                                                                                              |
-| POST   | `/platform/user/logout-all`      | platform user           |                                                                                                                                                          |
+| Method | Path                                                                    | Auth                           | Notes                                                                                                                                                     |
+| ------ | ----------------------------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/authentication/login`                                                 | public, strict throttle        | Email + password. `x-terminal-id` is required for every client except `web`; the terminal must be active and belong to the member's business and branch.  |
+| POST   | `/authentication/refresh`                                               | public, strict throttle        | Rotates the refresh token (body `refreshToken`, or the cookie for browsers).                                                                              |
+| POST   | `/authentication/logout`                                                | public                         | Always **204**. Revokes the session of the given refresh token and clears the cookie.                                                                     |
+| POST   | `/authentication/logout-all`                                            | business user                  | Revokes every session of the caller: `{ revoked }`.                                                                                                       |
+| GET    | `/authentication/me`                                                    | business user                  | Profile, active context, effective permissions. Re-checks that the account and membership are still active.                                               |
+| POST   | `/authentication/register-owner`                                        | public, web only               | First owner of a provisioned business (redeem code). Issues no tokens.                                                                                    |
+| POST   | `/authentication/change-password`                                       | business user, strict throttle | Requires `currentPassword` (400 missing, 403 wrong); the new password must differ (400). Signs out every device and returns a new session (login-shaped). |
+| POST   | `/authentication/forgot-password`                                       | public, strict throttle        | Always **202** with the same body. Emails a 30-minute single-use link to active accounts only.                                                            |
+| POST   | `/authentication/reset-password`                                        | public, strict throttle        | `{ token, newPassword }`. 204, or one generic 400. Signs out every device.                                                                                |
+| POST   | `/platform/user/login`                                                  | public, strict throttle        | Fortis staff.                                                                                                                                             |
+| POST   | `/platform/user/refresh`                                                | public, strict throttle        | Body `refreshToken` (the `refresh-token` header is a deprecated fallback).                                                                                |
+| POST   | `/platform/user/logout`                                                 | public                         | Always 204.                                                                                                                                               |
+| POST   | `/platform/user/logout-all`                                             | platform user                  |                                                                                                                                                           |
+| POST   | `/platform/user/change-password`, `/forgot-password`, `/reset-password` | as above                       | Same rules for Fortis staff; links go to `/platform/reset-password`.                                                                                      |
 
 ## Token contract (frontend)
 
@@ -34,6 +38,14 @@ Sign-in for business users (owners and staff, `users`) and Fortis staff (`platfo
 - `auth_rotate_session` is atomic. The old session gets `revoked_at` and `rotated_at`, and a new one is created.
 - **Reuse vs invalid:** only a token that was already _rotated_ counts as reuse (a stale copy was replayed). Reuse revokes every session of that account and returns 401. A token revoked by logout, logout-all or a disabled account is plain invalid: 401, and nothing else is touched. Unknown and expired tokens are also plain 401.
 - Revoked sessions are kept until the purge job removes them, because reuse detection needs them.
+
+## Passwords
+
+- New passwords: 10–128 characters.
+- Reset tokens are 32 random bytes. Only their SHA-256 is stored, in `password_reset_tokens`, which the runtime role cannot read: it has RLS with no policies and is reached only through `app.auth_create_reset_token` and `app.auth_consume_reset_token`.
+- Requesting a new link invalidates older ones. Consuming a link sets the hash and revokes every session in one SQL statement.
+- `password_hash` columns are not readable by `fortis_app` at all (column privileges). Hashes are reached only through `app.auth_find_*_by_email` and `app.auth_current_password_hash()`.
+- A reset email that cannot be queued is logged, not reported: the response must not depend on whether the account exists.
 
 ## Rules and gotchas
 
@@ -54,7 +66,7 @@ Sign-in for business users (owners and staff, `users`) and Fortis staff (`platfo
 
 ## Config
 
-`JWT_ACCESS_SECRET` (≥ 32 characters; `JWT_SECRET` is accepted as the old name), `JWT_ACCESS_TTL`, `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_PLATFORM_AUDIENCE`, `REFRESH_TOKEN_TTL_DAYS`, `REFRESH_TOKEN_SESSION_TTL_HOURS`, `THROTTLE_*`, `AUTH_THROTTLE_LIMIT`.
+`JWT_ACCESS_SECRET` (≥ 32 characters; `JWT_SECRET` is accepted as the old name), `PASSWORD_RESET_TTL_MINUTES`, `FRONTEND_BASE_URL` (reset links), `JWT_ACCESS_TTL`, `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_PLATFORM_AUDIENCE`, `REFRESH_TOKEN_TTL_DAYS`, `REFRESH_TOKEN_SESSION_TTL_HOURS`, `THROTTLE_*`, `AUTH_THROTTLE_LIMIT`.
 
 ## Tests
 

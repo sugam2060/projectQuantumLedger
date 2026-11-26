@@ -30,6 +30,13 @@ import { ClientLoginDto, isBrowserClient } from './dto/client-login.dto';
 import { OwnerRegistrationDto } from './dto/owner-registration.dto';
 import { OwnerRegistrationHeadersDto } from './dto/owner-registration-headers.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import {
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from './dto/password.dto';
+import { PasswordResetService } from './password-reset.service';
+import { OptionalClientTypeHeadersDto } from './dto/optional-client-type-headers.dto';
 import { authMetadata, deliverTokens } from './utils/auth-response.util';
 
 /** Business-user sign-in, token refresh, sign-out, /me and owner registration. */
@@ -38,6 +45,7 @@ export class AuthenticationController {
   constructor(
     private readonly authService: AuthenticationService,
     private readonly cookies: AuthCookieService,
+    private readonly passwordReset: PasswordResetService,
   ) {}
 
   @Post('register-owner')
@@ -157,5 +165,55 @@ export class AuthenticationController {
     const result = await this.authService.logoutAll(user);
     this.cookies.clearRefreshCookie(response, 'user');
     return result;
+  }
+
+  /** Changes the password, signs out every device, returns a new session. */
+  @Post('change-password')
+  @StrictThrottle()
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChangePasswordDto,
+    @ClientTypeHeaders() headers: OptionalClientTypeHeadersDto,
+    @AuditContext() audit: AuditRequestContext,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.changePassword(
+      user,
+      dto,
+      authMetadata(headers.clientType, undefined, audit),
+    );
+    return deliverTokens(
+      result,
+      headers.clientType,
+      response,
+      this.cookies,
+      'user',
+    );
+  }
+
+  /** Always 202: never reveals whether the email has an account. */
+  @Post('forgot-password')
+  @Public()
+  @StrictThrottle()
+  @HttpCode(HttpStatus.ACCEPTED)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.passwordReset.requestReset('user', dto.email);
+    return {
+      message:
+        'If an account exists for this email, a reset link has been sent.',
+    };
+  }
+
+  /** Sets a new password from an emailed link; signs out every device. */
+  @Post('reset-password')
+  @Public()
+  @StrictThrottle()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+    @AuditContext() audit: AuditRequestContext,
+  ): Promise<void> {
+    await this.passwordReset.reset('user', dto.token, dto.newPassword, audit);
   }
 }

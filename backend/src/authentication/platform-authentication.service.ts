@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -13,7 +15,9 @@ import {
   isOpaqueTokenShape,
 } from '../common/utils/opaque-token.util';
 import { authConfig } from '../config';
+import type { ChangePasswordDto } from './dto/password.dto';
 import type { PlatformUserLoginDto } from './dto/platform-user-login.dto';
+import { PasswordsRepository } from './passwords.repository';
 import { PasswordService } from './password.service';
 import { PlatformAuthenticationRepository } from './platform-authentication.repository';
 import { SessionsRepository } from './sessions.repository';
@@ -39,6 +43,7 @@ export class PlatformAuthenticationService {
   constructor(
     private readonly repository: PlatformAuthenticationRepository,
     private readonly sessions: SessionsRepository,
+    private readonly passwordsRepository: PasswordsRepository,
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
     private readonly auditLogs: AuditLogsService,
@@ -71,20 +76,7 @@ export class PlatformAuthenticationService {
       await this.rehash(credential.id, dto.password);
     }
 
-    const refreshToken = generateOpaqueToken();
-    await this.sessions.create(
-      { platformUserId: credential.id },
-      {
-        tokenHash: hashOpaqueToken(refreshToken),
-        clientType: meta.clientType,
-        terminalId: null,
-        persistent: true,
-        userAgent: meta.userAgent ?? null,
-        ip: meta.ip ?? null,
-        expiresAt: new Date(Date.now() + this.refreshTtlMs()),
-      },
-    );
-    const result = await this.issue(credential, refreshToken);
+    const result = await this.startSession(credential, meta);
     await this.audit(credential.id, meta, 'platform.login.succeeded', 200);
     return result;
   }
@@ -138,6 +130,54 @@ export class PlatformAuthenticationService {
     return result;
   }
 
+  /** Changes the password, signs out every device and starts a new session. */
+  async changePassword(
+    user: AuthenticatedUser,
+    dto: ChangePasswordDto,
+    meta: AuthMetadata,
+  ): Promise<PlatformAuthResult> {
+    if (!user.platformUserId) throw new UnauthorizedException();
+    const platformUserId = user.platformUserId;
+
+    const currentHash = await this.passwordsRepository.currentHash({
+      platformUserId,
+    });
+    if (!currentHash) throw new UnauthorizedException('Account is not active');
+    if (!dto.currentPassword) {
+      throw new BadRequestException('currentPassword is required');
+    }
+    const current = await this.passwords.verify(
+      currentHash,
+      dto.currentPassword,
+    );
+    if (!current.valid) {
+      await this.audit(
+        platformUserId,
+        meta,
+        'platform.password.change_failed',
+        403,
+      );
+      throw new ForbiddenException('Current password is incorrect');
+    }
+    if (dto.currentPassword === dto.newPassword) {
+      throw new BadRequestException(
+        'The new password must differ from the current one',
+      );
+    }
+
+    await this.repository.updatePasswordHash(
+      platformUserId,
+      await this.passwords.hash(dto.newPassword),
+    );
+    await this.sessions.revokeAll({ platformUserId });
+    const account = await this.repository.findAccount(platformUserId);
+    if (!account) throw new UnauthorizedException('Account is not active');
+
+    const result = await this.startSession(account, meta);
+    await this.audit(platformUserId, meta, 'platform.password.changed', 200);
+    return result;
+  }
+
   async logout(refreshToken: string | undefined): Promise<void> {
     if (!isOpaqueTokenShape(refreshToken)) return;
     await this.sessions.revoke(hashOpaqueToken(refreshToken));
@@ -149,6 +189,26 @@ export class PlatformAuthenticationService {
       platformUserId: user.platformUserId,
     });
     return { revoked };
+  }
+
+  private async startSession(
+    account: Pick<PlatformAccount, 'id' | 'email' | 'name' | 'isBootstrap'>,
+    meta: AuthMetadata,
+  ): Promise<PlatformAuthResult> {
+    const refreshToken = generateOpaqueToken();
+    await this.sessions.create(
+      { platformUserId: account.id },
+      {
+        tokenHash: hashOpaqueToken(refreshToken),
+        clientType: meta.clientType,
+        terminalId: null,
+        persistent: true,
+        userAgent: meta.userAgent ?? null,
+        ip: meta.ip ?? null,
+        expiresAt: new Date(Date.now() + this.refreshTtlMs()),
+      },
+    );
+    return this.issue(account, refreshToken);
   }
 
   private async issue(

@@ -3,13 +3,16 @@ import { ConfigModule, type ConfigType } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuditLogsModule } from '../audit-logs';
+import { EmailModule } from '../jobs/email';
 import { appConfig, authConfig } from '../config';
 import { RolesPermissionsModule } from '../roles-permissions/roles-permissions.module';
 import { AuthCookieService } from './auth-cookie.service';
 import { AuthenticationController } from './authentication.controller';
 import { AuthenticationRepository } from './authentication.repository';
 import { AuthenticationService } from './authentication.service';
+import { PasswordResetService } from './password-reset.service';
 import { PasswordService } from './password.service';
+import { PasswordsRepository } from './passwords.repository';
 import { PlatformAuthenticationController } from './platform-authentication.controller';
 import { PlatformAuthenticationRepository } from './platform-authentication.repository';
 import { PlatformAuthenticationService } from './platform-authentication.service';
@@ -27,6 +30,7 @@ import { TokenService } from './token.service';
     ConfigModule.forFeature(authConfig),
     ConfigModule.forFeature(appConfig),
     AuditLogsModule,
+    EmailModule,
     RolesPermissionsModule,
     PassportModule,
     JwtModule.registerAsync({
@@ -51,7 +55,9 @@ import { TokenService } from './token.service';
     AuthenticationRepository,
     PlatformAuthenticationRepository,
     SessionsRepository,
+    PasswordsRepository,
     PasswordService,
+    PasswordResetService,
     TokenService,
     AuthCookieService,
     AuthenticationService,

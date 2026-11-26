@@ -10,3 +10,4 @@ process.env.JWT_SECRET ??= 'test-jwt-secret-that-is-at-least-32-characters';
 // Generous limits so suites are not throttled; throttling has its own tests.
 process.env.THROTTLE_LIMIT = '10000';
 process.env.AUTH_THROTTLE_LIMIT = '10000';
+process.env.FRONTEND_BASE_URL ??= 'https://app.fortis.test';

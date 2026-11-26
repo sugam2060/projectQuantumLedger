@@ -14,3 +14,4 @@ export * from './audit/access-logs';
 export * from './audit/audit-logs';
 export * from './audit/platform-audit-logs';
 export * from './relations';
+export * from './auth/password-reset-tokens';

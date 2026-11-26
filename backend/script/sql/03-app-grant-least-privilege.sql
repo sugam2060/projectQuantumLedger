@@ -74,3 +74,12 @@ BEGIN
   END IF;
 END
 $revoke_migration_ledger$;
+
+-- Password hashes are not readable by the runtime role, even on rows RLS lets it
+-- see. Sign-in and password changes read them only through app.auth_* functions.
+REVOKE SELECT ON TABLE public.users FROM fortis_app;
+GRANT SELECT (id, email_normalized, name, status, created_at, updated_at)
+  ON TABLE public.users TO fortis_app;
+REVOKE SELECT ON TABLE public.platform_users FROM fortis_app;
+GRANT SELECT (id, email_normalized, name, status, is_bootstrap, created_at, updated_at)
+  ON TABLE public.platform_users TO fortis_app;

@@ -134,6 +134,20 @@
       "when": 1795619949721,
       "tag": "0018_rls_membership_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795620315565,
+      "tag": "0019_password_reset_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795663077500,
+      "tag": "0020_tighten_tenant_policies",
+      "breakpoints": true
     }
   ]
 }

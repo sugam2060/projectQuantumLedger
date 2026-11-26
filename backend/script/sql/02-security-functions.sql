@@ -49,6 +49,24 @@ BEGIN
 END;
 $$;
 
+-- True when a platform account already uses this email. Only platform users may
+-- ask (used to reject duplicate staff invitations).
+CREATE OR REPLACE FUNCTION app.platform_email_in_use(p_email text)
+RETURNS boolean
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF NOT app.is_platform_user() THEN
+    RETURN false;
+  END IF;
+  RETURN EXISTS (
+    SELECT 1 FROM public.platform_users p
+     WHERE p.email_normalized = pg_catalog.lower(pg_catalog.btrim(p_email))
+  );
+END;
+$$;
+
 -- The current user has an active membership in the business.
 CREATE OR REPLACE FUNCTION app.is_business_member(p_business_id uuid)
 RETURNS boolean
@@ -458,5 +476,135 @@ BEGIN
        OR (p_platform_user_id IS NOT NULL AND s.platform_user_id = p_platform_user_id));
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RETURN v_count;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Password reset. public.password_reset_tokens has RLS with no policies; only
+-- these functions touch it. p_actor is 'user' or 'platform'.
+-- ---------------------------------------------------------------------------
+
+-- Issues a reset token for an active account with this email. Earlier open tokens
+-- of that account are invalidated. Returns the account (for the email) or no row,
+-- so the caller can answer the same way whether or not the account exists.
+CREATE OR REPLACE FUNCTION app.auth_create_reset_token(
+  p_actor text,
+  p_email text,
+  p_token_hash text,
+  p_expires_at timestamptz
+)
+RETURNS TABLE (account_id uuid, email text, name text)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_id uuid;
+  v_email text;
+  v_name text;
+BEGIN
+  IF p_actor = 'user' THEN
+    SELECT u.id, u.email_normalized, u.name INTO v_id, v_email, v_name
+      FROM public.users u
+     WHERE u.email_normalized = pg_catalog.lower(pg_catalog.btrim(p_email))
+       AND u.status = 'active';
+  ELSIF p_actor = 'platform' THEN
+    SELECT p.id, p.email_normalized, p.name INTO v_id, v_email, v_name
+      FROM public.platform_users p
+     WHERE p.email_normalized = pg_catalog.lower(pg_catalog.btrim(p_email))
+       AND p.status = 'active';
+  ELSE
+    RAISE EXCEPTION 'unknown actor %', p_actor;
+  END IF;
+
+  IF v_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  UPDATE public.password_reset_tokens t
+     SET consumed_at = pg_catalog.now()
+   WHERE t.consumed_at IS NULL
+     AND ((p_actor = 'user' AND t.user_id = v_id)
+       OR (p_actor = 'platform' AND t.platform_user_id = v_id));
+
+  INSERT INTO public.password_reset_tokens (
+    user_id, platform_user_id, token_hash, expires_at
+  ) VALUES (
+    CASE WHEN p_actor = 'user' THEN v_id END,
+    CASE WHEN p_actor = 'platform' THEN v_id END,
+    p_token_hash,
+    p_expires_at
+  );
+
+  RETURN QUERY SELECT v_id, v_email, v_name;
+END;
+$$;
+
+-- Consumes a reset token (single use, enforced by one UPDATE ... WHERE
+-- consumed_at IS NULL), stores the new password hash and revokes every session of
+-- the account. Returns the account id, or no row when the token is unknown,
+-- expired, already used or the account is no longer active.
+CREATE OR REPLACE FUNCTION app.auth_consume_reset_token(
+  p_actor text,
+  p_token_hash text,
+  p_password_hash text
+)
+RETURNS uuid
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_user uuid;
+  v_platform uuid;
+BEGIN
+  UPDATE public.password_reset_tokens t
+     SET consumed_at = pg_catalog.now()
+   WHERE t.token_hash = p_token_hash
+     AND t.consumed_at IS NULL
+     AND t.expires_at > pg_catalog.now()
+     AND ((p_actor = 'user' AND t.user_id IS NOT NULL)
+       OR (p_actor = 'platform' AND t.platform_user_id IS NOT NULL))
+  RETURNING t.user_id, t.platform_user_id INTO v_user, v_platform;
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  IF v_user IS NOT NULL THEN
+    UPDATE public.users u
+       SET password_hash = p_password_hash, updated_at = pg_catalog.now()
+     WHERE u.id = v_user AND u.status = 'active';
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    UPDATE public.sessions s SET revoked_at = pg_catalog.now()
+     WHERE s.user_id = v_user AND s.revoked_at IS NULL;
+    RETURN v_user;
+  END IF;
+
+  UPDATE public.platform_users p
+     SET password_hash = p_password_hash, updated_at = pg_catalog.now()
+   WHERE p.id = v_platform AND p.status = 'active';
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  UPDATE public.sessions s SET revoked_at = pg_catalog.now()
+   WHERE s.platform_user_id = v_platform AND s.revoked_at IS NULL;
+  RETURN v_platform;
+END;
+$$;
+
+-- The current user's (or platform user's) own password hash, for change-password.
+CREATE OR REPLACE FUNCTION app.auth_current_password_hash()
+RETURNS text
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  v_hash text;
+BEGIN
+  IF app.current_user_id() IS NOT NULL THEN
+    SELECT u.password_hash INTO v_hash FROM public.users u
+     WHERE u.id = app.current_user_id() AND u.status = 'active';
+  ELSIF app.current_platform_user_id() IS NOT NULL THEN
+    SELECT p.password_hash INTO v_hash FROM public.platform_users p
+     WHERE p.id = app.current_platform_user_id() AND p.status = 'active';
+  END IF;
+  RETURN v_hash;
 END;
 $$;

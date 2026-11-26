@@ -128,9 +128,7 @@ export class PlatformUsersService {
       mailJob = await this.repository.inInvitationTransaction(
         { platformUserId, inviteeEmail: email },
         async (tx) => {
-          const existingPlatformUser =
-            await this.repository.findPlatformUserIdByEmail(tx, email);
-          if (existingPlatformUser) {
+          if (await this.repository.isPlatformEmailInUse(tx, email)) {
             throw new ConflictException(
               'A platform user with this email already exists',
             );

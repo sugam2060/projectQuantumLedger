@@ -260,6 +260,81 @@ describe('RLS policies (as fortis_app)', () => {
     });
   });
 
+  describe('tightened after review', () => {
+    it('shows the business row (documents, PAN) only to the owner', async () => {
+      const { a, manager, cashier } = await world();
+      for (const userId of [manager.id, cashier.id]) {
+        expect(await ids(as(userId), 'SELECT id FROM business')).toEqual([]);
+      }
+      expect(await ids(as(a.owner.id), 'SELECT id FROM business')).toEqual([
+        a.businessId,
+      ]);
+    });
+
+    it('does not let an owner attach an outsider to their business', async () => {
+      const { a, aRole } = await world();
+      const outsider = await createUser();
+      await expect(
+        rowCount(
+          as(a.owner.id),
+          'INSERT INTO business_memberships (business_id, user_id, role_id) VALUES ($1, $2, $3)',
+          [a.businessId, outsider.id, aRole],
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+    });
+
+    it('hides users whose membership in my business has ended', async () => {
+      const { a, aRole } = await world();
+      const former = await createUser();
+      await createMembership({
+        businessId: a.businessId,
+        userId: former.id,
+        roleId: aRole,
+        isActive: false,
+      });
+      expect(
+        await ids(as(a.owner.id), 'SELECT id FROM users WHERE id = $1', [
+          former.id,
+        ]),
+      ).toEqual([]);
+    });
+
+    it('never lets the runtime role read password hashes', async () => {
+      const { a } = await world();
+      const staff = await createPlatformUser({ isBootstrap: true });
+      await expect(
+        asApp(as(a.owner.id), (client) =>
+          client.query('SELECT password_hash FROM users WHERE id = $1', [
+            a.owner.id,
+          ]),
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+      await expect(
+        asApp({ 'app.platform_user_id': staff.id }, (client) =>
+          client.query('SELECT password_hash FROM platform_users'),
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+    });
+
+    it('lets only bootstrap staff list other platform users', async () => {
+      const staff = await createPlatformUser();
+      const other = await createPlatformUser();
+      const boss = await createPlatformUser({ isBootstrap: true });
+      expect(
+        await ids(
+          { 'app.platform_user_id': staff.id },
+          'SELECT id FROM platform_users',
+        ),
+      ).toEqual([staff.id]);
+      expect(
+        await ids(
+          { 'app.platform_user_id': boss.id },
+          'SELECT id FROM platform_users',
+        ),
+      ).toEqual([staff.id, other.id, boss.id].sort());
+    });
+  });
+
   describe('pooled connections', () => {
     it('does not carry one transaction’s context into the next on the same connection', async () => {
       const { a } = await world();

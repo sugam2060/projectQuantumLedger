@@ -25,6 +25,13 @@ import { isBrowserClient } from './dto/client-login.dto';
 import { OptionalClientTypeHeadersDto } from './dto/optional-client-type-headers.dto';
 import { PlatformUserLoginDto } from './dto/platform-user-login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import {
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from './dto/password.dto';
+import { PasswordResetService } from './password-reset.service';
+
 import { PlatformAuthenticationService } from './platform-authentication.service';
 import { authMetadata, deliverTokens } from './utils/auth-response.util';
 
@@ -35,6 +42,7 @@ export class PlatformAuthenticationController {
   constructor(
     private readonly platformAuthService: PlatformAuthenticationService,
     private readonly cookies: AuthCookieService,
+    private readonly passwordReset: PasswordResetService,
   ) {}
 
   @Post('login')
@@ -127,5 +135,60 @@ export class PlatformAuthenticationController {
     const result = await this.platformAuthService.logoutAll(user);
     this.cookies.clearRefreshCookie(response, 'platform');
     return result;
+  }
+
+  /** Changes the password, signs out every device, returns a new session. */
+  @Post('change-password')
+  @StrictThrottle()
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChangePasswordDto,
+    @ClientTypeHeaders() headers: OptionalClientTypeHeadersDto,
+    @AuditContext() audit: AuditRequestContext,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.platformAuthService.changePassword(
+      user,
+      dto,
+      authMetadata(headers.clientType, undefined, audit),
+    );
+    return deliverTokens(
+      result,
+      headers.clientType,
+      response,
+      this.cookies,
+      'platform',
+    );
+  }
+
+  /** Always 202: never reveals whether the email has an account. */
+  @Post('forgot-password')
+  @Public()
+  @StrictThrottle()
+  @HttpCode(HttpStatus.ACCEPTED)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.passwordReset.requestReset('platform', dto.email);
+    return {
+      message:
+        'If an account exists for this email, a reset link has been sent.',
+    };
+  }
+
+  /** Sets a new password from an emailed link; signs out every device. */
+  @Post('reset-password')
+  @Public()
+  @StrictThrottle()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+    @AuditContext() audit: AuditRequestContext,
+  ): Promise<void> {
+    await this.passwordReset.reset(
+      'platform',
+      dto.token,
+      dto.newPassword,
+      audit,
+    );
   }
 }

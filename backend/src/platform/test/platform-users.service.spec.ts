@@ -31,13 +31,7 @@ describe('PlatformUsersService', () => {
     database.transactionWithSession.mockImplementation(
       async (_session: unknown, callback: (transaction: unknown) => unknown) =>
         callback({
-          select: jest.fn(() => ({
-            from: jest.fn(() => ({
-              where: jest.fn(() => ({
-                limit: jest.fn().mockResolvedValue([]),
-              })),
-            })),
-          })),
+          execute: jest.fn().mockResolvedValue({ rows: [{ in_use: false }] }),
           insert: jest.fn(() => ({
             values: jest.fn().mockResolvedValue(undefined),
           })),
@@ -56,13 +50,7 @@ describe('PlatformUsersService', () => {
     database.transactionWithSession.mockImplementation(
       async (_session: unknown, callback: (transaction: unknown) => unknown) =>
         callback({
-          select: jest.fn(() => ({
-            from: jest.fn(() => ({
-              where: jest.fn(() => ({
-                limit: jest.fn().mockResolvedValue([]),
-              })),
-            })),
-          })),
+          execute: jest.fn().mockResolvedValue({ rows: [{ in_use: false }] }),
           insert: jest.fn((table: unknown) => ({
             values: jest.fn((values: unknown) => {
               inserted.push({ table, values });
@@ -147,13 +135,7 @@ describe('PlatformUsersService', () => {
     database.transactionWithSession.mockImplementation(
       async (_session: unknown, callback: (transaction: unknown) => unknown) =>
         callback({
-          select: jest.fn(() => ({
-            from: jest.fn(() => ({
-              where: jest.fn(() => ({
-                limit: jest.fn().mockResolvedValue([{ id: 'existing-id' }]),
-              })),
-            })),
-          })),
+          execute: jest.fn().mockResolvedValue({ rows: [{ in_use: true }] }),
           insert: jest.fn(),
         }),
     );

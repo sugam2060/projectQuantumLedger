@@ -15,4 +15,6 @@ export type AuthConfig = {
   refreshPersistentTtlSeconds: number;
   /** Refresh lifetime otherwise (browser session cookie). */
   refreshSessionTtlSeconds: number;
+  /** Lifetime of an emailed password-reset link. */
+  passwordResetTtlMinutes: number;
 };

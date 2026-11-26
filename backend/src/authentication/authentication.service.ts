@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -23,6 +25,8 @@ import {
 } from './authentication.repository';
 import type { ClientLoginDto, ClientType } from './dto/client-login.dto';
 import type { OwnerRegistrationDto } from './dto/owner-registration.dto';
+import type { ChangePasswordDto } from './dto/password.dto';
+import { PasswordsRepository } from './passwords.repository';
 import { PasswordService } from './password.service';
 import { SessionsRepository } from './sessions.repository';
 import { TokenService } from './token.service';
@@ -49,6 +53,7 @@ export class AuthenticationService {
   constructor(
     private readonly repository: AuthenticationRepository,
     private readonly sessions: SessionsRepository,
+    private readonly passwordsRepository: PasswordsRepository,
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
     private readonly effectivePermissions: EffectivePermissionsService,
@@ -97,22 +102,12 @@ export class AuthenticationService {
       throw new UnauthorizedException(binding.reason);
     }
 
-    const persistent = dto.remember === true;
-    const refreshToken = generateOpaqueToken();
-    await this.sessions.create(
-      { userId: account.id },
-      {
-        tokenHash: hashOpaqueToken(refreshToken),
-        clientType: meta.clientType,
-        terminalId: binding.terminal?.id ?? null,
-        persistent,
-        userAgent: meta.userAgent ?? null,
-        ip: meta.ip ?? null,
-        expiresAt: new Date(Date.now() + this.refreshTtlMs(persistent)),
-      },
+    const result = await this.startSession(
+      account,
+      binding,
+      meta,
+      dto.remember === true,
     );
-
-    const result = await this.issue(account, binding, refreshToken, persistent);
     await this.auditLogs.logUserEvent(
       { userId: account.id, businessId: binding.membership.businessId },
       {
@@ -201,6 +196,70 @@ export class AuthenticationService {
         businessId: binding.membership.businessId,
         terminalId: binding.terminal?.id,
         eventType: 'USER_TOKEN_REFRESHED',
+        responseStatus: 200,
+      },
+    );
+    return result;
+  }
+
+  /**
+   * Changes the signed-in user's password, signs out every device and starts a
+   * new session for this one (login-shaped response).
+   */
+  async changePassword(
+    user: AuthenticatedUser,
+    dto: ChangePasswordDto,
+    meta: AuthMetadata,
+  ): Promise<UserAuthResult> {
+    if (!user.userId) throw new UnauthorizedException();
+    const userId = user.userId;
+
+    const currentHash = await this.passwordsRepository.currentHash({ userId });
+    if (!currentHash) throw new UnauthorizedException('Account is not active');
+    if (!dto.currentPassword) {
+      throw new BadRequestException('currentPassword is required');
+    }
+    const current = await this.passwords.verify(
+      currentHash,
+      dto.currentPassword,
+    );
+    if (!current.valid) {
+      await this.auditFailure(
+        userId,
+        user.businessId,
+        meta,
+        'USER_PASSWORD_CHANGE_FAILED',
+      );
+      throw new ForbiddenException('Current password is incorrect');
+    }
+    if (dto.currentPassword === dto.newPassword) {
+      throw new BadRequestException(
+        'The new password must differ from the current one',
+      );
+    }
+
+    await this.repository.updatePasswordHash(
+      userId,
+      await this.passwords.hash(dto.newPassword),
+    );
+    await this.sessions.revokeAll({ userId });
+
+    const account = await this.repository.findAccount(userId);
+    if (!account) throw new UnauthorizedException('Account is not active');
+    const binding = await this.bindMembership(
+      userId,
+      user.terminalId ?? meta.terminalId,
+    );
+    if (!binding.ok) throw new UnauthorizedException(binding.reason);
+
+    const result = await this.startSession(account, binding, meta, false);
+    await this.auditLogs.logUserEvent(
+      { userId, businessId: binding.membership.businessId },
+      {
+        ...meta.audit,
+        userId,
+        businessId: binding.membership.businessId,
+        eventType: 'USER_PASSWORD_CHANGED',
         responseStatus: 200,
       },
     );
@@ -464,6 +523,32 @@ export class AuthenticationService {
       return { ok: false, reason: 'No active business membership' };
     }
     return { ok: true, membership, memberships, terminal };
+  }
+
+  private async startSession(
+    account: UserAccount,
+    binding: {
+      membership: ActiveMembership;
+      memberships: ActiveMembership[];
+      terminal: ActiveTerminal | null;
+    },
+    meta: AuthMetadata,
+    persistent: boolean,
+  ): Promise<UserAuthResult> {
+    const refreshToken = generateOpaqueToken();
+    await this.sessions.create(
+      { userId: account.id },
+      {
+        tokenHash: hashOpaqueToken(refreshToken),
+        clientType: meta.clientType,
+        terminalId: binding.terminal?.id ?? null,
+        persistent,
+        userAgent: meta.userAgent ?? null,
+        ip: meta.ip ?? null,
+        expiresAt: new Date(Date.now() + this.refreshTtlMs(persistent)),
+      },
+    );
+    return this.issue(account, binding, refreshToken, persistent);
   }
 
   private async issue(

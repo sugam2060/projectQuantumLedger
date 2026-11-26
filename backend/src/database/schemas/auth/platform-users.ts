@@ -47,7 +47,7 @@ export const platformUsers = pgTable(
       for: 'select',
       to: 'fortis_app',
       using: sql`
-        id = app.current_platform_user_id() OR app.is_platform_user()
+        id = app.current_platform_user_id() OR app.is_bootstrap_platform_user()
       `,
     }),
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service';
-import { invitations, platformUsers } from '../database/schemas';
+import { invitations } from '../database/schemas';
 import type { PlatformTransaction } from './types';
 
 type NewInvitation = typeof invitations.$inferInsert;
@@ -22,13 +22,15 @@ export class PlatformUsersRepository {
     );
   }
 
-  async findPlatformUserIdByEmail(tx: PlatformTransaction, email: string) {
-    const [row] = await tx
-      .select({ id: platformUsers.id })
-      .from(platformUsers)
-      .where(eq(platformUsers.emailNormalized, email))
-      .limit(1);
-    return row;
+  /** True when a platform account already uses this email. */
+  async isPlatformEmailInUse(
+    tx: PlatformTransaction,
+    email: string,
+  ): Promise<boolean> {
+    const result = await tx.execute<{ in_use: boolean }>(
+      sql`SELECT app.platform_email_in_use(${email}) AS in_use`,
+    );
+    return result.rows[0]?.in_use === true;
   }
 
   async insertInvitation(

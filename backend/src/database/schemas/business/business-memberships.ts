@@ -68,8 +68,7 @@ export const businessMemberships = pgTable(
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-        app.is_business_owner(business_id)
-        OR app.is_platform_user()
+        app.is_platform_user()
         OR (
           is_owner = true
           AND role_id IS NULL

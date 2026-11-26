@@ -179,17 +179,19 @@ export class AuthenticationRepository {
     return row;
   }
 
+  /** Existing account for the email (with hash), via the pre-auth lookup. */
   async findUserByEmailForRegistration(tx: AuthTransaction, email: string) {
-    const [row] = await tx
-      .select({
-        id: users.id,
-        passwordHash: users.passwordHash,
-        status: users.status,
-      })
-      .from(users)
-      .where(eq(users.emailNormalized, email))
-      .limit(1);
-    return row;
+    const result = await tx.execute<{
+      id: string;
+      password_hash: string;
+      status: string;
+    }>(
+      sql`SELECT id, password_hash, status FROM app.auth_find_user_by_email(${email})`,
+    );
+    const row = result.rows[0];
+    return row
+      ? { id: row.id, passwordHash: row.password_hash, status: row.status }
+      : undefined;
   }
 
   async insertUser(

@@ -21,5 +21,6 @@ export const authConfig = registerAs('auth', (): AuthConfig => {
     refreshPersistentTtlSeconds: readInt('REFRESH_TOKEN_TTL_DAYS', 30) * 86_400,
     refreshSessionTtlSeconds:
       readInt('REFRESH_TOKEN_SESSION_TTL_HOURS', 12) * 3600,
+    passwordResetTtlMinutes: readInt('PASSWORD_RESET_TTL_MINUTES', 30),
   };
 });

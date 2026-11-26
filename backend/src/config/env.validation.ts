@@ -109,6 +109,12 @@ class EnvironmentVariables {
   REFRESH_TOKEN_SESSION_TTL_HOURS?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(1440)
+  PASSWORD_RESET_TTL_MINUTES?: number;
+
+  @IsOptional()
   @IsUrl({
     protocols: ['http', 'https'],
     require_tld: false,
@@ -177,6 +183,7 @@ const NUMERIC_KEYS = [
   'MAIL_PORT',
   'REFRESH_TOKEN_TTL_DAYS',
   'REFRESH_TOKEN_SESSION_TTL_HOURS',
+  'PASSWORD_RESET_TTL_MINUTES',
 ] as const;
 
 /**

@@ -70,6 +70,7 @@ describe('config factories', () => {
       platformAudience: 'fortis-platform',
       refreshPersistentTtlSeconds: 30 * 86_400,
       refreshSessionTtlSeconds: 12 * 3600,
+      passwordResetTtlMinutes: 30,
     });
     expect(redisConfig()).toEqual({ url: 'rediss://cache:6380/1' });
     expect(storageConfig().cloudinary).toEqual({

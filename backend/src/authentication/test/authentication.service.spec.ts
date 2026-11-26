@@ -21,6 +21,7 @@ const config: AuthConfig = {
   platformAudience: 'p',
   refreshPersistentTtlSeconds: 1000,
   refreshSessionTtlSeconds: 100,
+  passwordResetTtlMinutes: 30,
 };
 
 const meta = (overrides: Partial<AuthMetadata> = {}): AuthMetadata => ({
@@ -86,16 +87,28 @@ function setup() {
     logUserEvent: jest.fn().mockResolvedValue(undefined),
     insertUserEvent: jest.fn(),
   };
+  const passwordsRepository = {
+    currentHash: jest.fn().mockResolvedValue('stored'),
+  };
   const service = new AuthenticationService(
     repository as never,
     sessions as never,
+    passwordsRepository as never,
     passwords as never,
     tokens as never,
     effective as never,
     audit as never,
     config,
   );
-  return { service, repository, sessions, passwords, tokens, audit };
+  return {
+    service,
+    repository,
+    sessions,
+    passwordsRepository,
+    passwords,
+    tokens,
+    audit,
+  };
 }
 
 describe('AuthenticationService.login', () => {
