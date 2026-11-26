@@ -93,11 +93,16 @@ export const invitations = pgTable(
     }),
 
     // 2. INSERT Policy: Platform admins can insert anywhere; owners can insert anywhere in their business; branch managers only for their specific branch
+    // Only platform admins create invitations directly, and only staff
+    // invitations in their own name. Business invitations go through
+    // app.create_business_invitation.
     pgPolicy('invitations_insert', {
       for: 'insert',
       to: 'fortis_app',
       withCheck: sql`
-        app.is_platform_user()
+        app.is_platform_admin()
+        AND invitation_type = 'platform_user'
+        AND invited_by_platform_user_id = app.current_platform_user_id()
       `,
     }),
 
@@ -106,10 +111,10 @@ export const invitations = pgTable(
       for: 'update',
       to: 'fortis_app',
       using: sql`
-        app.is_platform_user()
+        app.is_platform_admin() AND invitation_type = 'platform_user'
       `,
       withCheck: sql`
-        app.is_platform_user()
+        app.is_platform_admin() AND invitation_type = 'platform_user'
       `,
     }),
 
@@ -118,7 +123,7 @@ export const invitations = pgTable(
       for: 'delete',
       to: 'fortis_app',
       using: sql`
-        app.is_platform_user()
+        app.is_platform_admin() AND invitation_type = 'platform_user'
       `,
     }),
   ],

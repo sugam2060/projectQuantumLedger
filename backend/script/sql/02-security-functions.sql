@@ -49,6 +49,23 @@ BEGIN
 END;
 $$;
 
+-- The current platform user may manage staff: active and bootstrap or admin.
+CREATE OR REPLACE FUNCTION app.is_platform_admin()
+RETURNS boolean
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+      FROM public.platform_users p
+     WHERE p.id = app.current_platform_user_id()
+       AND p.status = 'active'
+       AND (p.is_bootstrap OR p.role = 'admin')
+  );
+END;
+$$;
+
 -- True when a platform account already uses this email. Only platform users may
 -- ask (used to reject duplicate staff invitations).
 CREATE OR REPLACE FUNCTION app.platform_email_in_use(p_email text)
@@ -1032,13 +1049,19 @@ DECLARE
   v_inv record;
   v_id uuid;
 BEGIN
+  -- The inviter must still be an active platform admin (bootstrap or role
+  -- admin): only admins may create staff accounts, of any role.
   SELECT i.id, i.email_normalized, i.invitee_name, i.platform_role INTO v_inv
     FROM public.invitations i
+    JOIN public.platform_users inviter
+      ON inviter.id = i.invited_by_platform_user_id
+     AND inviter.status = 'active'
+     AND (inviter.is_bootstrap OR inviter.role = 'admin')
    WHERE i.token_hash = p_token_hash
      AND i.invitation_type = 'platform_user'
      AND i.consumed_at IS NULL AND i.revoked_at IS NULL
      AND i.expires_at > pg_catalog.now()
-     FOR UPDATE;
+     FOR UPDATE OF i;
   IF NOT FOUND OR p_password_hash IS NULL OR EXISTS (
     SELECT 1 FROM public.platform_users p WHERE p.email_normalized = v_inv.email_normalized
   ) THEN

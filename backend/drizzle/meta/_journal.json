@@ -183,6 +183,13 @@
       "when": 1795666324611,
       "tag": "0025_member_management",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795681879600,
+      "tag": "0026_platform_invitations_admin_only",
+      "breakpoints": true
     }
   ]
 }

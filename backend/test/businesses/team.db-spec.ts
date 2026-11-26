@@ -622,6 +622,54 @@ describe('roles, members and invitations (real database)', () => {
         .expect(200);
     });
 
+    it('lets only platform admins create staff invitations, and only as themselves', async () => {
+      const support = await createPlatformUser({ role: 'support' });
+      const admin = await createPlatformUser({ role: 'admin' });
+      const insert = (actor: string, inviter: string) =>
+        asApp({ 'app.platform_user_id': actor }, (client) =>
+          client.query(
+            `INSERT INTO invitations (email_normalized, invitee_name, invitation_type,
+               platform_role, token_hash, expires_at, invited_by_platform_user_id)
+             VALUES ('evil@fortis.test', 'Evil', 'platform_user', 'admin',
+                     repeat('b', 64), now() + interval '1 day', $1)`,
+            [inviter],
+          ),
+        );
+      await expect(insert(support.id, support.id)).rejects.toMatchObject({
+        code: '42501',
+      });
+      await expect(insert(admin.id, support.id)).rejects.toMatchObject({
+        code: '42501',
+      });
+      await expect(insert(admin.id, admin.id)).resolves.toBeDefined();
+    });
+
+    it('refuses invitations whose inviter is not (or no longer) an admin', async () => {
+      const manager = await createPlatformUser({ role: 'manager' });
+      const admin = await createPlatformUser({ role: 'admin' });
+      const { hashOpaqueToken } =
+        await import('../../src/common/utils/opaque-token.util.js');
+      const plant = async (inviter: string, email: string, token: string) =>
+        owner().query(
+          `INSERT INTO invitations (email_normalized, invitee_name, invitation_type,
+             platform_role, token_hash, expires_at, invited_by_platform_user_id)
+           VALUES ($1, 'X', 'platform_user', 'admin', $2, now() + interval '1 day', $3)`,
+          [email, hashOpaqueToken(token), inviter],
+        );
+      await plant(manager.id, 'm@fortis.test', 'm'.repeat(43));
+      await plant(admin.id, 'd@fortis.test', 'd'.repeat(43));
+      await owner().query(
+        `UPDATE platform_users SET role = 'support' WHERE id = $1`,
+        [admin.id],
+      );
+      for (const token of ['m'.repeat(43), 'd'.repeat(43)]) {
+        await http
+          .post(`${API}/platform/users/invitations/accept`)
+          .send({ token, password: NEW_PASSWORD })
+          .expect(400);
+      }
+    });
+
     it('rejects the stored hash used as a token', async () => {
       const boss = await createPlatformUser({ isBootstrap: true });
       await owner().query(
