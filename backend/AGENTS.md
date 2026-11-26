@@ -131,7 +131,9 @@ Health endpoints (`GET /health/live`, `GET /health/ready`) are planned but not i
 
 ## Env
 
-See `.env.example`: `DATABASE_URL`, `REDIS_URL`, `RABBITMQ_URL`, `OBSERVE_APP_KEY`, `OBSERVE_APP_SECRET`. Never commit secrets.
+See `.env.example`. Required: `DATABASE_URL`, `DATABASE_MIGRATION_URL`, `FORTIS_APP_DB_PASSWORD`, `JWT_ACCESS_SECRET`,
+`REDIS_URL`, `FRONTEND_BASE_URL`, `CLOUDINARY_*`, `MAIL_*`, `NODE_ENV`. Everything else is optional with the default shown
+(commented out) there. Config is read only in `src/config/` (and `script/`). Never commit secrets.
 
 ## Done When
 
