@@ -3,8 +3,24 @@
 NestJS backend: PostgreSQL (Drizzle ORM), Redis, RabbitMQ, Passport auth, NestJS Observe.
 
 
-# Claude.md and AGENTS.md file update rule:
-Update this file (and `CLAUDE.md`) in the same change whenever folder layout, commands, workflow rules or env vars change.
+## Instruction file update rule
+
+Update this file in the same change whenever folder layout, commands, workflow rules or env vars change. If the
+rule applies across projects, also update the root `../CLAUDE.md`. `backend/CLAUDE.md` only imports this file;
+don't edit it.
+
+## Skills
+
+Follow the skill rules in the root `../CLAUDE.md`. For backend work, the usual skills are:
+
+- `nestjs-*` skills: architecture, best practices, features/performance, OOP patterns, audits, commit/PR
+- `drizzle-best-practices` and `postgres-best-practices`: schema, queries, migrations, RLS
+- `redis-*`: cache, sessions, rate limiting
+- `api-design`: endpoint shape
+- `javascript-testing-patterns`: Jest specs
+- `jwt-*`: inspect test tokens
+
+For library docs, use context7.
 
 ## Commands
 
@@ -52,6 +68,8 @@ Cross-cutting and infra folders:
 - `config/`: one `registerAs` file per concern + `types/` + `env.validation.ts`. The only place that reads `process.env` (besides `script/`).
 - `database/`: pool provider, `DatabaseService`, Drizzle schemas grouped by domain in `schemas/{auth,business,audit}/`, one table per file.
 - `redis/`, `storage/`: infra modules (Redis client, object storage).
+- `jobs/`: RabbitMQ queue module (`queue.module.ts`) and background jobs (`email/`).
+- `types/`: app-wide shared types.
 - `script/`: `migrate.ts` and raw SQL. `drizzle/`: migrations.
 
 Global guards and the global pipe are registered once in `AppModule`, as an ordered and commented list.
@@ -98,7 +116,10 @@ Tests:
 - No `any`; derive types from Drizzle schema and DTOs.
 - Multi-step DB writes use transactions.
 - SQL and Drizzle calls only in `*.repository.ts`; services never touch `DatabaseService`.
-- Auth/security rules: see `src/authentication/README.md`.
+- Auth/security rules: see `src/authentication/README.md`. Passport patterns:
+  - Custom strategies extend `PassportStrategy(Strategy)` and verify credentials in `validate()`.
+  - Use custom `AuthGuard` subclasses, not magic strategy strings.
+  - Hash passwords with bcrypt.
 - Authorization: business routes with `:businessId` use `@RequiredPermission(Permission.X)`; platform routes use
   `@RequiredPlatformPermission`; own-account routes use `@SelfService()`. The route audit test enforces this.
   Details and how to add a permission: `src/authorization/README.md`.
@@ -130,6 +151,11 @@ Don't edit a test just to make it pass unless the test is wrong; say so if so.
 ## Tasks
 
 Decompose large tasks; parallelize independent subtasks; sequence dependent ones (schema → service → controller → e2e).
+
+## NestJS Observe
+
+`@nestjs/observe` handles production tracing, errors, metrics, logs and release comparison, and it integrates
+with the Observe MCP server. Link a project with `npx @nestjs/observe link`.
 
 ## Health
 

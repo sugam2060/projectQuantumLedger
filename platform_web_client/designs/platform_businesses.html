@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Businesses — Fortis Platform Manager</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+        globalThis.tailwind = globalThis.tailwind || {};
+        globalThis.tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'fortis-navy': '#111D25',
+                        'fortis-forest': '#496D59',
+                        'fortis-sage': '#7FB596',
+                        'fortis-offwhite': '#F2F5F3',
+                        'light-primary': '#111D25',
+                        'light-on-primary': '#FFFFFF',
+                        'light-primary-container': '#D7E4EF',
+                        'light-on-primary-container': '#111D25',
+                        'light-secondary': '#496D59',
+                        'light-on-secondary': '#FFFFFF',
+                        'light-secondary-container': '#C1E9D0',
+                        'light-on-secondary-container': '#133726',
+                        'light-tertiary': '#564334',
+                        'light-on-tertiary': '#FFFFFF',
+                        'light-tertiary-container': '#FBDDC9',
+                        'light-on-tertiary-container': '#27180C',
+                        'light-error': '#BA1A1A',
+                        'light-on-error': '#FFFFFF',
+                        'light-error-container': '#FFDAD5',
+                        'light-on-error-container': '#930009',
+                        'light-success': '#006D3E',
+                        'light-on-success': '#FFFFFF',
+                        'light-success-container': '#96F7B8',
+                        'light-on-success-container': '#00210F',
+                        'light-warning': '#9B4500',
+                        'light-on-warning': '#FFFFFF',
+                        'light-warning-container': '#FFDBCA',
+                        'light-on-warning-container': '#331200',
+                        'light-info': '#00639B',
+                        'light-on-info': '#FFFFFF',
+                        'light-info-container': '#CEE5FF',
+                        'light-on-info-container': '#001D33',
+                        'light-background': '#FBF9F9',
+                        'light-on-background': '#1B1C1C',
+                        'light-surface': '#FBF9F9',
+                        'light-surface-dim': '#DCD9DA',
+                        'light-surface-bright': '#FFFFFF',
+                        'light-surface-container-lowest': '#FFFFFF',
+                        'light-surface-container-low': '#F5F3F3',
+                        'light-surface-container': '#F0EDEE',
+                        'light-surface-container-high': '#EAE7E8',
+                        'light-surface-container-highest': '#E4E2E2',
+                        'light-on-surface': '#1B1C1C',
+                        'light-surface-variant': '#E0E3E7',
+                        'light-on-surface-variant': '#43474B',
+                        'light-outline': '#74777B',
+                        'light-outline-variant': '#C4C7CB',
+                        'light-inverse-surface': '#303031',
+                        'light-inverse-on-surface': '#F3F0F0',
+                        'light-inverse-primary': '#BBC8D3',
+                        'dark-primary': '#BBC8D3',
+                        'dark-on-primary': '#26323A',
+                        'dark-primary-container': '#111D25',
+                        'dark-on-primary-container': '#F2F5F3',
+                        'dark-secondary': '#7FB596',
+                        'dark-on-secondary': '#0F291B',
+                        'dark-secondary-container': '#2A4E3B',
+                        'dark-on-secondary-container': '#C4ECD3',
+                        'dark-tertiary': '#DDC1AE',
+                        'dark-on-tertiary': '#3E2D1F',
+                        'dark-tertiary-container': '#27180C',
+                        'dark-on-tertiary-container': '#FBDDC9',
+                        'dark-error': '#FFB4AB',
+                        'dark-on-error': '#690004',
+                        'dark-error-container': '#930009',
+                        'dark-on-error-container': '#FFDAD5',
+                        'dark-success': '#7ADA9E',
+                        'dark-on-success': '#00391E',
+                        'dark-success-container': '#00522E',
+                        'dark-on-success-container': '#96F7B8',
+                        'dark-warning': '#FFB68E',
+                        'dark-on-warning': '#532200',
+                        'dark-warning-container': '#763300',
+                        'dark-on-warning-container': '#FFDBCA',
+                        'dark-info': '#96CCFF',
+                        'dark-on-info': '#003353',
+                        'dark-info-container': '#004A76',
+                        'dark-on-info-container': '#CEE5FF',
+                        'dark-background': '#131314',
+                        'dark-on-background': '#E4E2E2',
+                        'dark-surface': '#131314',
+                        'dark-surface-dim': '#131314',
+                        'dark-surface-bright': '#39393A',
+                        'dark-surface-container-lowest': '#0E0E0F',
+                        'dark-surface-container-low': '#1B1C1C',
+                        'dark-surface-container': '#1F2020',
+                        'dark-surface-container-high': '#2A2A2B',
+                        'dark-surface-container-highest': '#353535',
+                        'dark-on-surface': '#E4E2E2',
+                        'dark-surface-variant': '#43474B',
+                        'dark-on-surface-variant': '#C4C7CB',
+                        'dark-outline': '#8E9195',
+                        'dark-outline-variant': '#43474B',
+                        'dark-inverse-surface': '#E4E2E2',
+                        'dark-inverse-on-surface': '#303031',
+                        'dark-inverse-primary': '#546069',
+                    },
+                    borderRadius: {
+                        'none': '0px',
+                        'sm': '4px',
+                        'DEFAULT': '6px',
+                        'md': '8px',
+                        'lg': '12px',
+                        'xl': '16px',
+                        'full': '9999px',
+                    },
+                    spacing: {
+                        'gutter-xs': '4px',
+                        'gutter-sm': '8px',
+                        'gutter-md': '16px',
+                        'gutter-lg': '24px',
+                        'gutter-xl': '32px',
+                        'section': '48px',
+                        'page-margin': '24px',
+                    },
+                    fontFamily: {
+                        'display': ['"Alata"', 'sans-serif'],
+                        'headline': ['"Alata"', 'sans-serif'],
+                        'title': ['"Instrument Sans"', 'sans-serif'],
+                        'body': ['"Instrument Sans"', 'sans-serif'],
+                        'label': ['"Instrument Sans"', 'sans-serif'],
+                        'mono': ['"Spline Sans Mono"', 'monospace'],
+                    },
+                    fontSize: {
+                        'display-lg': ['40px', { lineHeight: '44px', letterSpacing: '-0.5px', fontWeight: '400' }],
+                        'display-lg-mobile': ['32px', { lineHeight: '36px', letterSpacing: '-0.25px', fontWeight: '400' }],
+                        'headline-lg': ['32px', { lineHeight: '38px', letterSpacing: '-0.25px', fontWeight: '400' }],
+                        'headline-md': ['24px', { lineHeight: '30px', letterSpacing: '0px', fontWeight: '400' }],
+                        'headline-sm': ['20px', { lineHeight: '26px', letterSpacing: '0px', fontWeight: '400' }],
+                        'title-lg': ['18px', { lineHeight: '24px', letterSpacing: '0px', fontWeight: '600' }],
+                        'title-md': ['16px', { lineHeight: '22px', letterSpacing: '0px', fontWeight: '600' }],
+                        'body-lg': ['16px', { lineHeight: '24px', letterSpacing: '0px', fontWeight: '400' }],
+                        'body-md': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '400' }],
+                        'body-sm': ['12px', { lineHeight: '18px', letterSpacing: '0.1px', fontWeight: '400' }],
+                        'label-lg': ['14px', { lineHeight: '20px', letterSpacing: '0.1px', fontWeight: '600' }],
+                        'label-md': ['12px', { lineHeight: '16px', letterSpacing: '0.2px', fontWeight: '600' }],
+                        'label-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.3px', fontWeight: '500' }],
+                        'mono-lg': ['24px', { lineHeight: '30px', letterSpacing: '-0.25px', fontWeight: '600' }],
+                        'mono-md': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '500' }],
+                        'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.2px', fontWeight: '500' }],
+                    },
+                    transitionDuration: {
+                        'state-change': '100ms',
+                        'surface-enter': '200ms',
+                        'surface-exit': '140ms',
+                    },
+                    transitionDelay: {
+                        'state-change': '0ms',
+                        'surface-enter': '0ms',
+                        'surface-exit': '0ms',
+                    },
+                    transitionTimingFunction: {
+                        'state-change': 'ease-out',
+                        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+                        'surface-exit': 'cubic-bezier(0.3, 0, 1, 1)',
+                    },
+                },
+            },
+        };
+        if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+    </script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Alata&amp;family=Instrument+Sans:wght@400;500;600;700&amp;family=Spline+Sans+Mono:wght@400;500;600&amp;display=swap"
+        rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block"
+        rel="stylesheet">
+    <style>
+        .material-symbols-outlined,
+        .material-symbols-rounded,
+        .material-symbols-sharp,
+        .material-icons {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            line-height: 1 !important;
+            box-sizing: content-box;
+            overflow: hidden;
+            white-space: nowrap;
+            direction: ltr;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body class="bg-light-surface text-light-on-surface font-body antialiased">
+    <div class="min-h-[1024px] flex flex-col lg:flex-row" data-stitch-vh="min-h-[1024px]===min-h-screen">
+        <!-- Left Platform Manager Sidebar -->
+        <aside
+            class="w-full lg:w-60 shrink-0 bg-dark-primary-container text-dark-on-primary-container border-b lg:border-b-0 lg:border-r border-dark-outline-variant flex flex-col justify-between p-gutter-md lg:p-gutter-lg gap-gutter-lg">
+            <div class="flex flex-col gap-gutter-lg">
+                <!-- Brand Header -->
+                <div class="flex items-center justify-between gap-gutter-sm">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgdmlld0JveD0iMCAwIDEyOTAgNDAwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHJvbGU9ImltZyIgc3R5bGU9IiIgeG1sbnM6YzJwYT0iaHR0cDovL2MycGEub3JnL21hbmlmZXN0Ij48bWV0YWRhdGE+PGMycGE6bWFuaWZlc3Q+QUFBV2tHcDFiV0lBQUFBZWFuVnRaR015Y0dFQUVRQVFnQUFBcWdBNG0zRURZekp3WVFBQUFCWnFhblZ0WWdBQUFFZHFkVzFrWXpKdFlRQVJBQkNBQUFDcUFEaWJjUU4xY200Nll6SndZVG80T1dNMlptSXdPQzA1TmpKbUxUUmtZV1V0WVdReU1pMWpZVE5sTWpkak56QXlZamNBQUFBRGYycDFiV0lBQUFBcGFuVnRaR015WVhNQUVRQVFnQUFBcWdBNG0zRURZekp3WVM1aGMzTmxjblJwYjI1ekFBQUFBTHhxZFcxaUFBQUFSR3AxYldSalltOXlBQkVBRUlBQUFLb0FPSnR4RTJNeWNHRXVhVzVuY21Wa2FXVnVkQzUyTXdBQUFBQVlZekp6YU1rbHlCRWtvTkFqQkEvT3lOdldYd1FBQUFCd1kySnZjcU5zY21Wc1lYUnBiMjV6YUdsd2FIQmhjbVZ1ZEU5bWFXUmpPbVp2Y20xaGRHMXBiV0ZuWlM5emRtY3JlRzFzYW1sdWMzUmhibU5sU1VSNExIaHRjRHBwYVdRNk1EazNOalF3WlRBdFlqTTNOQzAwWm1OaUxUbGxNREl0TldKak1ESm1OakV6WldJNEFBQUJ6bXAxYldJQUFBQkJhblZ0WkdOaWIzSUFFUUFRZ0FBQXFnQTRtM0VUWXpKd1lTNWhZM1JwYjI1ekxuWXlBQUFBQUJoak1uTm9PWnRmTHN4NTlUSkJOR05ZMkwyNVZnQUFBWVZqWW05eW9XZGhZM1JwYjI1emdxSm1ZV04wYVc5dWEyTXljR0V1YjNCbGJtVmthbkJoY21GdFpYUmxjbk9oYTJsdVozSmxaR2xsYm5SemdhSmpkWEpzZUMxelpXeG1JMnAxYldKbVBXTXljR0V1WVhOelpYSjBhVzl1Y3k5ak1uQmhMbWx1WjNKbFpHbGxiblF1ZGpOa2FHRnphRmdnbVBwZWNncHlpSzZLRlRXSGduZWhYM2JhRXRMYVVIS28rSm9BSXNRMWl1T2tabUZqZEdsdmJuZ2RZMjl0TG1GdWRHaHliM0JwWXk1amJHRjFaR1V1Y0hKdmRtbGtaV1J0YzI5bWRIZGhjbVZCWjJWdWRLRmtibUZ0WldaRGJHRjFaR1ZxY0dGeVlXMWxkR1Z5YzZGNEgyTnZiUzVoYm5Sb2NtOXdhV011YjNKcFoybHVMV052Ym1acFpHVnVZMlZuZFc1cmJtOTNibXRrWlhOamNtbHdkR2x2Ym5obVEyeGhkV1JsSUhCeWIzWnBaR1ZrSUhSb2FYTWdabWxzWlNCaGRDQjBhR1VnY21WeGRXVnpkQ0J2WmlCaElIVnpaWElnWVc1a0lHMWhlU0JvWVhabElHTnlaV0YwWldRZ2IzSWdiVzlrYVdacFpXUWdkR2hsSUdacGJHVWdZMjl1ZEdWdWRITXVBQUFBeEdwMWJXSUFBQUJBYW5WdFpHTmliM0lBRVFBUWdBQUFxZ0E0bTNFVFl6SndZUzVvWVhOb0xtUmhkR0VBQUFBQUdHTXljMmhQY0djTmQ5QXV0K0wwZ0dTdnhLaU9BQUFBZkdOaWIzS2xhbVY0WTJ4MWMybHZibk9Cb21WemRHRnlkQmlmWm14bGJtZDBhQmtlR0dSdVlXMWxibXAxYldKbUlHMWhibWxtWlhOMFkyRnNaMlp6YUdFeU5UWmthR0Z6YUZnZ1lpMDBqc0NLS1ZVdHAwcUdZeGs5R1pYYkJ5M09rM25oOGZTL2NxbjUyWWxqY0dGa1NRQUFBQUFBQUFBQUFBQUFBbVJxZFcxaUFBQUFKMnAxYldSak1tTnNBQkVBRUlBQUFLb0FPSnR4QTJNeWNHRXVZMnhoYVcwdWRqSUFBQUFDTldOaWIzS21hbWx1YzNSaGJtTmxTVVI0TEhodGNEcHBhV1E2WWpWa1ptRXdaVEV0TnpFM055MDBaVEUxTFdGbE9EWXRPVE0wTmpNd1kyWTJaVGhrZEdOc1lXbHRYMmRsYm1WeVlYUnZjbDlwYm1adm8yUnVZVzFsYzBGdWRHaHliM0JwWXlCRGJHRjFaR1V1WVdsbmRtVnljMmx2Ym1VeExqQXVNSGR2Y21jdVkyOXVkR1Z1ZEdGMWRHZ3VZekp3WVY5eWMyWXdMamt3TGpCcGMybG5ibUYwZFhKbGVFMXpaV3htSTJwMWJXSm1QUzlqTW5CaEwzVnlianBqTW5CaE9qZzVZelptWWpBNExUazJNbVl0TkdSaFpTMWhaREl5TFdOaE0yVXlOMk0zTURKaU55OWpNbkJoTG5OcFoyNWhkSFZ5WlhKamNtVmhkR1ZrWDJGemMyVnlkR2x2Ym5PQ29tTjFjbXg0S25ObGJHWWphblZ0WW1ZOVl6SndZUzVoYzNObGNuUnBiMjV6TDJNeWNHRXVZV04wYVc5dWN5NTJNbVJvWVhOb1dDQ1VEcklQSjJSUmY5QUN3VERJYlJHVkt2RTVzWktTRlQ1MFY2Vklna2RGaXFKamRYSnNlQ2x6Wld4bUkycDFiV0ptUFdNeWNHRXVZWE56WlhKMGFXOXVjeTlqTW5CaExtaGhjMmd1WkdGMFlXUm9ZWE5vV0NENlNrcTA5NjFpQU1DbTFlaStzQXI5c1RkbS9xSC8xRXYzS25MTm9HZVY5WE5uWVhSb1pYSmxaRjloYzNObGNuUnBiMjV6Z2FKamRYSnNlQzF6Wld4bUkycDFiV0ptUFdNeWNHRXVZWE56WlhKMGFXOXVjeTlqTW5CaExtbHVaM0psWkdsbGJuUXVkak5rYUdGemFGZ2dtUHBlY2dweWlLNktGVFdIZ25laFgzYmFFdExhVUhLbytKb0FJc1ExaXVOallXeG5abk5vWVRJMU5nQUFFRGhxZFcxaUFBQUFLR3AxYldSak1tTnpBQkVBRUlBQUFLb0FPSnR4QTJNeWNHRXVjMmxuYm1GMGRYSmxBQUFBRUFoalltOXkwb1JaQWhLaUFTWVlJVmtDQ2pDQ0FnWXdnZ0dOb0FNQ0FRSUNGRURsb0FydXdqblF2cmlEK2daQ0JUMW5WUk1BTUFvR0NDcUdTTTQ5QkFNRE1Fa3hGekFWQmdOVkJBb1REa0Z1ZEdoeWIzQnBZeXdnVUVKRE1TNHdMQVlEVlFRREV5VkJiblJvY205d2FXTWdRMjl1ZEdWdWRDQkRjbVZrWlc1MGFXRnNjeUJTYjI5MElFTkJNQjRYRFRJMk1EZ3dOekU0TkRNMU5sb1hEVEk0TURnd05qRTVORE0xTmxvd1JERVhNQlVHQTFVRUNoTU9RVzUwYUhKdmNHbGpMQ0JRUWtNeEtUQW5CZ05WQkFNVElFRnVkR2h5YjNCcFl5QkRiR0YxWkdVZ1EyOXVkR1Z1ZENCVGFXZHVhVzVuTUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFbUhvS2E4dFFHQVVVMVRTOVFxVTVXMFRwMk4zWHN2bEs3QmZRdDZZV0t3RXpkMlIzL2R6S1BFVURkQ2psTGpwOWZUK0tGalJWbnVaOXYwb1h2VGUzazZOWU1GWXdEZ1lEVlIwUEFRSC9CQVFEQWdlQU1CVUdBMVVkSlFRT01Bd0dDaXNHQVFRQmcraGVBZ0V3REFZRFZSMFRBUUgvQkFJd0FEQWZCZ05WSFNNRUdEQVdnQlRPVWVJRWdVNWtXeVA0NDhUUG1qNmN3ZGRjd2pBS0JnZ3Foa2pPUFFRREF3Tm5BREJrQWpBeGN4MFVuZ0Y2MHN0VmpzNUc0VDJlaXB0c0JrNW1mOW9DdGZKUEFVQmw4cXMvUEVYYTgrZ2sxL1g1UUoyRFZjWUNNSEJmWE4zMVlhcGlTcVl2bElXckRWREpLT3ZYTWwra2t6MzdXdDBQQkk4c3c0ODZNcTZKZU9oVCtsUlI0YjFIQ2FGamNHRmtXUTJlQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQTlsaEFDSTRYbnA1bnRjZjl3NzJSUU9MblVjYkVabEJXYy9DYmpVMlFZN3NTdzFkQ3NDU0JmR0FCbmhLK3p2clhxaTIyc2IzVWQ5T3g3aGNMK0xwaEV5dEJydz09PC9jMnBhOm1hbmlmZXN0PjwvbWV0YWRhdGE+PHRpdGxlIHN0eWxlPSJmaWxsOnJnYigwLCAwLCAwKTtzdHJva2U6bm9uZTtjb2xvcjpyZ2IoMTEsIDExLCAxMSk7c3Ryb2tlLXdpZHRoOjFweDtzdHJva2UtbGluZWNhcDpidXR0O3N0cm9rZS1saW5lam9pbjptaXRlcjtvcGFjaXR5OjE7Zm9udC1mYW1pbHk6YW50aHJvcGljLXNhbnMsIC1hcHBsZS1zeXN0ZW0sIEJsaW5rTWFjU3lzdGVtRm9udCwgJnF1b3Q7U2Vnb2UgVUkmcXVvdDssIHNhbnMtc2VyaWY7Zm9udC1zaXplOjE2cHg7Zm9udC13ZWlnaHQ6NDAwO3RleHQtYW5jaG9yOnN0YXJ0O2RvbWluYW50LWJhc2VsaW5lOmF1dG8iPkZvcnRpcyBsb2dvLCBkYXJrIGJhY2tncm91bmQgdmVyc2lvbjwvdGl0bGU+PGRlc2Mgc3R5bGU9ImZpbGw6cmdiKDAsIDAsIDApO3N0cm9rZTpub25lO2NvbG9yOnJnYigxMSwgMTEsIDExKTtzdHJva2Utd2lkdGg6MXB4O3N0cm9rZS1saW5lY2FwOmJ1dHQ7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO29wYWNpdHk6MTtmb250LWZhbWlseTphbnRocm9waWMtc2FucywgLWFwcGxlLXN5c3RlbSwgQmxpbmtNYWNTeXN0ZW1Gb250LCAmcXVvdDtTZWdvZSBVSSZxdW90Oywgc2Fucy1zZXJpZjtmb250LXNpemU6MTZweDtmb250LXdlaWdodDo0MDA7dGV4dC1hbmNob3I6c3RhcnQ7ZG9taW5hbnQtYmFzZWxpbmU6YXV0byI+Rm9ydGlzIHdvcmRtYXJrIGluIG9mZi13aGl0ZSBhbmd1bGFyIGNhcGl0YWxzIGJlc2lkZSBhIHRocmVlLXBhcnQgb2ZmLXdoaXRlIGFuZCBsaWdodCBncmVlbiBlbWJsZW0uPC9kZXNjPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQwIDMwKSIgc3R5bGU9ImZpbGw6cmdiKDAsIDAsIDApO3N0cm9rZTpub25lO2NvbG9yOnJnYigxMSwgMTEsIDExKTtzdHJva2Utd2lkdGg6MXB4O3N0cm9rZS1saW5lY2FwOmJ1dHQ7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO29wYWNpdHk6MTtmb250LWZhbWlseTphbnRocm9waWMtc2FucywgLWFwcGxlLXN5c3RlbSwgQmxpbmtNYWNTeXN0ZW1Gb250LCAmcXVvdDtTZWdvZSBVSSZxdW90Oywgc2Fucy1zZXJpZjtmb250LXNpemU6MTZweDtmb250LXdlaWdodDo0MDA7dGV4dC1hbmNob3I6c3RhcnQ7ZG9taW5hbnQtYmFzZWxpbmU6YXV0byI+PHBhdGggZmlsbD0iI0YyRjVGMyIgZD0iTTAgMTExIDE4MyAwbDU5IDM1TDU5IDE0N3YxMjVMMCAzMDd6IiBzdHlsZT0iZmlsbDpyZ2IoMjQyLCAyNDUsIDI0Myk7c3Ryb2tlOm5vbmU7Y29sb3I6cmdiKDExLCAxMSwgMTEpO3N0cm9rZS13aWR0aDoxcHg7c3Ryb2tlLWxpbmVjYXA6YnV0dDtzdHJva2UtbGluZWpvaW46bWl0ZXI7b3BhY2l0eToxO2ZvbnQtZmFtaWx5OmFudGhyb3BpYy1zYW5zLCAtYXBwbGUtc3lzdGVtLCBCbGlua01hY1N5c3RlbUZvbnQsICZxdW90O1NlZ29lIFVJJnF1b3Q7LCBzYW5zLXNlcmlmO2ZvbnQtc2l6ZToxNnB4O2ZvbnQtd2VpZ2h0OjQwMDt0ZXh0LWFuY2hvcjpzdGFydDtkb21pbmFudC1iYXNlbGluZTphdXRvIi8+PHBhdGggZmlsbD0iIzdGQjU5NiIgZD0ibTk5IDE3NyAxODMtMTExIDU5IDM1LTE4MyAxMTJ2MTI0bC01OS0zNXoiIHN0eWxlPSJmaWxsOnJnYigxMjcsIDE4MSwgMTUwKTtzdHJva2U6bm9uZTtjb2xvcjpyZ2IoMTEsIDExLCAxMSk7c3Ryb2tlLXdpZHRoOjFweDtzdHJva2UtbGluZWNhcDpidXR0O3N0cm9rZS1saW5lam9pbjptaXRlcjtvcGFjaXR5OjE7Zm9udC1mYW1pbHk6YW50aHJvcGljLXNhbnMsIC1hcHBsZS1zeXN0ZW0sIEJsaW5rTWFjU3lzdGVtRm9udCwgJnF1b3Q7U2Vnb2UgVUkmcXVvdDssIHNhbnMtc2VyaWY7Zm9udC1zaXplOjE2cHg7Zm9udC13ZWlnaHQ6NDAwO3RleHQtYW5jaG9yOnN0YXJ0O2RvbWluYW50LWJhc2VsaW5lOmF1dG8iLz48cGF0aCBmaWxsPSIjRjJGNUYzIiBkPSJtMTU4IDIzNyAxMDEtNjEgNTkgMzUtMTAxIDYxdjk2bC01OS0zNXoiIHN0eWxlPSJmaWxsOnJnYigyNDIsIDI0NSwgMjQzKTtzdHJva2U6bm9uZTtjb2xvcjpyZ2IoMTEsIDExLCAxMSk7c3Ryb2tlLXdpZHRoOjFweDtzdHJva2UtbGluZWNhcDpidXR0O3N0cm9rZS1saW5lam9pbjptaXRlcjtvcGFjaXR5OjE7Zm9udC1mYW1pbHk6YW50aHJvcGljLXNhbnMsIC1hcHBsZS1zeXN0ZW0sIEJsaW5rTWFjU3lzdGVtRm9udCwgJnF1b3Q7U2Vnb2UgVUkmcXVvdDssIHNhbnMtc2VyaWY7Zm9udC1zaXplOjE2cHg7Zm9udC13ZWlnaHQ6NDAwO3RleHQtYW5jaG9yOnN0YXJ0O2RvbWluYW50LWJhc2VsaW5lOmF1dG8iLz48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDAgMCkiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0YyRjVGMyIgc3Ryb2tlLXdpZHRoPSIzNiIgc3Ryb2tlLWxpbmVqb2luPSJtaXRlciIgc3Ryb2tlLW1pdGVybGltaXQ9IjEwIiBzdHlsZT0iZmlsbDpub25lO3N0cm9rZTpyZ2IoMjQyLCAyNDUsIDI0Myk7Y29sb3I6cmdiKDExLCAxMSwgMTEpO3N0cm9rZS13aWR0aDozNnB4O3N0cm9rZS1saW5lY2FwOmJ1dHQ7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO29wYWNpdHk6MTtmb250LWZhbWlseTphbnRocm9waWMtc2FucywgLWFwcGxlLXN5c3RlbSwgQmxpbmtNYWNTeXN0ZW1Gb250LCAmcXVvdDtTZWdvZSBVSSZxdW90Oywgc2Fucy1zZXJpZjtmb250LXNpemU6MTZweDtmb250LXdlaWdodDo0MDA7dGV4dC1hbmNob3I6c3RhcnQ7ZG9taW5hbnQtYmFzZWxpbmU6YXV0byI+PHBhdGggZD0iTTM5NCA5OFYyNjhNMzc2IDExNkg0ODZNMzk0IDE3Nkg0NjYiIHN0eWxlPSJmaWxsOm5vbmU7c3Ryb2tlOnJnYigyNDIsIDI0NSwgMjQzKTtjb2xvcjpyZ2IoMTEsIDExLCAxMSk7c3Ryb2tlLXdpZHRoOjM2cHg7c3Ryb2tlLWxpbmVjYXA6YnV0dDtzdHJva2UtbGluZWpvaW46bWl0ZXI7b3BhY2l0eToxO2ZvbnQtZmFtaWx5OmFudGhyb3BpYy1zYW5zLCAtYXBwbGUtc3lzdGVtLCBCbGlua01hY1N5c3RlbUZvbnQsICZxdW90O1NlZ29lIFVJJnF1b3Q7LCBzYW5zLXNlcmlmO2ZvbnQtc2l6ZToxNnB4O2ZvbnQtd2VpZ2h0OjQwMDt0ZXh0LWFuY2hvcjpzdGFydDtkb21pbmFudC1iYXNlbGluZTphdXRvIi8+PHBhdGggZD0iTTU2NCAxMTZINjAyTDYzOCAxNTJWMjE0TDYwMiAyNTBINTY0TDUyOCAyMTRWMTUyWiIgc3R5bGU9ImZpbGw6bm9uZTtzdHJva2U6cmdiKDI0MiwgMjQ1LCAyNDMpO2NvbG9yOnJnYigxMSwgMTEsIDExKTtzdHJva2Utd2lkdGg6MzZweDtzdHJva2UtbGluZWNhcDpidXR0O3N0cm9rZS1saW5lam9pbjptaXRlcjtvcGFjaXR5OjE7Zm9udC1mYW1pbHk6YW50aHJvcGljLXNhbnMsIC1hcHBsZS1zeXN0ZW0sIEJsaW5rTWFjU3lzdGVtRm9udCwgJnF1b3Q7U2Vnb2UgVUkmcXVvdDssIHNhbnMtc2VyaWY7Zm9udC1zaXplOjE2cHg7Zm9udC13ZWlnaHQ6NDAwO3RleHQtYW5jaG9yOnN0YXJ0O2RvbWluYW50LWJhc2VsaW5lOmF1dG8iLz48cGF0aCBkPSJNNjk4IDk4VjI2OE02OTggMTE2SDc3MEw4MDQgMTUwVjE3Nkw3NzAgMjEwSDY5OCIgc3R5bGU9ImZpbGw6bm9uZTtzdHJva2U6cmdiKDI0MiwgMjQ1LCAyNDMpO2NvbG9yOnJnYigxMSwgMTEsIDExKTtzdHJva2Utd2lkdGg6MzZweDtzdHJva2UtbGluZWNhcDpidXR0O3N0cm9rZS1saW5lam9pbjptaXRlcjtvcGFjaXR5OjE7Zm9udC1mYW1pbHk6YW50aHJvcGljLXNhbnMsIC1hcHBsZS1zeXN0ZW0sIEJsaW5rTWFjU3lzdGVtRm9udCwgJnF1b3Q7U2Vnb2UgVUkmcXVvdDssIHNhbnMtc2VyaWY7Zm9udC1zaXplOjE2cHg7Zm9udC13ZWlnaHQ6NDAwO3RleHQtYW5jaG9yOnN0YXJ0O2RvbWluYW50LWJhc2VsaW5lOmF1dG8iLz48cGF0aCBkPSJNODUwIDExNkg5OTBNOTIwIDExNlYyNjgiIHN0eWxlPSJmaWxsOm5vbmU7c3Ryb2tlOnJnYigyNDIsIDI0NSwgMjQzKTtjb2xvcjpyZ2IoMTEsIDExLCAxMSk7c3Ryb2tlLXdpZHRoOjM2cHg7c3Ryb2tlLWxpbmVjYXA6YnV0dDtzdHJva2UtbGluZWpvaW46bWl0ZXI7b3BhY2l0eToxO2ZvbnQtZmFtaWx5OmFudGhyb3BpYy1zYW5zLCAtYXBwbGUtc3lzdGVtLCBCbGlua01hY1N5c3RlbUZvbnQsICZxdW90O1NlZ29lIFVJJnF1b3Q7LCBzYW5zLXNlcmlmO2ZvbnQtc2l6ZToxNnB4O2ZvbnQtd2VpZ2h0OjQwMDt0ZXh0LWFuY2hvcjpzdGFydDtkb21pbmFudC1iYXNlbGluZTphdXRvIi8+PHBhdGggc3Ryb2tlPSIjN0ZCNTk2IiBkPSJNMTAzMiA5OFYyNjgiIHN0eWxlPSJmaWxsOm5vbmU7c3Ryb2tlOnJnYigxMjcsIDE4MSwgMTUwKTtjb2xvcjpyZ2IoMTEsIDExLCAxMSk7c3Ryb2tlLXdpZHRoOjM2cHg7c3Ryb2tlLWxpbmVjYXA6YnV0dDtzdHJva2UtbGluZWpvaW46bWl0ZXI7b3BhY2l0eToxO2ZvbnQtZmFtaWx5OmFudGhyb3BpYy1zYW5zLCAtYXBwbGUtc3lzdGVtLCBCbGlua01hY1N5c3RlbUZvbnQsICZxdW90O1NlZ29lIFVJJnF1b3Q7LCBzYW5zLXNlcmlmO2ZvbnQtc2l6ZToxNnB4O2ZvbnQtd2VpZ2h0OjQwMDt0ZXh0LWFuY2hvcjpzdGFydDtkb21pbmFudC1iYXNlbGluZTphdXRvIi8+PHBhdGggZD0iTTExODYgMTM0VjExNkgxMTEwTDEwOTIgMTM0VjE2NUwxMTEwIDE4M0gxMTY4TDExODYgMjAxVjIzMkwxMTY4IDI1MEgxMDkyVjIzMiIgc3R5bGU9ImZpbGw6bm9uZTtzdHJva2U6cmdiKDI0MiwgMjQ1LCAyNDMpO2NvbG9yOnJnYigxMSwgMTEsIDExKTtzdHJva2Utd2lkdGg6MzZweDtzdHJva2UtbGluZWNhcDpidXR0O3N0cm9rZS1saW5lam9pbjptaXRlcjtvcGFjaXR5OjE7Zm9udC1mYW1pbHk6YW50aHJvcGljLXNhbnMsIC1hcHBsZS1zeXN0ZW0sIEJsaW5rTWFjU3lzdGVtRm9udCwgJnF1b3Q7U2Vnb2UgVUkmcXVvdDssIHNhbnMtc2VyaWY7Zm9udC1zaXplOjE2cHg7Zm9udC13ZWlnaHQ6NDAwO3RleHQtYW5jaG9yOnN0YXJ0O2RvbWluYW50LWJhc2VsaW5lOmF1dG8iLz48L2c+PHBhdGggdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDAgMCkiIGZpbGw9IiNGMkY1RjMiIGQ9Ik03MzggMTk2SDc4Mkw4MzQgMjY4SDc4OFoiIHN0eWxlPSJmaWxsOnJnYigyNDIsIDI0NSwgMjQzKTtzdHJva2U6bm9uZTtjb2xvcjpyZ2IoMTEsIDExLCAxMSk7c3Ryb2tlLXdpZHRoOjFweDtzdHJva2UtbGluZWNhcDpidXR0O3N0cm9rZS1saW5lam9pbjptaXRlcjtvcGFjaXR5OjE7Zm9udC1mYW1pbHk6YW50aHJvcGljLXNhbnMsIC1hcHBsZS1zeXN0ZW0sIEJsaW5rTWFjU3lzdGVtRm9udCwgJnF1b3Q7U2Vnb2UgVUkmcXVvdDssIHNhbnMtc2VyaWY7Zm9udC1zaXplOjE2cHg7Zm9udC13ZWlnaHQ6NDAwO3RleHQtYW5jaG9yOnN0YXJ0O2RvbWluYW50LWJhc2VsaW5lOmF1dG8iLz48L3N2Zz4="
+                        alt="Fortis" class="h-6 w-auto">
+                    <span data-design-text-token="mono-sm"
+                        class="font-mono text-mono-sm text-fortis-sage px-2 py-0.5 rounded-sm border border-dark-outline-variant">
+                        Platform
+                    </span>
+                </div>
+
+                <!-- Sidebar Navigation -->
+                <nav aria-label="Platform manager navigation" class="flex lg:flex-col gap-1 overflow-x-auto">
+                    <a href="PlatformHome.html"
+                        class="nav-item flex items-center gap-gutter-sm px-gutter-sm py-2.5 rounded text-dark-on-surface-variant hover:bg-dark-surface-container hover:text-fortis-offwhite transition-colors duration-state-change shrink-0">
+                        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">home</span>
+                        <span data-design-text-token="label-md" class="font-label text-label-md">Home</span>
+                    </a>
+
+                    <a href="PlatformTeam.html"
+                        class="nav-item flex items-center gap-gutter-sm px-gutter-sm py-2.5 rounded text-dark-on-surface-variant hover:bg-dark-surface-container hover:text-fortis-offwhite transition-colors duration-state-change shrink-0">
+                        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">group</span>
+                        <span data-design-text-token="label-md" class="font-label text-label-md">Team</span>
+                    </a>
+
+                    <a href="PlatformBusinesses.html" aria-current="page"
+                        class="nav-item flex items-center justify-between gap-gutter-sm px-gutter-sm py-2.5 rounded bg-dark-secondary-container text-dark-on-secondary-container shrink-0">
+                        <span class="inline-flex items-center gap-gutter-sm">
+                            <span class="material-symbols-outlined text-[18px]" aria-hidden="true">domain</span>
+                            <span data-design-text-token="label-md" class="font-label text-label-md">Businesses</span>
+                        </span>
+                        <span data-design-text-token="mono-sm"
+                            class="font-mono text-mono-sm text-dark-on-secondary-container tabular-nums">42</span>
+                    </a>
+
+                    <a href="PlatformSubscription.html"
+                        class="nav-item flex items-center gap-gutter-sm px-gutter-sm py-2.5 rounded text-dark-on-surface-variant hover:bg-dark-surface-container hover:text-fortis-offwhite transition-colors duration-state-change shrink-0">
+                        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">credit_card</span>
+                        <span data-design-text-token="label-md" class="font-label text-label-md">Subscription</span>
+                    </a>
+
+                    <a href="#logs"
+                        class="flex items-center gap-gutter-sm px-gutter-sm py-2.5 rounded text-dark-on-surface-variant hover:bg-dark-surface-container hover:text-fortis-offwhite transition-colors duration-state-change shrink-0">
+                        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">terminal</span>
+                        <span data-design-text-token="label-md" class="font-label text-label-md">Logs</span>
+                    </a>
+
+                    <a href="#analytics"
+                        class="flex items-center gap-gutter-sm px-gutter-sm py-2.5 rounded text-dark-on-surface-variant hover:bg-dark-surface-container hover:text-fortis-offwhite transition-colors duration-state-change shrink-0">
+                        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">analytics</span>
+                        <span data-design-text-token="label-md" class="font-label text-label-md">Analytics</span>
+                    </a>
+                </nav>
+            </div>
+
+            <!-- Bottom Platform Manager Avatar & Popover -->
+            <div class="relative pt-gutter-md lg:pb-gutter-xl border-t border-dark-outline-variant">
+                <div id="manager-popover" role="menu" aria-labelledby="manager-avatar-btn"
+                    class="hidden absolute left-0 right-0 bottom-full mb-2 z-30 bg-light-surface-container-lowest text-light-on-surface border border-light-outline-variant rounded-md shadow-lg p-1.5 flex flex-col gap-1">
+                    <a href="#account-setting" role="menuitem"
+                        class="flex items-center gap-gutter-sm px-gutter-sm py-2 rounded text-light-on-surface hover:bg-light-surface-container-low transition-colors duration-state-change">
+                        <span class="material-symbols-outlined text-[18px] text-light-on-surface-variant"
+                            aria-hidden="true">manage_accounts</span>
+                        <span data-design-text-token="label-md" class="font-label text-label-md">Account setting</span>
+                    </a>
+                    <div class="border-t border-light-outline-variant my-0.5"></div>
+                    <a href="../web-sign-in/WebSignIn.html" role="menuitem"
+                        class="flex items-center gap-gutter-sm px-gutter-sm py-2 rounded text-light-error hover:bg-light-error-container transition-colors duration-state-change">
+                        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">logout</span>
+                        <span data-design-text-token="label-md" class="font-label text-label-md">Sign out</span>
+                    </a>
+                </div>
+
+                <button type="button" id="manager-avatar-btn" aria-haspopup="menu" aria-expanded="false"
+                    class="w-full flex items-center justify-between gap-gutter-sm p-1.5 rounded hover:bg-dark-surface-container transition-colors duration-state-change cursor-pointer text-left">
+                    <div class="flex items-center gap-gutter-sm min-w-0">
+                        <span
+                            class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-dark-secondary-container text-dark-on-secondary-container font-label text-label-md shrink-0">
+                            RL
+                        </span>
+                        <div class="flex flex-col min-w-0">
+                            <span data-design-text-token="label-md"
+                                class="font-label text-label-md text-fortis-offwhite truncate">Rohan Lama</span>
+                            <span data-design-text-token="body-sm"
+                                class="font-body text-body-sm text-dark-on-surface-variant truncate">Platform
+                                Manager</span>
+                        </div>
+                    </div>
+                    <span class="material-symbols-outlined text-[18px] text-dark-on-surface-variant shrink-0"
+                        aria-hidden="true">unfold_more</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Workspace -->
+        <div class="flex-1 flex flex-col min-w-0 bg-light-surface">
+            <!-- Sticky Top Header -->
+            <header
+                class="sticky top-0 z-20 bg-light-surface-container-lowest border-b border-light-outline-variant px-gutter-lg py-gutter-md flex flex-col sm:flex-row sm:items-center justify-between gap-gutter-md">
+                <div class="flex flex-col gap-0.5">
+                    <h1 id="page-title" data-design-text-token="headline-md"
+                        class="font-headline text-headline-md text-light-primary text-balance">
+                        Businesses
+                    </h1>
+                    <p id="page-subtitle" data-design-text-token="body-sm"
+                        class="font-body text-body-sm text-light-on-surface-variant">
+                        Inspect all active and requested businesses, branch/terminal counts, and export business logs.
+                    </p>
+                </div>
+
+                <div class="flex items-center gap-gutter-sm">
+                    <span
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-light-success-container text-light-on-success-container">
+                        <span class="material-symbols-outlined text-[16px]" aria-hidden="true">check_circle</span>
+                        <span data-design-text-token="label-sm" class="font-label text-label-sm">Platform API:
+                            Healthy</span>
+                    </span>
+                </div>
+            </header>
+
+            <!-- Main Workspace -->
+            <main class="flex-1 p-gutter-lg flex flex-col gap-gutter-lg">
+                <!-- BUSINESSES VIEW -->
+                <div id="view-businesses" class="view-panel flex flex-col gap-gutter-lg">
+                    <!-- Businesses Toolbar -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-gutter-md">
+                        <div role="tablist" aria-label="Filter businesses"
+                            class="inline-flex items-center gap-1 p-1 rounded-md bg-light-surface-container-low border border-light-outline-variant self-start">
+                            <button type="button" data-biz-filter="all"
+                                class="biz-filter-tab px-gutter-md py-1.5 rounded font-label text-label-md bg-light-primary text-light-on-primary cursor-pointer">
+                                All <span data-biz-count="all" class="font-mono text-mono-sm tabular-nums ml-1">7</span>
+                            </button>
+                            <button type="button" data-biz-filter="active"
+                                class="biz-filter-tab px-gutter-md py-1.5 rounded font-label text-label-md text-light-on-surface-variant hover:text-light-on-surface cursor-pointer">
+                                Active <span data-biz-count="active"
+                                    class="font-mono text-mono-sm tabular-nums ml-1">5</span>
+                            </button>
+                            <button type="button" data-biz-filter="requested"
+                                class="biz-filter-tab px-gutter-md py-1.5 rounded font-label text-label-md text-light-on-surface-variant hover:text-light-on-surface cursor-pointer">
+                                Requested <span data-biz-count="requested"
+                                    class="font-mono text-mono-sm tabular-nums ml-1">2</span>
+                            </button>
+                        </div>
+
+                        <div class="relative flex items-center">
+                            <span aria-hidden="true"
+                                class="material-symbols-outlined text-[18px] text-light-on-surface-variant absolute left-3 pointer-events-none">search</span>
+                            <input id="biz-search" type="search" placeholder="Search business, city, or plan..."
+                                class="w-full sm:w-64 min-h-[40px] pl-9 pr-gutter-md py-1.5 rounded bg-light-surface-container-lowest text-light-on-surface font-body text-body-sm border border-light-outline-variant placeholder:text-light-outline focus:border-light-primary focus:ring-1 focus:ring-light-primary">
+                        </div>
+                    </div>
+
+                    <!-- Businesses Table -->
+                    <section data-component-id="card-elevated" data-component-type="card"
+                        data-component-variant="elevated"
+                        class="bg-light-surface-container-lowest border border-light-outline-variant rounded-lg p-gutter-lg flex flex-col gap-gutter-md">
+                        <div data-component-id="table-interactive" data-component-type="table"
+                            data-component-variant="interactive"
+                            class="w-full overflow-x-auto bg-light-surface-container-lowest border border-light-outline-variant rounded-md">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-light-surface-container-low border-b border-light-outline-variant">
+                                    <tr>
+                                        <th scope="col" class="px-gutter-md py-gutter-sm text-light-on-surface-variant">
+                                            <span data-design-text-token="label-md"
+                                                class="font-label text-label-md">Business</span>
+                                        </th>
+                                        <th scope="col" class="px-gutter-md py-gutter-sm text-light-on-surface-variant">
+                                            <span data-design-text-token="label-md"
+                                                class="font-label text-label-md">Plan</span>
+                                        </th>
+                                        <th scope="col"
+                                            class="px-gutter-md py-gutter-sm text-right text-light-on-surface-variant">
+                                            <span data-design-text-token="label-md"
+                                                class="font-label text-label-md">Branches</span>
+                                        </th>
+                                        <th scope="col"
+                                            class="px-gutter-md py-gutter-sm text-right text-light-on-surface-variant">
+                                            <span data-design-text-token="label-md"
+                                                class="font-label text-label-md">Terminals</span>
+                                        </th>
+                                        <th scope="col" class="px-gutter-md py-gutter-sm text-light-on-surface-variant">
+                                            <span data-design-text-token="label-md"
+                                                class="font-label text-label-md">Status</span>
+                                        </th>
+                                        <th scope="col"
+                                            class="px-gutter-md py-gutter-sm text-right text-light-on-surface-variant">
+                                            <span data-design-text-token="label-md"
+                                                class="font-label text-label-md">Business logs</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="biz-tbody" class="divide-y divide-light-outline-variant"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div><!-- /#view-businesses -->
+
+                <!-- BUSINESS DETAIL VIEW (Branches with pagination + Terminals per branch) -->
+                <div id="view-business-detail" class="view-panel hidden flex flex-col gap-gutter-lg">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-gutter-md">
+                        <button type="button" id="back-to-businesses-btn"
+                            class="inline-flex items-center gap-1.5 min-h-[40px] px-gutter-md py-1.5 rounded bg-light-surface-container-low text-light-on-surface border border-light-outline-variant hover:bg-light-surface-container font-label text-label-md self-start cursor-pointer">
+                            <span class="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
+                            <span>Back to businesses</span>
+                        </button>
+
+                        <div class="flex flex-wrap items-center gap-gutter-sm self-start sm:self-auto">
+                            <button type="button" id="detail-view-logs-btn"
+                                class="inline-flex items-center gap-1.5 min-h-[40px] px-gutter-md py-1.5 rounded bg-light-surface-container-low text-light-primary border border-light-outline-variant hover:bg-light-surface-container font-label text-label-md cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]"
+                                    aria-hidden="true">receipt_long</span>
+                                <span>View &amp; export business logs</span>
+                            </button>
+                            <button type="button" id="open-create-branch-btn"
+                                class="inline-flex items-center gap-1.5 min-h-[40px] px-gutter-md py-1.5 rounded bg-light-primary text-light-on-primary hover:opacity-90 font-label text-label-md cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]"
+                                    aria-hidden="true">add_business</span>
+                                <span>Provision new branch</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <section data-component-id="card-elevated" data-component-type="card"
+                        data-component-variant="elevated"
+                        class="bg-light-surface-container-lowest border border-light-outline-variant rounded-lg p-gutter-lg grid grid-cols-1 sm:grid-cols-4 gap-gutter-md">
+                        <div class="flex flex-col gap-0.5 sm:col-span-2">
+                            <div class="flex items-center gap-gutter-sm">
+                                <span id="detail-biz-name" data-design-text-token="title-lg"
+                                    class="font-title text-title-lg text-light-primary">Alpine Roasters</span>
+                                <span id="detail-biz-id" data-design-text-token="mono-sm"
+                                    class="font-mono text-mono-sm text-light-on-surface-variant">BIZ-101</span>
+                            </div>
+                            <span id="detail-biz-legal" data-design-text-token="body-sm"
+                                class="font-body text-body-sm text-light-on-surface-variant">Alpine Coffee Co. ·
+                                Seattle, US</span>
+                        </div>
+                        <div class="flex flex-col gap-0.5">
+                            <span data-design-text-token="label-sm"
+                                class="font-label text-label-sm text-light-on-surface-variant">Plan &amp;
+                                branches</span>
+                            <span id="detail-biz-plan" data-design-text-token="mono-md"
+                                class="font-mono text-mono-md text-light-on-surface tabular-nums">Enterprise · 12
+                                branches</span>
+                        </div>
+                        <div class="flex flex-col gap-0.5">
+                            <span data-design-text-token="label-sm"
+                                class="font-label text-label-sm text-light-on-surface-variant">Total terminals</span>
+                            <span id="detail-biz-terminals" data-design-text-token="mono-md"
+                                class="font-mono text-mono-md text-light-secondary tabular-nums">38 terminals</span>
+                        </div>
+                    </section>
+
+                    <section data-component-id="card-elevated" data-component-type="card"
+                        data-component-variant="elevated"
+                        class="w-full bg-light-surface-container-lowest border border-light-outline-variant rounded-lg p-gutter-lg flex flex-col gap-gutter-md">
+                        <header class="flex items-center justify-between gap-gutter-md">
+                            <div class="flex flex-col gap-0.5">
+                                <h2 data-design-text-token="title-lg"
+                                    class="font-title text-title-lg text-light-primary">Branches</h2>
+                                <p data-design-text-token="body-sm"
+                                    class="font-body text-body-sm text-light-on-surface-variant">Click any branch to
+                                    inspect its paginated terminals and staff.</p>
+                            </div>
+                            <span id="branch-range-label" data-design-text-token="mono-sm"
+                                class="font-mono text-mono-sm text-light-on-surface-variant tabular-nums">1–4 of
+                                12</span>
+                        </header>
+
+                        <div data-component-id="table-interactive" data-component-type="table"
+                            data-component-variant="interactive"
+                            class="w-full overflow-x-auto bg-light-surface-container-lowest border border-light-outline-variant rounded-md">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-light-surface-container-low border-b border-light-outline-variant">
+                                    <tr>
+                                        <th scope="col" class="px-gutter-md py-gutter-sm text-light-on-surface-variant">
+                                            <span data-design-text-token="label-md"
+                                                class="font-label text-label-md">Branch</span></th>
+                                        <th scope="col" class="px-gutter-md py-gutter-sm text-light-on-surface-variant">
+                                            <span data-design-text-token="label-md"
+                                                class="font-label text-label-md">Manager</span></th>
+                                        <th scope="col"
+                                            class="px-gutter-md py-gutter-sm text-right text-light-on-surface-variant">
+                                            <span data-design-text-token="label-md"
+                                                class="font-label text-label-md">Terminals</span></th>
+                                        <th scope="col" class="px-gutter-md py-gutter-sm text-light-on-surface-variant">
+                                            <span data-design-text-token="label-md"
+                                                class="font-label text-label-md">Status</span></th>
+                                        <th scope="col"
+                                            class="px-gutter-md py-gutter-sm text-right text-light-on-surface-variant">
+                                            <span data-design-text-token="label-md"
+                                                class="font-label text-label-md">Logs</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detail-branches-tbody" class="divide-y divide-light-outline-variant"></tbody>
+                            </table>
+                        </div>
+
+                        <footer class="flex items-center justify-between gap-gutter-md pt-gutter-xs">
+                            <span id="branch-page-info" data-design-text-token="body-sm"
+                                class="font-body text-body-sm text-light-on-surface-variant tabular-nums">Page 1 of
+                                3</span>
+                            <div class="inline-flex items-center gap-gutter-sm">
+                                <button type="button" id="branch-prev-btn"
+                                    class="inline-flex items-center gap-1 min-h-[36px] px-gutter-sm py-1 rounded bg-light-surface-container-low text-light-on-surface border border-light-outline-variant hover:bg-light-surface-container disabled:opacity-40 font-label text-label-sm cursor-pointer">
+                                    <span class="material-symbols-outlined text-[16px]"
+                                        aria-hidden="true">chevron_left</span>
+                                    <span>Previous</span>
+                                </button>
+                                <button type="button" id="branch-next-btn"
+                                    class="inline-flex items-center gap-1 min-h-[36px] px-gutter-sm py-1 rounded bg-light-surface-container-low text-light-on-surface border border-light-outline-variant hover:bg-light-surface-container disabled:opacity-40 font-label text-label-sm cursor-pointer">
+                                    <span>Next</span>
+                                    <span class="material-symbols-outlined text-[16px]"
+                                        aria-hidden="true">chevron_right</span>
+                                </button>
+                            </div>
+                        </footer>
+                    </section>
+                </div><!-- /#view-business-detail -->
+            </main>
+        </div>
+    </div>
+
+    <!-- Business Logs Modal -->
+    <div id="biz-logs-backdrop" role="dialog" aria-modal="true" aria-labelledby="biz-logs-title"
+        class="hidden fixed inset-0 z-40 bg-fortis-navy/60 flex items-center justify-center p-gutter-md">
+        <div
+            class="w-full max-w-[560px] bg-light-surface-container-lowest border border-light-outline-variant rounded-lg p-gutter-lg flex flex-col gap-gutter-md">
+            <header
+                class="flex items-start justify-between gap-gutter-md pb-gutter-sm border-b border-light-outline-variant">
+                <div class="flex flex-col gap-0.5">
+                    <h3 id="biz-logs-title" data-design-text-token="title-lg"
+                        class="font-title text-title-lg text-light-primary">Business logs</h3>
+                    <span id="biz-logs-sub" data-design-text-token="body-sm"
+                        class="font-body text-body-sm text-light-on-surface-variant">Recent operational events</span>
+                </div>
+                <button type="button" id="close-biz-logs" aria-label="Close logs"
+                    class="inline-flex items-center justify-center w-9 h-9 rounded text-light-on-surface-variant hover:bg-light-surface-container-low cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
+                </button>
+            </header>
+
+            <ul id="biz-logs-list"
+                class="divide-y divide-light-outline-variant border border-light-outline-variant rounded-md bg-light-surface-container-low">
+            </ul>
+
+            <footer class="flex items-center justify-end gap-gutter-sm">
+                <button type="button" id="export-biz-logs-btn"
+                    class="inline-flex items-center gap-1.5 min-h-[40px] px-gutter-md py-1.5 rounded bg-light-primary text-light-on-primary font-label text-label-md hover:opacity-90 cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px]" aria-hidden="true">download</span>
+                    <span>Export logs CSV</span>
+                </button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Branch Details Modal (Terminals & Staff with Pagination) -->
+    <div id="branch-detail-backdrop" role="dialog" aria-modal="true" aria-labelledby="branch-modal-title"
+        class="hidden fixed inset-0 z-40 bg-fortis-navy/60 flex items-center justify-center p-gutter-md">
+        <div
+            class="w-full max-w-[680px] bg-light-surface-container-lowest border border-light-outline-variant rounded-lg p-gutter-lg flex flex-col gap-gutter-md">
+            <header
+                class="flex items-start justify-between gap-gutter-md pb-gutter-sm border-b border-light-outline-variant">
+                <div class="flex flex-col gap-0.5 min-w-0">
+                    <div class="flex items-center gap-gutter-sm">
+                        <h3 id="branch-modal-title" data-design-text-token="title-lg"
+                            class="font-title text-title-lg text-light-primary truncate">Flagship Pike St.</h3>
+                        <span id="branch-modal-code" data-design-text-token="mono-sm"
+                            class="font-mono text-mono-sm text-light-secondary shrink-0">BR-01</span>
+                    </div>
+                    <span id="branch-modal-sub" data-design-text-token="body-sm"
+                        class="font-body text-body-sm text-light-on-surface-variant">Manager · Location</span>
+                </div>
+                <div class="flex items-center gap-gutter-sm shrink-0">
+                    <button type="button" id="branch-modal-export-btn"
+                        class="inline-flex items-center gap-1 min-h-[36px] px-gutter-sm py-1 rounded bg-light-surface-container-low text-light-primary border border-light-outline-variant hover:bg-light-surface-container font-label text-label-sm cursor-pointer">
+                        <span class="material-symbols-outlined text-[15px]" aria-hidden="true">download</span>
+                        <span>Export branch logs</span>
+                    </button>
+                    <button type="button" id="close-branch-modal" aria-label="Close branch dialog"
+                        class="inline-flex items-center justify-center w-9 h-9 rounded text-light-on-surface-variant hover:bg-light-surface-container-low cursor-pointer">
+                        <span class="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
+                    </button>
+                </div>
+            </header>
+
+            <div
+                class="flex items-center justify-between gap-gutter-md border-b border-light-outline-variant pb-gutter-sm">
+                <div class="inline-flex rounded-md bg-light-surface-container-low p-1 border border-light-outline-variant"
+                    role="tablist">
+                    <button type="button" role="tab" aria-selected="true" data-branch-tab="terminals"
+                        class="branch-modal-tab px-gutter-md py-1.5 rounded bg-light-primary text-light-on-primary font-label text-label-md cursor-pointer">
+                        Terminals (<span id="branch-tab-terminals-count" class="tabular-nums">0</span>)
+                    </button>
+                    <button type="button" role="tab" aria-selected="false" data-branch-tab="staff"
+                        class="branch-modal-tab px-gutter-md py-1.5 rounded text-light-on-surface-variant hover:text-light-on-surface font-label text-label-md cursor-pointer">
+                        Staff (<span id="branch-tab-staff-count" class="tabular-nums">0</span>)
+                    </button>
+                    <button type="button" role="tab" aria-selected="false" data-branch-tab="add-terminals"
+                        class="branch-modal-tab inline-flex items-center gap-1 px-gutter-md py-1.5 rounded text-light-on-surface-variant hover:text-light-on-surface font-label text-label-md cursor-pointer">
+                        <span class="material-symbols-outlined text-[15px]" aria-hidden="true">add</span>
+                        <span>Add terminals</span>
+                    </button>
+                </div>
+                <span id="branch-modal-range" data-design-text-token="mono-sm"
+                    class="font-mono text-mono-sm text-light-on-surface-variant tabular-nums">1–3 of 4</span>
+            </div>
+
+            <div id="branch-panel-terminals" class="flex flex-col gap-gutter-md">
+                <ul id="branch-modal-terminals-list" class="flex flex-col gap-gutter-sm"></ul>
+                <footer
+                    class="flex items-center justify-between gap-gutter-md pt-gutter-xs border-t border-light-outline-variant">
+                    <span id="branch-term-page-info" data-design-text-token="body-sm"
+                        class="font-body text-body-sm text-light-on-surface-variant tabular-nums">Page 1 of 1</span>
+                    <div class="inline-flex items-center gap-gutter-sm">
+                        <button type="button" id="branch-term-prev"
+                            class="inline-flex items-center gap-1 min-h-[36px] px-gutter-sm py-1 rounded bg-light-surface-container-low text-light-on-surface border border-light-outline-variant hover:bg-light-surface-container disabled:opacity-40 font-label text-label-sm cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">chevron_left</span>
+                            <span>Previous</span>
+                        </button>
+                        <button type="button" id="branch-term-next"
+                            class="inline-flex items-center gap-1 min-h-[36px] px-gutter-sm py-1 rounded bg-light-surface-container-low text-light-on-surface border border-light-outline-variant hover:bg-light-surface-container disabled:opacity-40 font-label text-label-sm cursor-pointer">
+                            <span>Next</span>
+                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">chevron_right</span>
+                        </button>
+                    </div>
+                </footer>
+            </div>
+
+            <div id="branch-panel-staff" class="hidden flex flex-col gap-gutter-md">
+                <div
+                    class="w-full overflow-x-auto bg-light-surface-container-lowest border border-light-outline-variant rounded-md">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-light-surface-container-low border-b border-light-outline-variant">
+                            <tr>
+                                <th scope="col" class="px-gutter-md py-gutter-sm text-light-on-surface-variant"><span
+                                        data-design-text-token="label-md" class="font-label text-label-md">Staff
+                                        member</span></th>
+                                <th scope="col" class="px-gutter-md py-gutter-sm text-light-on-surface-variant"><span
+                                        data-design-text-token="label-md" class="font-label text-label-md">Role</span>
+                                </th>
+                                <th scope="col" class="px-gutter-md py-gutter-sm text-light-on-surface-variant"><span
+                                        data-design-text-token="label-md" class="font-label text-label-md">Last
+                                        active</span></th>
+                                <th scope="col" class="px-gutter-md py-gutter-sm text-light-on-surface-variant"><span
+                                        data-design-text-token="label-md" class="font-label text-label-md">Shift</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="branch-modal-staff-tbody" class="divide-y divide-light-outline-variant"></tbody>
+                    </table>
+                </div>
+                <footer
+                    class="flex items-center justify-between gap-gutter-md pt-gutter-xs border-t border-light-outline-variant">
+                    <span id="branch-staff-page-info" data-design-text-token="body-sm"
+                        class="font-body text-body-sm text-light-on-surface-variant tabular-nums">Page 1 of 2</span>
+                    <div class="inline-flex items-center gap-gutter-sm">
+                        <button type="button" id="branch-staff-prev"
+                            class="inline-flex items-center gap-1 min-h-[36px] px-gutter-sm py-1 rounded bg-light-surface-container-low text-light-on-surface border border-light-outline-variant hover:bg-light-surface-container disabled:opacity-40 font-label text-label-sm cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">chevron_left</span>
+                            <span>Previous</span>
+                        </button>
+                        <button type="button" id="branch-staff-next"
+                            class="inline-flex items-center gap-1 min-h-[36px] px-gutter-sm py-1 rounded bg-light-surface-container-low text-light-on-surface border border-light-outline-variant hover:bg-light-surface-container disabled:opacity-40 font-label text-label-sm cursor-pointer">
+                            <span>Next</span>
+                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">chevron_right</span>
+                        </button>
+                    </div>
+                </footer>
+            </div>
+
+            <div id="branch-panel-add-terminals" class="hidden flex flex-col gap-gutter-md">
+                <form id="branch-add-terminals-form" class="flex flex-col gap-gutter-md">
+                    <div class="flex items-center justify-between gap-gutter-sm">
+                        <p data-design-text-token="body-sm"
+                            class="font-body text-body-sm text-light-on-surface-variant">Provision one or more new POS
+                            terminals for this branch.</p>
+                        <button type="button" id="branch-modal-add-row-btn"
+                            class="inline-flex items-center gap-1 min-h-[32px] px-gutter-sm py-1 rounded bg-light-surface-container-low text-light-primary border border-light-outline-variant hover:bg-light-surface-container font-label text-label-sm shrink-0 cursor-pointer">
+                            <span class="material-symbols-outlined text-[15px]" aria-hidden="true">add</span>
+                            <span>Add row</span>
+                        </button>
+                    </div>
+
+                    <div id="branch-modal-add-terms-list" class="flex flex-col gap-gutter-sm"></div>
+
+                    <footer
+                        class="pt-gutter-sm border-t border-light-outline-variant flex items-center justify-end gap-gutter-sm">
+                        <button type="submit"
+                            class="inline-flex items-center gap-1.5 min-h-[40px] px-gutter-lg py-1.5 rounded bg-light-primary text-light-on-primary font-label text-label-md hover:opacity-90 cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]" aria-hidden="true">add_circle</span>
+                            <span>Add terminals to branch</span>
+                        </button>
+                    </footer>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Provision New Branch Modal -->
+    <div id="create-branch-backdrop" role="dialog" aria-modal="true" aria-labelledby="create-branch-title"
+        class="hidden fixed inset-0 z-40 bg-fortis-navy/60 flex items-center justify-center p-gutter-md">
+        <div
+            class="w-full max-w-[540px] bg-light-surface-container-lowest border border-light-outline-variant rounded-lg p-gutter-lg flex flex-col gap-gutter-md">
+            <header
+                class="flex items-start justify-between gap-gutter-md pb-gutter-sm border-b border-light-outline-variant">
+                <div class="flex flex-col gap-0.5">
+                    <h3 id="create-branch-title" data-design-text-token="title-lg"
+                        class="font-title text-title-lg text-light-primary">Provision new branch</h3>
+                    <p id="create-branch-biz-sub" data-design-text-token="body-sm"
+                        class="font-body text-body-sm text-light-on-surface-variant">Create a new branch and initial POS
+                        terminals for this business.</p>
+                </div>
+                <button type="button" id="close-create-branch" aria-label="Close dialog"
+                    class="inline-flex items-center justify-center w-9 h-9 rounded text-light-on-surface-variant hover:bg-light-surface-container-low cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
+                </button>
+            </header>
+
+            <form id="create-branch-form" class="flex flex-col gap-gutter-md">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-gutter-md">
+                    <div class="flex flex-col gap-1.5 sm:col-span-2">
+                        <label for="new-branch-name" data-design-text-token="label-md"
+                            class="font-label text-label-md text-light-on-surface">Branch name</label>
+                        <input id="new-branch-name" type="text" required placeholder="e.g., Downtown Annex"
+                            class="w-full min-h-[44px] px-gutter-md py-gutter-sm rounded bg-light-surface-container-lowest text-light-on-surface font-body text-body-md border border-light-outline-variant focus:border-light-primary focus:ring-1 focus:ring-light-primary">
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        <label for="new-branch-code" data-design-text-token="label-md"
+                            class="font-label text-label-md text-light-on-surface">Code <span
+                                class="font-body text-body-sm text-light-on-surface-variant">(auto)</span></label>
+                        <input id="new-branch-code" type="text" readonly value="BR-13"
+                            class="w-full min-h-[44px] px-gutter-md py-gutter-sm rounded bg-light-surface-container-low text-light-secondary font-mono text-mono-md border border-light-outline-variant cursor-default">
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label for="new-branch-address" data-design-text-token="label-md"
+                        class="font-label text-label-md text-light-on-surface">Address</label>
+                    <input id="new-branch-address" type="text" required placeholder="e.g., 410 Pine St, Suite 200"
+                        class="w-full min-h-[44px] px-gutter-md py-gutter-sm rounded bg-light-surface-container-lowest text-light-on-surface font-body text-body-md border border-light-outline-variant focus:border-light-primary focus:ring-1 focus:ring-light-primary">
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label for="new-branch-contact" data-design-text-token="label-md"
+                        class="font-label text-label-md text-light-on-surface">Contact number</label>
+                    <input id="new-branch-contact" type="tel" required placeholder="e.g., +1 (206) 555-0194"
+                        class="w-full min-h-[44px] px-gutter-md py-gutter-sm rounded bg-light-surface-container-lowest text-light-on-surface font-body text-body-md border border-light-outline-variant focus:border-light-primary focus:ring-1 focus:ring-light-primary">
+                </div>
+
+                <div class="flex flex-col gap-gutter-sm">
+                    <div class="flex items-center justify-between gap-gutter-sm">
+                        <span data-design-text-token="label-md"
+                            class="font-label text-label-md text-light-on-surface">Terminals</span>
+                        <button type="button" id="add-branch-terminal-btn"
+                            class="inline-flex items-center gap-1 min-h-[32px] px-gutter-sm py-1 rounded bg-light-surface-container-low text-light-primary border border-light-outline-variant hover:bg-light-surface-container font-label text-label-sm cursor-pointer">
+                            <span class="material-symbols-outlined text-[15px]" aria-hidden="true">add</span>
+                            <span>Add terminal</span>
+                        </button>
+                    </div>
+                    <div id="new-branch-terminals-list" class="flex flex-col gap-gutter-sm"></div>
+                </div>
+
+                <footer
+                    class="pt-gutter-sm border-t border-light-outline-variant flex items-center justify-end gap-gutter-sm">
+                    <button type="button" id="cancel-create-branch-btn"
+                        class="min-h-[40px] px-gutter-md py-1.5 rounded bg-light-surface-container-low text-light-on-surface border border-light-outline-variant font-label text-label-md cursor-pointer">Cancel</button>
+                    <button type="submit"
+                        class="inline-flex items-center gap-1.5 min-h-[40px] px-gutter-lg py-1.5 rounded bg-light-primary text-light-on-primary font-label text-label-md hover:opacity-90 cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]" aria-hidden="true">check</span>
+                        <span>Provision branch</span>
+                    </button>
+                </footer>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toaster -->
+    <div id="toaster" aria-live="polite"
+        class="fixed top-gutter-md inset-x-gutter-md sm:inset-x-auto sm:top-auto sm:bottom-gutter-lg sm:right-gutter-lg z-50 pointer-events-none flex flex-col gap-gutter-sm sm:w-[360px]">
+    </div>
+
+    <script>
+        (function () {
+            const avatarBtn = document.getElementById('manager-avatar-btn');
+            const popover = document.getElementById('manager-popover');
+
+            function togglePopover(forceOpen) {
+                const isHidden = popover.classList.contains('hidden');
+                const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : isHidden;
+                popover.classList.toggle('hidden', !shouldOpen);
+                avatarBtn.setAttribute('aria-expanded', String(shouldOpen));
+            }
+
+            avatarBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                togglePopover();
+            });
+
+            document.addEventListener('click', function (e) {
+                if (!popover.contains(e.target) && !avatarBtn.contains(e.target)) {
+                    togglePopover(false);
+                }
+            });
+
+            const toaster = document.getElementById('toaster');
+            function showToast(title, message) {
+                const toast = document.createElement('div');
+                toast.className = 'pointer-events-auto rounded-md p-gutter-md bg-light-surface-container-lowest border border-light-outline-variant shadow-lg flex items-start gap-gutter-sm';
+                toast.innerHTML =
+                    '<span class="material-symbols-outlined text-[20px] text-light-success shrink-0 mt-0.5" aria-hidden="true">check_circle</span>' +
+                    '<div class="flex-1 flex flex-col gap-0.5">' +
+                    '<span data-design-text-token="label-md" class="font-label text-label-md text-light-on-surface">' + title + '</span>' +
+                    '<p data-design-text-token="body-sm" class="font-body text-body-sm text-light-on-surface-variant">' + message + '</p>' +
+                    '</div>';
+                toaster.appendChild(toast);
+                setTimeout(() => toast.remove(), 4000);
+            }
+
+            const businesses = [
+                { id: 'BIZ-101', name: 'Alpine Roasters', legal: 'Alpine Coffee Co.', location: 'Seattle, US', plan: 'Enterprise', branches: 12, terminals: 38, status: 'active' },
+                { id: 'BIZ-102', name: 'Himalaya Mart', legal: 'Himalaya Retail Pvt. Ltd.', location: 'Kathmandu, NP', plan: 'Growth', branches: 8, terminals: 24, status: 'active' },
+                { id: 'BIZ-103', name: 'Veridian Pharmacy', legal: 'Veridian Health Pte. Ltd.', location: 'Singapore', plan: 'Enterprise', branches: 15, terminals: 46, status: 'active' },
+                { id: 'BIZ-104', name: 'Kaveri Grocers', legal: 'Kaveri Fresh Mart LLP', location: 'Bengaluru, IN', plan: 'Growth', branches: 6, terminals: 19, status: 'active' },
+                { id: 'BIZ-105', name: 'Solstice Bakery', legal: 'Solstice Artisan Foods LLC', location: 'Portland, US', plan: 'Starter', branches: 4, terminals: 12, status: 'active' },
+                { id: 'REQ-4819', name: 'Meridian Market', legal: 'Meridian Retail Holdings Pvt. Ltd.', location: 'Kathmandu, NP', plan: 'Pending KYC', branches: 0, terminals: 0, status: 'requested' },
+                { id: 'REQ-4808', name: 'Lumbini Hardware', legal: 'Lumbini Builders Supply Pvt. Ltd.', location: 'Pokhara, NP', plan: 'Pending KYC', branches: 0, terminals: 0, status: 'requested' }
+            ];
+            let bizFilter = 'all';
+            let bizSearch = '';
+            let activeLogsBiz = null;
+            let activeDetailBiz = null;
+            let detailBranches = [];
+            let branchPage = 1;
+            const branchPageSize = 4;
+            let activeModalBranch = null;
+            let branchModalTab = 'terminals';
+            let branchTermPage = 1;
+            const branchTermPageSize = 3;
+            let branchStaffPage = 1;
+            const branchStaffPageSize = 4;
+
+            function showSubView(isDetail) {
+                document.getElementById('view-businesses').classList.toggle('hidden', isDetail);
+                document.getElementById('view-business-detail').classList.toggle('hidden', !isDetail);
+                document.getElementById('page-title').textContent = isDetail && activeDetailBiz ? activeDetailBiz.name : 'Businesses';
+                document.getElementById('page-subtitle').textContent = isDetail
+                    ? 'Inspect paginated branch details and active POS terminals per branch.'
+                    : 'Inspect all active and requested businesses, branch/terminal counts, and export business logs.';
+            }
+
+            function buildBranchesForBiz(biz) {
+                if (!biz || !biz.branches) return [];
+                const branchNames = [
+                    'Flagship Pike St.', 'Capitol Hill Hub', 'South Lake Union', 'Ballard Market',
+                    'Fremont Roastery', 'University District', 'Bellevue Square', 'Kirkland Waterfront',
+                    'Redmond Town Ctr', 'Tacoma North', 'Bainbridge Ferry', 'Olympia Downtown',
+                    'Spokane Central', 'Bellingham Bay', 'Vancouver Crossing'
+                ];
+                const managers = [
+                    'S. Gurung', 'A. Karki', 'M. Rai', 'P. Tamang',
+                    'N. Shrestha', 'R. Adhikari', 'K. Basnet', 'D. Limbu',
+                    'T. Magar', 'B. Thapa', 'L. Sherpa', 'J. Pandey',
+                    'E. Joshi', 'V. Bhatta', 'C. Acharya'
+                ];
+                const staffNames = [
+                    'Bikash Shrestha', 'Priya Adhikari', 'Nabin Tamang', 'Sunita Rai',
+                    'Ramesh Karki', 'Pooja Magar', 'Dipesh Gurung', 'Aarati Thapa'
+                ];
+                const staffRoles = ['Branch Manager', 'Head Cashier', 'Counter Cashier', 'Inventory Clerk'];
+                const list = [];
+                for (let i = 0; i < biz.branches; i++) {
+                    const code = 'BR-' + String(i + 1).padStart(2, '0');
+                    const termCount = Math.max(2, Math.round(biz.terminals / biz.branches) + (i % 2 === 0 ? 1 : 0));
+                    const terms = [];
+                    for (let t = 0; t < termCount; t++) {
+                        terms.push({
+                            id: 'TRM-' + biz.id.replace(/\D/g, '') + '-' + String(i + 1).padStart(2, '0') + String(t + 1),
+                            label: t === 0 ? 'Front counter' : (t === 1 ? 'Express lane' : 'Counter ' + (t + 1)),
+                            version: 'Electron v2.4.1',
+                            heartbeat: (t + 1) + 'm ago',
+                            status: (i === 2 && t === 1) ? 'offline' : 'online'
+                        });
+                    }
+                    const staff = [];
+                    const staffCount = 6 + (i % 3);
+                    for (let s = 0; s < staffCount; s++) {
+                        staff.push({
+                            name: staffNames[(i + s) % staffNames.length],
+                            role: s === 0 ? staffRoles[0] : staffRoles[1 + (s % 3)],
+                            lastActive: s === 0 ? 'Active now' : ((s * 7 + 4) + 'm ago'),
+                            shift: s % 2 === 0 ? 'Morning' : 'Evening'
+                        });
+                    }
+                    list.push({
+                        code: code,
+                        name: branchNames[i % branchNames.length],
+                        city: biz.location,
+                        manager: managers[i % managers.length],
+                        terminalCount: termCount,
+                        status: i === 2 ? 'attention' : 'online',
+                        terminals: terms,
+                        staff: staff
+                    });
+                }
+                return list;
+            }
+
+            function openBusinessDetail(bizId) {
+                const biz = businesses.find(b => b.id === bizId);
+                if (!biz) return;
+                activeDetailBiz = biz;
+                detailBranches = buildBranchesForBiz(biz);
+                branchPage = 1;
+
+                document.getElementById('detail-biz-name').textContent = biz.name;
+                document.getElementById('detail-biz-id').textContent = biz.id;
+                document.getElementById('detail-biz-legal').textContent = biz.legal + ' · ' + biz.location;
+                document.getElementById('detail-biz-plan').textContent = biz.plan + ' · ' + biz.branches + ' branches';
+                document.getElementById('detail-biz-terminals').textContent = biz.terminals + ' terminals';
+
+                renderBranchesPage();
+                showSubView(true);
+            }
+
+            function renderBranchesPage() {
+                const tbody = document.getElementById('detail-branches-tbody');
+                const total = detailBranches.length;
+                const totalPages = Math.max(1, Math.ceil(total / branchPageSize));
+                if (branchPage > totalPages) branchPage = totalPages;
+
+                const startIdx = (branchPage - 1) * branchPageSize;
+                const pageItems = detailBranches.slice(startIdx, startIdx + branchPageSize);
+
+                document.getElementById('branch-range-label').textContent = total === 0
+                    ? '0 of 0'
+                    : (startIdx + 1) + '–' + Math.min(startIdx + pageItems.length, total) + ' of ' + total;
+                document.getElementById('branch-page-info').textContent = 'Page ' + branchPage + ' of ' + totalPages;
+                document.getElementById('branch-prev-btn').disabled = branchPage <= 1;
+                document.getElementById('branch-next-btn').disabled = branchPage >= totalPages;
+
+                if (pageItems.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-gutter-md py-gutter-lg text-center font-body text-body-md text-light-on-surface-variant">No branches provisioned yet (KYC pending).</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = pageItems.map(br => {
+                    const badge = br.status === 'online'
+                        ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-light-success-container text-light-on-success-container"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">check_circle</span><span data-design-text-token="label-sm" class="font-label text-label-sm">Online</span></span>'
+                        : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-light-warning-container text-light-on-warning-container"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">warning</span><span data-design-text-token="label-sm" class="font-label text-label-sm">1 offline</span></span>';
+
+                    return '<tr data-branch-code="' + br.code + '" class="hover:bg-light-surface-container-low cursor-pointer">' +
+                        '<td class="px-gutter-md py-gutter-sm">' +
+                        '<div class="flex flex-col">' +
+                        '<span data-design-text-token="label-md" class="font-label text-label-md text-light-on-surface">' + br.name + '</span>' +
+                        '<span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-light-on-surface-variant">' + br.code + ' · ' + br.city + '</span>' +
+                        '</div>' +
+                        '</td>' +
+                        '<td class="px-gutter-md py-gutter-sm"><span data-design-text-token="body-sm" class="font-body text-body-sm text-light-on-surface">' + br.manager + '</span></td>' +
+                        '<td class="px-gutter-md py-gutter-sm text-right"><span data-design-text-token="mono-md" class="font-mono text-mono-md tabular-nums text-light-on-surface">' + br.terminalCount + '</span></td>' +
+                        '<td class="px-gutter-md py-gutter-sm">' + badge + '</td>' +
+                        '<td class="px-gutter-md py-gutter-sm text-right">' +
+                        '<button type="button" data-branch-log="' + br.code + '" class="inline-flex items-center gap-1 min-h-[32px] px-gutter-sm py-1 rounded bg-light-surface-container-low text-light-primary border border-light-outline-variant hover:bg-light-surface-container font-label text-label-sm cursor-pointer">' +
+                        '<span class="material-symbols-outlined text-[15px]" aria-hidden="true">download</span>' +
+                        '<span>Export</span>' +
+                        '</button>' +
+                        '</td>' +
+                        '</tr>';
+                }).join('');
+
+                tbody.querySelectorAll('[data-branch-log]').forEach(btn => {
+                    btn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        const br = detailBranches.find(x => x.code === btn.getAttribute('data-branch-log'));
+                        if (br && activeDetailBiz) {
+                            showToast('Branch logs exported', activeDetailBiz.name + ' · ' + br.name + ' (' + br.code + ') CSV downloaded.');
+                        }
+                    });
+                });
+
+                tbody.querySelectorAll('tr[data-branch-code]').forEach(row => {
+                    row.addEventListener('click', function () {
+                        const br = detailBranches.find(x => x.code === row.getAttribute('data-branch-code'));
+                        if (br) openBranchModal(br);
+                    });
+                });
+            }
+
+            const branchModalBackdrop = document.getElementById('branch-detail-backdrop');
+
+            function setBranchModalTab(tab) {
+                branchModalTab = tab;
+                document.querySelectorAll('.branch-modal-tab').forEach(btn => {
+                    const active = btn.getAttribute('data-branch-tab') === tab;
+                    btn.setAttribute('aria-selected', String(active));
+                    btn.className = active
+                        ? 'branch-modal-tab inline-flex items-center gap-1 px-gutter-md py-1.5 rounded bg-light-primary text-light-on-primary font-label text-label-md cursor-pointer'
+                        : 'branch-modal-tab inline-flex items-center gap-1 px-gutter-md py-1.5 rounded text-light-on-surface-variant hover:text-light-on-surface font-label text-label-md cursor-pointer';
+                });
+                document.getElementById('branch-panel-terminals').classList.toggle('hidden', tab !== 'terminals');
+                document.getElementById('branch-panel-staff').classList.toggle('hidden', tab !== 'staff');
+                document.getElementById('branch-panel-add-terminals').classList.toggle('hidden', tab !== 'add-terminals');
+                renderBranchModalContent();
+            }
+
+            function renderBranchModalContent() {
+                if (!activeModalBranch) return;
+                const br = activeModalBranch;
+                document.getElementById('branch-tab-terminals-count').textContent = String(br.terminals.length);
+                document.getElementById('branch-tab-staff-count').textContent = String(br.staff.length);
+
+                if (branchModalTab === 'terminals') {
+                    const total = br.terminals.length;
+                    const totalPages = Math.max(1, Math.ceil(total / branchTermPageSize));
+                    if (branchTermPage > totalPages) branchTermPage = totalPages;
+                    const startIdx = (branchTermPage - 1) * branchTermPageSize;
+                    const items = br.terminals.slice(startIdx, startIdx + branchTermPageSize);
+
+                    document.getElementById('branch-modal-range').textContent = total === 0 ? '0 of 0' : (startIdx + 1) + '–' + Math.min(startIdx + items.length, total) + ' of ' + total;
+                    document.getElementById('branch-term-page-info').textContent = 'Page ' + branchTermPage + ' of ' + totalPages;
+                    document.getElementById('branch-term-prev').disabled = branchTermPage <= 1;
+                    document.getElementById('branch-term-next').disabled = branchTermPage >= totalPages;
+
+                    const termList = document.getElementById('branch-modal-terminals-list');
+                    termList.innerHTML = items.map(t => {
+                        const tBadge = t.status === 'online'
+                            ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-light-success-container text-light-on-success-container"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">check_circle</span><span data-design-text-token="label-sm" class="font-label text-label-sm">Online</span></span>'
+                            : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-light-error-container text-light-on-error-container"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">cloud_off</span><span data-design-text-token="label-sm" class="font-label text-label-sm">Offline</span></span>';
+
+                        return '<li class="p-gutter-md rounded-md bg-light-surface-container-low border border-light-outline-variant flex items-center justify-between gap-gutter-md">' +
+                            '<div class="flex flex-col gap-0.5">' +
+                            '<div class="flex items-center gap-gutter-sm">' +
+                            '<span data-design-text-token="mono-md" class="font-mono text-mono-md text-light-primary">' + t.id + '</span>' +
+                            '<span data-design-text-token="label-md" class="font-label text-label-md text-light-on-surface">' + t.label + '</span>' +
+                            '</div>' +
+                            '<span data-design-text-token="body-sm" class="font-body text-body-sm text-light-on-surface-variant">' + t.version + ' · Heartbeat ' + t.heartbeat + '</span>' +
+                            '</div>' +
+                            '<div class="flex items-center gap-gutter-sm shrink-0">' +
+                            tBadge +
+                            '<button type="button" data-modal-term-log="' + t.id + '" class="inline-flex items-center gap-1 min-h-[32px] px-gutter-sm py-1 rounded bg-light-surface-container-lowest text-light-primary border border-light-outline-variant hover:bg-light-surface-container font-label text-label-sm cursor-pointer">' +
+                            '<span class="material-symbols-outlined text-[15px]" aria-hidden="true">download</span>' +
+                            '<span>Logs</span>' +
+                            '</button>' +
+                            '</div>' +
+                            '</li>';
+                    }).join('');
+
+                    termList.querySelectorAll('[data-modal-term-log]').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            showToast('Terminal logs exported', btn.getAttribute('data-modal-term-log') + ' diagnostics CSV downloaded.');
+                        });
+                    });
+                } else if (branchModalTab === 'staff') {
+                    const total = br.staff.length;
+                    const totalPages = Math.max(1, Math.ceil(total / branchStaffPageSize));
+                    if (branchStaffPage > totalPages) branchStaffPage = totalPages;
+                    const startIdx = (branchStaffPage - 1) * branchStaffPageSize;
+                    const items = br.staff.slice(startIdx, startIdx + branchStaffPageSize);
+
+                    document.getElementById('branch-modal-range').textContent = total === 0 ? '0 of 0' : (startIdx + 1) + '–' + Math.min(startIdx + items.length, total) + ' of ' + total;
+                    document.getElementById('branch-staff-page-info').textContent = 'Page ' + branchStaffPage + ' of ' + totalPages;
+                    document.getElementById('branch-staff-prev').disabled = branchStaffPage <= 1;
+                    document.getElementById('branch-staff-next').disabled = branchStaffPage >= totalPages;
+
+                    document.getElementById('branch-modal-staff-tbody').innerHTML = items.map(s =>
+                        '<tr>' +
+                        '<td class="px-gutter-md py-gutter-sm"><span data-design-text-token="label-md" class="font-label text-label-md text-light-on-surface">' + s.name + '</span></td>' +
+                        '<td class="px-gutter-md py-gutter-sm"><span data-design-text-token="body-sm" class="font-body text-body-sm text-light-on-surface-variant">' + s.role + '</span></td>' +
+                        '<td class="px-gutter-md py-gutter-sm"><span data-design-text-token="body-sm" class="font-body text-body-sm text-light-on-surface-variant">' + s.lastActive + '</span></td>' +
+                        '<td class="px-gutter-md py-gutter-sm"><span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-light-secondary">' + s.shift + '</span></td>' +
+                        '</tr>'
+                    ).join('');
+                } else {
+                    document.getElementById('branch-modal-range').textContent = draftModalAddTerminals.length + ' pending';
+                    renderModalAddTerminals();
+                }
+            }
+
+            let draftModalAddTerminals = [{ name: '' }];
+            const branchModalAddList = document.getElementById('branch-modal-add-terms-list');
+
+            function renderModalAddTerminals() {
+                const hasScroll = draftModalAddTerminals.length > 4;
+                branchModalAddList.className = hasScroll
+                    ? 'flex flex-col gap-gutter-sm max-h-[220px] overflow-y-auto pr-1'
+                    : 'flex flex-col gap-gutter-sm';
+                branchModalAddList.innerHTML = draftModalAddTerminals.map((t, idx) => {
+                    const val = t.name.replace(/"/g, '&quot;');
+                    return '<div class="flex items-center gap-gutter-sm">' +
+                        '<input type="text" required data-modal-draft-term="' + idx + '" value="' + val + '" placeholder="e.g., Counter ' + (activeModalBranch ? activeModalBranch.terminals.length + idx + 1 : idx + 1) + '" class="flex-1 min-h-[40px] px-gutter-md py-1.5 rounded bg-light-surface-container-lowest text-light-on-surface font-body text-body-md border border-light-outline-variant focus:border-light-primary focus:ring-1 focus:ring-light-primary">' +
+                        (draftModalAddTerminals.length > 1
+                            ? '<button type="button" data-modal-remove-term="' + idx + '" aria-label="Remove terminal row" class="inline-flex items-center justify-center w-9 h-9 rounded text-light-error hover:bg-light-error-container cursor-pointer shrink-0"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span></button>'
+                            : '') +
+                        '</div>';
+                }).join('');
+
+                branchModalAddList.querySelectorAll('[data-modal-draft-term]').forEach(input => {
+                    input.addEventListener('input', function () {
+                        const idx = Number(input.getAttribute('data-modal-draft-term'));
+                        if (draftModalAddTerminals[idx]) draftModalAddTerminals[idx].name = input.value;
+                    });
+                });
+
+                branchModalAddList.querySelectorAll('[data-modal-remove-term]').forEach(btn => {
+                    btn.addEventListener('click', function () {
+                        const idx = Number(btn.getAttribute('data-modal-remove-term'));
+                        draftModalAddTerminals.splice(idx, 1);
+                        renderModalAddTerminals();
+                        document.getElementById('branch-modal-range').textContent = draftModalAddTerminals.length + ' pending';
+                    });
+                });
+            }
+
+            document.getElementById('branch-modal-add-row-btn').addEventListener('click', function () {
+                const nextNum = (activeModalBranch ? activeModalBranch.terminals.length : 0) + draftModalAddTerminals.length + 1;
+                draftModalAddTerminals.push({ name: 'Counter ' + nextNum });
+                renderModalAddTerminals();
+                document.getElementById('branch-modal-range').textContent = draftModalAddTerminals.length + ' pending';
+                branchModalAddList.scrollTop = branchModalAddList.scrollHeight;
+            });
+
+            document.getElementById('branch-add-terminals-form').addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (!activeModalBranch || !activeDetailBiz) return;
+                const validNames = draftModalAddTerminals.map(t => t.name.trim()).filter(Boolean);
+                if (validNames.length === 0) return;
+
+                const bizNum = activeDetailBiz.id.replace(/\D/g, '') || '100';
+                const brNum = activeModalBranch.code.replace(/\D/g, '') || '01';
+                const existingCount = activeModalBranch.terminals.length;
+
+                validNames.forEach((name, idx) => {
+                    activeModalBranch.terminals.push({
+                        id: 'TRM-' + bizNum + '-' + brNum + String(existingCount + idx + 1),
+                        label: name,
+                        version: 'Electron v2.4.1',
+                        heartbeat: 'Just now',
+                        status: 'online'
+                    });
+                });
+
+                activeModalBranch.terminalCount = activeModalBranch.terminals.length;
+                activeDetailBiz.terminals += validNames.length;
+                document.getElementById('detail-biz-terminals').textContent = activeDetailBiz.terminals + ' terminals';
+
+                draftModalAddTerminals = [{ name: '' }];
+                branchTermPage = Math.max(1, Math.ceil(activeModalBranch.terminals.length / branchTermPageSize));
+                renderBranchesPage();
+                renderBusinesses();
+                setBranchModalTab('terminals');
+                showToast('Terminals added', validNames.length + ' terminal(s) provisioned under ' + activeModalBranch.name + '.');
+            });
+
+            function openBranchModal(br) {
+                activeModalBranch = br;
+                branchTermPage = 1;
+                branchStaffPage = 1;
+                draftModalAddTerminals = [{ name: 'Counter ' + (br.terminals.length + 1) }];
+                document.getElementById('branch-modal-title').textContent = br.name;
+                document.getElementById('branch-modal-code').textContent = br.code;
+                document.getElementById('branch-modal-sub').textContent = 'Manager: ' + br.manager + ' · ' + br.city;
+                setBranchModalTab('terminals');
+                branchModalBackdrop.classList.remove('hidden');
+            }
+
+            document.querySelectorAll('.branch-modal-tab').forEach(btn => {
+                btn.addEventListener('click', () => setBranchModalTab(btn.getAttribute('data-branch-tab')));
+            });
+
+            document.getElementById('branch-term-prev').addEventListener('click', () => {
+                if (branchTermPage > 1) {
+                    branchTermPage -= 1;
+                    renderBranchModalContent();
+                }
+            });
+            document.getElementById('branch-term-next').addEventListener('click', () => {
+                branchTermPage += 1;
+                renderBranchModalContent();
+            });
+            document.getElementById('branch-staff-prev').addEventListener('click', () => {
+                if (branchStaffPage > 1) {
+                    branchStaffPage -= 1;
+                    renderBranchModalContent();
+                }
+            });
+            document.getElementById('branch-staff-next').addEventListener('click', () => {
+                branchStaffPage += 1;
+                renderBranchModalContent();
+            });
+
+            document.getElementById('branch-modal-export-btn').addEventListener('click', () => {
+                if (activeModalBranch && activeDetailBiz) {
+                    showToast('Branch logs exported', activeDetailBiz.name + ' · ' + activeModalBranch.name + ' (' + activeModalBranch.code + ') CSV downloaded.');
+                }
+            });
+            document.getElementById('close-branch-modal').addEventListener('click', () => branchModalBackdrop.classList.add('hidden'));
+
+            document.getElementById('branch-prev-btn').addEventListener('click', function () {
+                if (branchPage > 1) {
+                    branchPage -= 1;
+                    renderBranchesPage();
+                }
+            });
+            document.getElementById('branch-next-btn').addEventListener('click', function () {
+                branchPage += 1;
+                renderBranchesPage();
+            });
+
+            document.getElementById('back-to-businesses-btn').addEventListener('click', function () {
+                showSubView(false);
+            });
+
+            document.getElementById('detail-view-logs-btn').addEventListener('click', function () {
+                if (activeDetailBiz) openBizLogs(activeDetailBiz.id);
+            });
+
+            function bizBadge(status) {
+                if (status === 'active') {
+                    return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-light-success-container text-light-on-success-container"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">check_circle</span><span data-design-text-token="label-sm" class="font-label text-label-sm">Active</span></span>';
+                }
+                return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-light-warning-container text-light-on-warning-container"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">pending_actions</span><span data-design-text-token="label-sm" class="font-label text-label-sm">Requested</span></span>';
+            }
+
+            function renderBusinesses() {
+                const counts = {
+                    all: businesses.length,
+                    active: businesses.filter(b => b.status === 'active').length,
+                    requested: businesses.filter(b => b.status === 'requested').length
+                };
+                Object.keys(counts).forEach(k => {
+                    const el = document.querySelector('[data-biz-count="' + k + '"]');
+                    if (el) el.textContent = String(counts[k]);
+                });
+
+                const q = bizSearch.trim().toLowerCase();
+                const rows = businesses.filter(b => {
+                    const matchStatus = bizFilter === 'all' || b.status === bizFilter;
+                    const matchQuery = !q || b.name.toLowerCase().includes(q) || b.location.toLowerCase().includes(q) || b.plan.toLowerCase().includes(q) || b.id.toLowerCase().includes(q);
+                    return matchStatus && matchQuery;
+                });
+
+                const tbody = document.getElementById('biz-tbody');
+                tbody.innerHTML = rows.map(b =>
+                    '<tr data-open-biz="' + b.id + '" class="hover:bg-light-surface-container-low/60 cursor-pointer">' +
+                    '<td class="px-gutter-md py-gutter-sm">' +
+                    '<div class="flex flex-col">' +
+                    '<span data-design-text-token="label-md" class="font-label text-label-md text-light-on-surface">' + b.name + '</span>' +
+                    '<span data-design-text-token="body-sm" class="font-body text-body-sm text-light-on-surface-variant">' + b.id + ' · ' + b.location + '</span>' +
+                    '</div>' +
+                    '</td>' +
+                    '<td class="px-gutter-md py-gutter-sm"><span data-design-text-token="body-sm" class="font-body text-body-sm text-light-on-surface">' + b.plan + '</span></td>' +
+                    '<td class="px-gutter-md py-gutter-sm text-right"><span data-design-text-token="mono-md" class="font-mono text-mono-md tabular-nums text-light-on-surface">' + b.branches + '</span></td>' +
+                    '<td class="px-gutter-md py-gutter-sm text-right"><span data-design-text-token="mono-md" class="font-mono text-mono-md tabular-nums text-light-on-surface">' + b.terminals + '</span></td>' +
+                    '<td class="px-gutter-md py-gutter-sm">' + bizBadge(b.status) + '</td>' +
+                    '<td class="px-gutter-md py-gutter-sm text-right">' +
+                    '<button type="button" data-biz-log-id="' + b.id + '" class="inline-flex items-center gap-1 min-h-[34px] px-gutter-sm py-1 rounded bg-light-surface-container-low text-light-primary border border-light-outline-variant hover:bg-light-surface-container font-label text-label-sm cursor-pointer">' +
+                    '<span class="material-symbols-outlined text-[15px]" aria-hidden="true">receipt_long</span>' +
+                    '<span>View &amp; export</span>' +
+                    '</button>' +
+                    '</td>' +
+                    '</tr>'
+                ).join('') || '<tr><td colspan="6" class="px-gutter-md py-gutter-lg text-center font-body text-body-md text-light-on-surface-variant">No businesses match your search.</td></tr>';
+
+                tbody.querySelectorAll('tr[data-open-biz]').forEach(row => {
+                    row.addEventListener('click', () => openBusinessDetail(row.getAttribute('data-open-biz')));
+                });
+
+                tbody.querySelectorAll('[data-biz-log-id]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        openBizLogs(btn.getAttribute('data-biz-log-id'));
+                    });
+                });
+            }
+
+            document.querySelectorAll('.biz-filter-tab').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    bizFilter = btn.getAttribute('data-biz-filter');
+                    document.querySelectorAll('.biz-filter-tab').forEach(t => {
+                        const active = t === btn;
+                        t.className = active
+                            ? 'biz-filter-tab px-gutter-md py-1.5 rounded font-label text-label-md bg-light-primary text-light-on-primary cursor-pointer'
+                            : 'biz-filter-tab px-gutter-md py-1.5 rounded font-label text-label-md text-light-on-surface-variant hover:text-light-on-surface cursor-pointer';
+                    });
+                    renderBusinesses();
+                });
+            });
+
+            document.getElementById('biz-search').addEventListener('input', function (e) {
+                bizSearch = e.target.value;
+                renderBusinesses();
+            });
+
+            const bizLogsBackdrop = document.getElementById('biz-logs-backdrop');
+            function openBizLogs(bizId) {
+                const biz = businesses.find(x => x.id === bizId);
+                if (!biz) return;
+                activeLogsBiz = biz;
+                document.getElementById('biz-logs-title').textContent = biz.name + ' — Business logs';
+                document.getElementById('biz-logs-sub').textContent = biz.legal + ' (' + biz.id + ') · ' + biz.location;
+                const events = [
+                    { ts: 'Today, 09:42', msg: 'Stock transfer batch synced across ' + Math.max(1, biz.branches) + ' branches.' },
+                    { ts: 'Today, 08:15', msg: 'Terminal heartbeat check passed (' + biz.terminals + '/' + biz.terminals + ' reporting).' },
+                    { ts: 'Yesterday, 19:04', msg: 'Accountant role exported daily settlement summary.' }
+                ];
+                document.getElementById('biz-logs-list').innerHTML = events.map(ev =>
+                    '<li class="px-gutter-md py-gutter-sm flex items-start justify-between gap-gutter-md">' +
+                    '<span data-design-text-token="body-sm" class="font-body text-body-sm text-light-on-surface">' + ev.msg + '</span>' +
+                    '<span data-design-text-token="mono-sm" class="font-mono text-mono-sm text-light-on-surface-variant shrink-0">' + ev.ts + '</span>' +
+                    '</li>'
+                ).join('');
+                bizLogsBackdrop.classList.remove('hidden');
+            }
+
+            document.getElementById('close-biz-logs').addEventListener('click', () => bizLogsBackdrop.classList.add('hidden'));
+            document.getElementById('export-biz-logs-btn').addEventListener('click', () => {
+                if (!activeLogsBiz) return;
+                bizLogsBackdrop.classList.add('hidden');
+                showToast('Logs exported', activeLogsBiz.name + ' (' + activeLogsBiz.id + ') CSV downloaded.');
+            });
+
+            const createBranchBackdrop = document.getElementById('create-branch-backdrop');
+            const newBranchTerminalsList = document.getElementById('new-branch-terminals-list');
+            let draftTerminals = [{ name: 'Front desk' }, { name: 'Back desk' }];
+
+            function renderDraftTerminals() {
+                const hasScroll = draftTerminals.length > 4;
+                newBranchTerminalsList.className = hasScroll
+                    ? 'flex flex-col gap-gutter-sm max-h-[216px] overflow-y-auto pr-1'
+                    : 'flex flex-col gap-gutter-sm';
+                newBranchTerminalsList.innerHTML = draftTerminals.map((t, idx) => {
+                    const val = t.name.replace(/"/g, '&quot;');
+                    return '<div class="flex items-center gap-gutter-sm">' +
+                        '<input type="text" required data-draft-term="' + idx + '" value="' + val + '" placeholder="Terminal name (e.g., Front desk)" class="flex-1 min-h-[40px] px-gutter-md py-1.5 rounded bg-light-surface-container-lowest text-light-on-surface font-body text-body-md border border-light-outline-variant focus:border-light-primary focus:ring-1 focus:ring-light-primary">' +
+                        (draftTerminals.length > 1
+                            ? '<button type="button" data-remove-term="' + idx + '" aria-label="Remove terminal" class="inline-flex items-center justify-center w-9 h-9 rounded text-light-error hover:bg-light-error-container cursor-pointer shrink-0"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span></button>'
+                            : '') +
+                        '</div>';
+                }).join('');
+
+                newBranchTerminalsList.querySelectorAll('[data-draft-term]').forEach(input => {
+                    input.addEventListener('input', function () {
+                        const idx = Number(input.getAttribute('data-draft-term'));
+                        if (draftTerminals[idx]) draftTerminals[idx].name = input.value;
+                    });
+                });
+
+                newBranchTerminalsList.querySelectorAll('[data-remove-term]').forEach(btn => {
+                    btn.addEventListener('click', function () {
+                        const idx = Number(btn.getAttribute('data-remove-term'));
+                        draftTerminals.splice(idx, 1);
+                        renderDraftTerminals();
+                    });
+                });
+            }
+
+            document.getElementById('open-create-branch-btn').addEventListener('click', function () {
+                if (!activeDetailBiz) return;
+                const nextNum = detailBranches.length + 1;
+                const autoCode = 'BR-' + String(nextNum).padStart(2, '0');
+                document.getElementById('create-branch-biz-sub').textContent = 'Provisioning under ' + activeDetailBiz.name + ' (' + activeDetailBiz.id + ').';
+                document.getElementById('new-branch-name').value = '';
+                document.getElementById('new-branch-code').value = autoCode;
+                document.getElementById('new-branch-address').value = '';
+                document.getElementById('new-branch-contact').value = '';
+                draftTerminals = [{ name: 'Front desk' }, { name: 'Back desk' }];
+                renderDraftTerminals();
+                createBranchBackdrop.classList.remove('hidden');
+            });
+
+            document.getElementById('add-branch-terminal-btn').addEventListener('click', function () {
+                draftTerminals.push({ name: 'Counter ' + (draftTerminals.length + 1) });
+                renderDraftTerminals();
+                newBranchTerminalsList.scrollTop = newBranchTerminalsList.scrollHeight;
+            });
+
+            document.getElementById('close-create-branch').addEventListener('click', () => createBranchBackdrop.classList.add('hidden'));
+            document.getElementById('cancel-create-branch-btn').addEventListener('click', () => createBranchBackdrop.classList.add('hidden'));
+
+            document.getElementById('create-branch-form').addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (!activeDetailBiz) return;
+                const name = document.getElementById('new-branch-name').value.trim();
+                const code = document.getElementById('new-branch-code').value.trim();
+                const address = document.getElementById('new-branch-address').value.trim();
+                const contact = document.getElementById('new-branch-contact').value.trim();
+                const validTerms = draftTerminals.map(t => t.name.trim()).filter(Boolean);
+                if (!name || !code || !address || !contact || validTerms.length === 0) return;
+
+                const bizNum = activeDetailBiz.id.replace(/\D/g, '') || '100';
+                const brNum = code.replace(/\D/g, '') || String(detailBranches.length + 1).padStart(2, '0');
+                const terminals = validTerms.map((termName, idx) => ({
+                    id: 'TRM-' + bizNum + '-' + brNum + String(idx + 1),
+                    label: termName,
+                    version: 'Electron v2.4.1',
+                    heartbeat: 'Just now',
+                    status: 'online'
+                }));
+
+                const newBranch = {
+                    code: code,
+                    name: name,
+                    city: address,
+                    contact: contact,
+                    manager: 'Unassigned',
+                    terminalCount: terminals.length,
+                    status: 'online',
+                    terminals: terminals,
+                    staff: []
+                };
+
+                detailBranches.unshift(newBranch);
+                activeDetailBiz.branches += 1;
+                activeDetailBiz.terminals += terminals.length;
+                document.getElementById('detail-biz-plan').textContent = activeDetailBiz.plan + ' · ' + activeDetailBiz.branches + ' branches';
+                document.getElementById('detail-biz-terminals').textContent = activeDetailBiz.terminals + ' terminals';
+
+                branchPage = 1;
+                renderBranchesPage();
+                renderBusinesses();
+                createBranchBackdrop.classList.add('hidden');
+                showToast('Branch provisioned', name + ' (' + code + ') created with ' + terminals.length + ' terminals.');
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    togglePopover(false);
+                    bizLogsBackdrop.classList.add('hidden');
+                    branchModalBackdrop.classList.add('hidden');
+                    createBranchBackdrop.classList.add('hidden');
+                }
+            });
+
+            renderBusinesses();
+        })();
+    </script>
+
+
+</body>
+
+</html>
